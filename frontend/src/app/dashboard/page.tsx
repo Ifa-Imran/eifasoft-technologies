@@ -1,10 +1,10 @@
 'use client';
 
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useAccount } from 'wagmi';
-import { useReadContract } from 'wagmi';
-import { formatUnits } from 'viem';
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { formatUnits, parseUnits } from 'viem';
 import { motion } from 'framer-motion';
 import {
   CurrencyDollarIcon,
@@ -16,10 +16,11 @@ import {
   CreditCardIcon,
   ArrowsRightLeftIcon,
   ExclamationTriangleIcon,
+  BeakerIcon,
 } from '@heroicons/react/24/outline';
 import { useStaking } from '@/hooks/useStaking';
 import { useCMS } from '@/hooks/useCMS';
-import { CONTRACTS, AffiliateDistributorABI } from '@/lib/contracts';
+import { CONTRACTS, AffiliateDistributorABI, USDTABI } from '@/lib/contracts';
 import { StatCard } from '@/components/ui/StatCard';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Button } from '@/components/ui/Button';
@@ -44,6 +45,51 @@ export default function DashboardPage() {
   const { claimableRewards, hasClaimed, subscriptionCount } = useCMS();
   const { subscribe } = useWS();
   const { addToast } = useToast();
+
+  // Testnet Faucet — mint MockUSDT
+  const { data: usdtBalance, refetch: refetchUsdtBalance } = useReadContract({
+    address: CONTRACTS.USDT,
+    abi: USDTABI,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address && !!CONTRACTS.USDT, refetchInterval: 15_000 },
+  });
+
+  const {
+    writeContract: writeMint,
+    data: mintTxHash,
+    isPending: isMintPending,
+    reset: resetMint,
+  } = useWriteContract();
+
+  const { isLoading: isMintConfirming, isSuccess: isMintSuccess } = useWaitForTransactionReceipt({
+    hash: mintTxHash,
+  });
+
+  const handleMint = useCallback(() => {
+    if (!address) return;
+    writeMint({
+      address: CONTRACTS.USDT,
+      abi: USDTABI,
+      functionName: 'mint',
+      args: [address, parseUnits('100000', 18)],
+    });
+  }, [address, writeMint]);
+
+  // React to mint success
+  useEffect(() => {
+    if (isMintSuccess) {
+      addToast('success', 'Faucet', 'Successfully minted 100,000 Test USDT!');
+      refetchUsdtBalance();
+      resetMint();
+    }
+  }, [isMintSuccess, addToast, refetchUsdtBalance, resetMint]);
+
+  const formattedUsdtBalance = usdtBalance
+    ? Number(formatUnits(usdtBalance as bigint, 18)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : '0.00';
+
+  const isMinting = isMintPending || isMintConfirming;
 
   // Affiliate income
   const { data: allIncome } = useReadContract({
@@ -349,6 +395,47 @@ export default function DashboardPage() {
             </div>
           </div>
         </Link>
+      </motion.div>
+
+      {/* Testnet Faucet */}
+      <motion.div {...fadeUp} transition={{ delay: 0.6 }} className="mt-6">
+        <div className="glass rounded-xl p-6 border border-cyan-500/20 bg-cyan-500/[0.03]">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2.5 rounded-lg bg-cyan-500/10 text-cyan-400">
+              <BeakerIcon className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-dark-50">Testnet Faucet</h2>
+              <p className="text-xs text-dark-500">Mint test USDT for development &amp; testing on opBNB testnet</p>
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="flex-1">
+              <p className="text-xs text-dark-500 mb-1">Your USDT Balance</p>
+              <p className="text-2xl font-semibold text-dark-50 font-mono">${formattedUsdtBalance}</p>
+            </div>
+            <button
+              onClick={handleMint}
+              disabled={isMinting || !isConnected}
+              className="relative px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-200
+                bg-gradient-to-r from-cyan-500 to-teal-500 text-white shadow-lg shadow-cyan-500/20
+                hover:shadow-cyan-500/40 hover:scale-[1.02]
+                disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-cyan-500/20"
+            >
+              {isMinting ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  {isMintConfirming ? 'Confirming...' : 'Minting...'}
+                </span>
+              ) : (
+                'Mint 100,000 Test USDT'
+              )}
+            </button>
+          </div>
+        </div>
       </motion.div>
     </div>
   );
