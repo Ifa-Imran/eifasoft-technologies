@@ -108,24 +108,24 @@ export async function initQueues(): Promise<void> {
         { data: { tier: 2 }, name: 'compound-tier-2' }
     );
 
-    // Rank update every hour
+    // TESTING: shortened from every 1 hour to every 3 hours (matches weekly cycle for testing)
     await rankUpdateQueue.upsertJobScheduler(
         'hourly-rank-update',
-        { every: 60 * 60 * 1000 },
+        { every: 3 * 60 * 60 * 1000 }, // TESTING: shortened from 1 hour
         { data: {}, name: 'hourly-rank-update' }
     );
 
-    // Weekly qualifier - Monday 00:00 UTC
+    // TESTING: shortened from weekly (Monday 00:00 UTC) to every 3 hours
     await qualifierWeeklyQueue.upsertJobScheduler(
         'weekly-qualifier',
-        { pattern: '0 0 * * 1' },
+        { every: 3 * 60 * 60 * 1000 }, // TESTING: shortened from cron '0 0 * * 1' (weekly)
         { data: {}, name: 'weekly-qualifier' }
     );
 
-    // Monthly qualifier - 1st of month 00:00 UTC
+    // TESTING: shortened from monthly (1st of month) to every 5 hours
     await qualifierMonthlyQueue.upsertJobScheduler(
         'monthly-qualifier',
-        { pattern: '0 0 1 * *' },
+        { every: 5 * 60 * 60 * 1000 }, // TESTING: shortened from cron '0 0 1 * *' (monthly)
         { data: {}, name: 'monthly-qualifier' }
     );
 
