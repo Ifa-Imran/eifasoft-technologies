@@ -90,8 +90,8 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - /opt/kairodao/certbot/conf:/etc/letsencrypt
-      - /opt/kairodao/certbot/www:/var/www/certbot
+      - certbot_conf:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
     depends_on:
       - frontend
       - backend
@@ -117,8 +117,8 @@ services:
   certbot:
     image: certbot/certbot
     volumes:
-      - /opt/kairodao/certbot/conf:/etc/letsencrypt
-      - /opt/kairodao/certbot/www:/var/www/certbot
+      - certbot_conf:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
     depends_on:
       - nginx
     entrypoint:
@@ -127,12 +127,14 @@ services:
       - |
         trap exit TERM
         sleep 10
-        certbot certonly --webroot --webroot-path=/var/www/certbot -d kairodao.com -d www.kairodao.com --email admin@kairodao.com --agree-tos --no-eff-email --non-interactive --staging
+        certbot certonly --webroot --webroot-path=/var/www/certbot -d kairodao.com -d www.kairodao.com --email admin@kairodao.com --agree-tos --no-eff-email --non-interactive
         while :; do certbot renew; sleep 12h & wait $${!}; done
 
 volumes:
   postgres_data:
   redis_data:
+  certbot_conf:
+  certbot_www:
 
 networks:
   kairo_network:
