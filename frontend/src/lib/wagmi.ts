@@ -20,7 +20,7 @@ export const opBNBMainnet = defineChain({
 
 export const config = getDefaultConfig({
   appName: 'KAIRO DeFi',
-  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'PLACEHOLDER_FOR_BUILD',
+  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'd9fddb48789291a159e8270ef32105c2',
   chains: [opBNBTestnet, opBNBMainnet],
   ssr: true,
 });
