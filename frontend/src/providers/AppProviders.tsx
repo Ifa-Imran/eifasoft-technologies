@@ -2,13 +2,16 @@
 
 import { WebSocketProvider } from '@/providers/WebSocketProvider';
 import { ToastProvider } from '@/providers/ToastProvider';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <ToastProvider>
-      <WebSocketProvider>
-        {children}
-      </WebSocketProvider>
+      <ErrorBoundary fallback={<>{children}</>} section="WebSocket">
+        <WebSocketProvider>
+          {children}
+        </WebSocketProvider>
+      </ErrorBoundary>
     </ToastProvider>
   );
 }

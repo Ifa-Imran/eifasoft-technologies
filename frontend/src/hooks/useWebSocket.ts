@@ -91,7 +91,11 @@ export function useWebSocket() {
         reconnectTimeoutRef.current = setTimeout(connect, delay);
       };
 
-      ws.onerror = () => {
+      ws.onerror = (e) => {
+        // Transient errors (e.g. backend not ready) are expected — suppress noise
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[WS] Connection error (will retry):', e);
+        }
         setConnectionState('error');
         ws.close();
       };

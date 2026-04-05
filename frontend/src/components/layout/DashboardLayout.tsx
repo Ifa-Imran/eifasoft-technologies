@@ -5,6 +5,7 @@ import { Sidebar } from './Sidebar';
 import { BottomNav } from './BottomNav';
 import { ParticleBackground } from './ParticleBackground';
 import { CapWarningBanner } from '@/components/ui/CapWarningBanner';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const NeuralBackground = dynamic(
   () => import('./NeuralBackground'),
@@ -20,7 +21,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     <div className="relative min-h-screen bg-void">
       {/* Background effects */}
       <ParticleBackground />
-      <NeuralBackground />
+      <ErrorBoundary fallback={null} section="NeuralBackground">
+        <NeuralBackground />
+      </ErrorBoundary>
 
       {/* 3X Cap Warning Banner */}
       <CapWarningBanner />
