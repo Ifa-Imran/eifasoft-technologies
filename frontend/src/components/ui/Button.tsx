@@ -1,53 +1,81 @@
+'use client';
+
 import { cn } from '@/lib/utils';
+import { motion, type HTMLMotionProps } from 'framer-motion';
 import { forwardRef } from 'react';
 
-type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
+type ButtonVariant = 'primary' | 'secondary' | 'warning' | 'ghost' | 'danger';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'children'> {
   variant?: ButtonVariant;
   size?: ButtonSize;
   loading?: boolean;
   children: React.ReactNode;
+  disabled?: boolean;
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
-  primary: 'bg-primary-500 hover:bg-primary-600 text-white shadow-lg shadow-primary-500/25',
-  secondary: 'bg-dark-700 hover:bg-dark-600 text-dark-100 border border-dark-600',
-  danger: 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30',
-  ghost: 'bg-transparent hover:bg-dark-800 text-dark-300 hover:text-dark-100',
+  primary: [
+    'bg-gradient-to-r from-neon-cyan to-[#0080FF] text-black font-semibold',
+    'shadow-lg shadow-neon-cyan/25',
+  ].join(' '),
+  secondary: [
+    'bg-transparent border border-neon-cyan text-neon-cyan',
+    'relative overflow-hidden',
+  ].join(' '),
+  warning: [
+    'bg-gradient-to-r from-neon-coral to-[#FF6B6B] text-white font-semibold',
+    'animate-glow-pulse shadow-lg shadow-neon-coral/25',
+  ].join(' '),
+  danger: [
+    'bg-gradient-to-r from-neon-coral to-[#FF6B6B] text-white font-semibold',
+    'shadow-lg shadow-neon-coral/25',
+  ].join(' '),
+  ghost: 'bg-transparent text-white hover:bg-white/5',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
-  sm: 'px-3 py-1.5 text-sm',
-  md: 'px-4 py-2 text-sm',
-  lg: 'px-6 py-3 text-base',
+  sm: 'px-3 py-1.5 text-xs rounded-lg gap-1.5',
+  md: 'px-5 py-2.5 text-sm rounded-xl gap-2',
+  lg: 'px-7 py-3.5 text-base rounded-xl gap-2.5',
 };
+
+const Spinner = ({ className }: { className?: string }) => (
+  <svg className={cn('animate-spin', className)} viewBox="0 0 24 24" fill="none">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+  </svg>
+);
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ variant = 'primary', size = 'md', loading = false, className, children, disabled, ...props }, ref) => {
+    const isDisabled = disabled || loading;
+
     return (
-      <button
+      <motion.button
         ref={ref}
+        whileHover={isDisabled ? undefined : { scale: 1.05 }}
+        whileTap={isDisabled ? undefined : { scale: 0.97 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 17 }}
         className={cn(
-          'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all duration-200',
-          'focus:outline-none focus:ring-2 focus:ring-primary-500/50',
-          'disabled:opacity-50 disabled:cursor-not-allowed',
+          'inline-flex items-center justify-center font-medium transition-all duration-200',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-neon-cyan/50 focus-visible:ring-offset-2 focus-visible:ring-offset-void',
           variantStyles[variant],
           sizeStyles[size],
+          isDisabled && 'opacity-40 cursor-not-allowed saturate-0',
           className,
         )}
-        disabled={disabled || loading}
+        disabled={isDisabled}
         {...props}
       >
-        {loading && (
-          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
+        {/* Secondary fill hover effect */}
+        {variant === 'secondary' && (
+          <span className="absolute inset-0 bg-neon-cyan/10 scale-x-0 origin-left transition-transform duration-300 group-hover:scale-x-100 hover:scale-x-100 pointer-events-none" />
         )}
-        {children}
-      </button>
+        {loading && <Spinner className="h-4 w-4 shrink-0" />}
+        <span className="relative z-10">{children}</span>
+      </motion.button>
     );
   },
 );

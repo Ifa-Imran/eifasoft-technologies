@@ -122,6 +122,7 @@ export const AffiliateDistributorABI = [
   { type: 'function', name: 'qualifierMonthly', inputs: [{ type: 'address' }], outputs: [{ type: 'uint256' }], stateMutability: 'view' },
   { type: 'function', name: 'teamVolume', inputs: [{ type: 'address' }], outputs: [{ type: 'uint256' }], stateMutability: 'view' },
   { type: 'function', name: 'directCount', inputs: [{ type: 'address' }], outputs: [{ type: 'uint256' }], stateMutability: 'view' },
+  { type: 'function', name: 'calculateRankSalary', inputs: [{ name: '_user', type: 'address' }], outputs: [{ name: 'salary', type: 'uint256' }], stateMutability: 'view' },
 ] as const;
 
 // ============ CoreMembershipSubscription ABI ============
@@ -179,6 +180,16 @@ export const AtomicP2pABI = [
   {
     type: 'function', name: 'getActiveSellOrders', inputs: [{ name: 'offset', type: 'uint256' }, { name: 'limit', type: 'uint256' }],
     outputs: [{ type: 'tuple[]', components: [{ name: 'creator', type: 'address' }, { name: 'kairoAmount', type: 'uint256' }, { name: 'kairoRemaining', type: 'uint256' }, { name: 'active', type: 'bool' }, { name: 'createdAt', type: 'uint256' }] }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function', name: 'getActiveBuyOrderIds', inputs: [{ name: 'offset', type: 'uint256' }, { name: 'limit', type: 'uint256' }],
+    outputs: [{ type: 'uint256[]' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function', name: 'getActiveSellOrderIds', inputs: [{ name: 'offset', type: 'uint256' }, { name: 'limit', type: 'uint256' }],
+    outputs: [{ type: 'uint256[]' }],
     stateMutability: 'view',
   },
   { type: 'function', name: 'getOrderBookStats', inputs: [], outputs: [{ name: 'totalBuyOrders', type: 'uint256' }, { name: 'totalSellOrders', type: 'uint256' }, { name: 'totalTrades', type: 'uint256' }, { name: 'activeBuyOrders', type: 'uint256' }, { name: 'activeSellOrders', type: 'uint256' }], stateMutability: 'view' },

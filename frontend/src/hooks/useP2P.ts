@@ -43,11 +43,35 @@ export function useP2P() {
     },
   });
 
+  // Read active buy order IDs (parallel to orders, same offset/limit)
+  const { data: activeBuyOrderIds, refetch: refetchBuyOrderIds } = useReadContract({
+    address: CONTRACTS.ATOMIC_P2P,
+    abi: AtomicP2pABI,
+    functionName: 'getActiveBuyOrderIds',
+    args: [BigInt(0), BigInt(20)],
+    query: {
+      enabled: !!CONTRACTS.ATOMIC_P2P,
+      refetchInterval: 10_000,
+    },
+  });
+
   // Read active sell orders
   const { data: activeSellOrders, refetch: refetchSellOrders } = useReadContract({
     address: CONTRACTS.ATOMIC_P2P,
     abi: AtomicP2pABI,
     functionName: 'getActiveSellOrders',
+    args: [BigInt(0), BigInt(20)],
+    query: {
+      enabled: !!CONTRACTS.ATOMIC_P2P,
+      refetchInterval: 10_000,
+    },
+  });
+
+  // Read active sell order IDs (parallel to orders, same offset/limit)
+  const { data: activeSellOrderIds, refetch: refetchSellOrderIds } = useReadContract({
+    address: CONTRACTS.ATOMIC_P2P,
+    abi: AtomicP2pABI,
+    functionName: 'getActiveSellOrderIds',
     args: [BigInt(0), BigInt(20)],
     query: {
       enabled: !!CONTRACTS.ATOMIC_P2P,
@@ -101,19 +125,24 @@ export function useP2P() {
     });
   };
 
+  const refetchAllBuyOrders = () => { refetchBuyOrders(); refetchBuyOrderIds(); };
+  const refetchAllSellOrders = () => { refetchSellOrders(); refetchSellOrderIds(); };
+
   return {
     orderBookStats,
     currentPrice,
     activeBuyOrders,
+    activeBuyOrderIds,
     activeSellOrders,
+    activeSellOrderIds,
     createBuyOrder,
     createSellOrder,
     cancelBuyOrder,
     cancelSellOrder,
     executeTrade,
     refetchStats,
-    refetchBuyOrders,
-    refetchSellOrders,
+    refetchBuyOrders: refetchAllBuyOrders,
+    refetchSellOrders: refetchAllSellOrders,
     isWritePending,
     isConfirming,
     txHash,

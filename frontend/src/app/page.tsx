@@ -1,42 +1,45 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, useInView } from 'framer-motion';
+import { useRef } from 'react';
+import { useAccount } from 'wagmi';
+import { useReadContract } from 'wagmi';
+import { formatUnits } from 'viem';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useKairoPrice } from '@/hooks/useKairoPrice';
 import { useReferral } from '@/hooks/useReferral';
 import { useCMS } from '@/hooks/useCMS';
-import { useReadContract } from 'wagmi';
-import { formatUnits } from 'viem';
-import { CONTRACTS, KAIROTokenABI, LiquidityPoolABI } from '@/lib/contracts';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { useGlobalStore } from '@/stores/useGlobalStore';
+import { CONTRACTS, KAIROTokenABI, LiquidityPoolABI, StakingManagerABI } from '@/lib/contracts';
+import { ParticleBackground } from '@/components/layout/ParticleBackground';
+import { GlassCard } from '@/components/ui/GlassCard';
+import { Button } from '@/components/ui/Button';
+import { AnimatedCounter } from '@/components/ui/AnimatedCounter';
+import { ProgressBar } from '@/components/ui/ProgressBar';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { Tooltip } from '@/components/ui/Tooltip';
 
-/* ────────── animation helpers ────────── */
-const fadeUp = {
-  hidden: { opacity: 0, y: 30 },
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.12, duration: 0.6, ease: [0.22, 1, 0.36, 1] },
-  }),
-};
+/* ═══════════════ Helpers ═══════════════ */
 
-function AnimatedSection({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: '-60px' });
-  return (
-    <motion.section
-      ref={ref}
-      initial="hidden"
-      animate={isInView ? 'visible' : 'hidden'}
-      className={className}
-    >
-      {children}
-    </motion.section>
-  );
+const MAX_SUBS = 10_000;
+
+const CONTRACT_LIST: { name: string; key: keyof typeof CONTRACTS }[] = [
+  { name: 'KAIRO Token', key: 'KAIRO_TOKEN' },
+  { name: 'Liquidity Pool', key: 'LIQUIDITY_POOL' },
+  { name: 'Staking Manager', key: 'STAKING_MANAGER' },
+  { name: 'Affiliate', key: 'AFFILIATE_DISTRIBUTOR' },
+  { name: 'CMS', key: 'CMS' },
+  { name: 'Atomic P2P', key: 'ATOMIC_P2P' },
+];
+
+function truncateAddr(addr: string) {
+  if (!addr || addr.length < 10) return addr || '—';
+  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
-/* ────────── countdown logic ────────── */
+/* ═══════════════ Countdown Hook ═══════════════ */
 
 function useCountdown(target: number) {
   const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
@@ -50,476 +53,528 @@ function useCountdown(target: number) {
     hours: Math.floor((diff % 86400) / 3600),
     minutes: Math.floor((diff % 3600) / 60),
     seconds: diff % 60,
+    isExpired: diff <= 0,
+    isClosingSoon: diff > 0 && diff < 7 * 86400,
   };
 }
 
-/* ────────── animated counter ────────── */
-function AnimatedCounter({ value, prefix = '', suffix = '' }: { value: number; prefix?: string; suffix?: string }) {
-  const [display, setDisplay] = useState(0);
-  const ref = useRef(null);
-  const inView = useInView(ref, { once: true });
+/* ═══════════════ Staggered Word Reveal ═══════════════ */
 
-  useEffect(() => {
-    if (!inView) return;
-    let start = 0;
-    const duration = 1500;
-    const step = (ts: number) => {
-      if (!start) start = ts;
-      const progress = Math.min((ts - start) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplay(Math.floor(eased * value));
-      if (progress < 1) requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
-  }, [inView, value]);
-
+function KineticHeadline({ text, className }: { text: string; className?: string }) {
+  const words = text.split(' ');
   return (
-    <span ref={ref} className="font-mono">
-      {prefix}{display.toLocaleString()}{suffix}
+    <span className={className}>
+      {words.map((word, i) => (
+        <motion.span
+          key={i}
+          className="inline-block mr-[0.3em]"
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 + i * 0.1, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        >
+          {word}
+        </motion.span>
+      ))}
     </span>
   );
 }
 
-/* ─────────────── TOKENOMICS DATA ─────────────── */
-const TOKENOMICS_COLORS = ['#06b6d4', '#3b82f6', '#8b5cf6', '#ef4444'];
+/* ═══════════════ Copy Button ═══════════════ */
 
-/* ─────────────── STEPS ─────────────── */
-const steps = [
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }, [text]);
+
+  return (
+    <Tooltip content={copied ? 'Copied!' : 'Copy address'}>
+      <button
+        onClick={handleCopy}
+        className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors text-gray-500 hover:text-neon-cyan focus-visible:ring-2 focus-visible:ring-neon-cyan/50 focus-visible:ring-offset-2 focus-visible:ring-offset-void"
+        aria-label="Copy address"
+      >
+        {copied ? (
+          <svg className="w-4 h-4 text-matrix-green" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        ) : (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+          </svg>
+        )}
+      </button>
+    </Tooltip>
+  );
+}
+
+/* ═══════════════ Feature Card Data ═══════════════ */
+
+const features = [
   {
-    num: 1,
     icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15 9h3.75M15 12h3.75M15 15h3.75M4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75v10.5A2.25 2.25 0 004.5 19.5zm6-10.125a1.875 1.875 0 11-3.75 0 1.875 1.875 0 013.75 0zm-3.375 4.5a3 3 0 016 0H7.125z" />
+      <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
       </svg>
     ),
-    title: 'Subscribe to CMS',
-    desc: 'Pay 10 USDT per subscription and earn 5 KAIRO loyalty rewards. Up to 10,000 total slots available.',
+    title: 'Hard Cap Guarantee',
+    subtitle: 'The 3X Protocol',
+    description: 'Every stake is capped at exactly 3X your principal. No more, no less. Transparent, on-chain, unstoppable.',
+    color: 'neon-cyan',
   },
   {
-    num: 2,
     icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
-      </svg>
-    ),
-    title: 'Stake USDT',
-    desc: 'Stake USDT and earn 0.1% compound interest per interval. Returns are capped at 3X your original stake.',
-  },
-  {
-    num: 3,
-    icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
       </svg>
     ),
-    title: 'Build Your Team',
-    desc: 'Earn up to 15-level referral rewards from your network. Direct, team, rank, and qualifier bonuses.',
+    title: '5-Level Deep Rewards',
+    subtitle: 'Neural Referral Networks',
+    description: 'Build your network and earn from 15 levels of team activity. Direct dividends, team bonuses, rank salaries, and qualifier pools.',
+    color: 'neon-purple',
   },
   {
-    num: 4,
     icon: (
-      <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
       </svg>
     ),
-    title: 'Trade on AtomicP2P',
-    desc: 'Buy and sell KAIRO tokens peer-to-peer with on-chain escrow protection. No slippage, no front-running.',
+    title: 'Zero-Slippage Trading',
+    subtitle: 'Atomic P2P Exchange',
+    description: 'Buy and sell KAIRO peer-to-peer at oracle prices. Atomic settlement means no disputes, no waiting. 2% fee burns KAIRO forever.',
+    color: 'neon-coral',
   },
 ];
 
-/* ─────────────── TIERS ─────────────── */
-const tiers = [
-  { name: 'Tier 1', range: '$10 – $499', interval: '8hr', closings: '3x daily', color: 'from-dark-700 to-dark-800', border: 'border-dark-600', popular: false },
-  { name: 'Tier 2', range: '$500 – $1,999', interval: '6hr', closings: '4x daily', color: 'from-dark-700 to-dark-800', border: 'border-dark-600', popular: false },
-  { name: 'Tier 3', range: '$2,000+', interval: '4hr', closings: '6x daily', color: 'from-primary-900/40 to-dark-800', border: 'border-primary-500/40', popular: true },
-];
+/* ═══════════════════════════════════════════════════════ */
+/*                      MAIN PAGE                         */
+/* ═══════════════════════════════════════════════════════ */
 
-/* ══════════════════════════════════════════════════════ */
-/*                    MAIN PAGE                          */
-/* ══════════════════════════════════════════════════════ */
 export default function HomePage() {
+  const { isConnected } = useAccount();
   const { price, isLoading: priceLoading } = useKairoPrice();
-  const { deadline: contractDeadline } = useCMS();
+  const { deadline: contractDeadline, remainingSubscriptions } = useCMS();
+  const { totalTVL, totalBurned } = useGlobalStore();
 
-  // Read on-chain tokenomics
-  const { data: totalSupplyRaw } = useReadContract({
-    address: CONTRACTS.KAIRO_TOKEN, abi: KAIROTokenABI, functionName: 'totalSupply',
-    query: { enabled: !!CONTRACTS.KAIRO_TOKEN, refetchInterval: 60_000 },
-  });
-  const { data: totalBurnedRaw } = useReadContract({
+  // Referral capture
+  useReferral();
+
+  // On-chain reads
+  const { data: totalBurnedRaw, isLoading: burnLoading } = useReadContract({
     address: CONTRACTS.KAIRO_TOKEN, abi: KAIROTokenABI, functionName: 'getTotalBurned',
     query: { enabled: !!CONTRACTS.KAIRO_TOKEN, refetchInterval: 60_000 },
   });
-  const { data: socialLockRaw } = useReadContract({
-    address: CONTRACTS.KAIRO_TOKEN, abi: KAIROTokenABI, functionName: 'getSocialLockAmount',
-    query: { enabled: !!CONTRACTS.KAIRO_TOKEN, refetchInterval: 60_000 },
-  });
-  const { data: balancesRaw } = useReadContract({
-    address: CONTRACTS.LIQUIDITY_POOL, abi: LiquidityPoolABI, functionName: 'getBalances',
+  const { data: tvlRaw, isLoading: tvlLoading } = useReadContract({
+    address: CONTRACTS.LIQUIDITY_POOL, abi: LiquidityPoolABI, functionName: 'getTotalValueLocked',
     query: { enabled: !!CONTRACTS.LIQUIDITY_POOL, refetchInterval: 60_000 },
   });
 
-  const totalSupply = totalSupplyRaw ? Number(formatUnits(totalSupplyRaw as bigint, 18)) : 0;
-  const totalBurned = totalBurnedRaw ? Number(formatUnits(totalBurnedRaw as bigint, 18)) : 0;
-  const socialLock = socialLockRaw ? Number(formatUnits(socialLockRaw as bigint, 18)) : 0;
-  const usdtLiquidity = balancesRaw ? Number(formatUnits((balancesRaw as [bigint, bigint])[0], 18)) : 0;
+  const burnedValue = totalBurned > 0 ? totalBurned : (totalBurnedRaw ? Number(formatUnits(totalBurnedRaw as bigint, 18)) : 0);
+  const tvlValue = totalTVL > 0 ? totalTVL : (tvlRaw ? Number(formatUnits(tvlRaw as bigint, 18)) : 0);
 
-  // CMS deadline from contract (fallback to 0 if not available)
+  // CMS data
   const cmsDeadline = contractDeadline ? Number(contractDeadline as bigint) : 0;
   const countdown = useCountdown(cmsDeadline);
-
-  // Build tokenomics chart data from on-chain values
-  const tokenomicsData = [
-    { name: 'Social Lock', value: Math.round(socialLock) || 10000, color: TOKENOMICS_COLORS[0] },
-    { name: 'Liquidity (USDT)', value: Math.round(usdtLiquidity) || 1, color: TOKENOMICS_COLORS[1] },
-    { name: 'Circulating', value: Math.max(Math.round(totalSupply - socialLock - totalBurned), 1), color: TOKENOMICS_COLORS[2] },
-    { name: 'Burned', value: Math.round(totalBurned) || 1, color: TOKENOMICS_COLORS[3] },
-  ];
-
-  // Capture ?ref= parameter on landing page
-  useReferral();
+  const remaining = remainingSubscriptions ? Number(remainingSubscriptions as bigint) : 0;
+  const filled = MAX_SUBS - remaining;
+  const fillPercent = MAX_SUBS > 0 ? (filled / MAX_SUBS) * 100 : 0;
 
   return (
     <div className="min-h-screen overflow-x-hidden">
-      {/* ─── HERO ─── */}
-      <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
-        {/* animated gradient orbs */}
+      {/* ═══════ SECTION 1: HERO ═══════ */}
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+        <ParticleBackground />
+
+        {/* Ambient glow orbs */}
         <div className="pointer-events-none absolute inset-0">
-          <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] rounded-full bg-primary-500/10 blur-[120px] animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] rounded-full bg-accent-500/10 blur-[100px] animate-pulse" style={{ animationDelay: '2s' }} />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-primary-500/5 blur-[160px]" />
+          <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] rounded-full bg-neon-cyan/5 blur-[160px]" />
+          <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] rounded-full bg-neon-purple/5 blur-[120px]" />
         </div>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
-          <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}>
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary-500/10 border border-primary-500/20 text-primary-400 text-sm font-medium mb-8">
-              <span className="w-2 h-2 rounded-full bg-primary-400 animate-pulse" />
-              Live on opBNB Chain
-            </div>
-          </motion.div>
-
-          <motion.h1
-            className="text-5xl sm:text-7xl lg:text-8xl font-bold tracking-tight leading-[1.05]"
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <span className="text-dark-50">KAIRO</span>
-            <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-400 via-primary-300 to-accent-400">
-              The Future of DeFi
-            </span>
-            <br />
-            <span className="text-dark-300 text-4xl sm:text-5xl lg:text-6xl">on opBNB</span>
-          </motion.h1>
-
-          <motion.p
-            className="mt-8 text-lg sm:text-xl text-dark-400 max-w-2xl mx-auto leading-relaxed"
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.25 }}
-          >
-            Earn up to <span className="text-primary-400 font-semibold">3X returns</span> with our innovative capping staking mechanism.
-            5-level referral rewards, CMS subscriptions, and atomic P2P trading.
-          </motion.p>
-
-          {/* Live price badge */}
+        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center z-10">
+          {/* Badge */}
           <motion.div
-            className="mt-6 inline-flex items-center gap-3 px-5 py-2.5 rounded-xl bg-dark-800/80 border border-dark-700 backdrop-blur-sm"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5, delay: 0.4 }}
-          >
-            <span className="text-dark-400 text-sm">KAIRO Price</span>
-            <span className="text-2xl font-bold font-mono text-primary-400">
-              {priceLoading ? '...' : `$${price.toFixed(4)}`}
-            </span>
-          </motion.div>
-
-          <motion.div
-            className="mt-10 flex flex-wrap items-center justify-center gap-4"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.45 }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className="mb-10"
           >
-            <Link
-              href="/dashboard"
-              className="px-8 py-3.5 rounded-xl bg-primary-500 hover:bg-primary-600 text-white font-semibold transition-all shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40 hover:scale-[1.02] active:scale-[0.98]"
-            >
-              Launch App
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-card text-neon-cyan text-sm font-space-grotesk">
+              <span className="w-2 h-2 rounded-full bg-neon-cyan animate-pulse shadow-[0_0_6px_#00F0FF]" aria-hidden="true" />
+              Live on opBNB
+            </span>
+          </motion.div>
+
+          {/* Kinetic headline */}
+          <h1 className="font-orbitron text-3xl sm:text-5xl md:text-7xl font-bold text-white leading-tight">
+            <KineticHeadline text="The Future of Deflationary Wealth" />
+          </h1>
+
+          {/* Sub-headline */}
+          <motion.p
+            className="mt-6 text-base sm:text-xl text-gray-300 font-space-grotesk max-w-3xl mx-auto"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.1, duration: 0.6 }}
+          >
+            3X Capped Staking &bull; Neural Referral Networks &bull; Atomic P2P Exchange
+          </motion.p>
+
+          {/* CTA */}
+          <motion.div
+            className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.4, duration: 0.6 }}
+          >
+            {isConnected ? (
+              <Link href="/dashboard">
+                <Button variant="primary" size="lg">Enter The DAO</Button>
+              </Link>
+            ) : (
+              <ConnectButton.Custom>
+                {({ openConnectModal, mounted }) => (
+                  <div {...(!mounted && { 'aria-hidden': true, style: { opacity: 0, pointerEvents: 'none' } })}>
+                    <Button variant="primary" size="lg" onClick={openConnectModal}>
+                      Enter The DAO
+                    </Button>
+                  </div>
+                )}
+              </ConnectButton.Custom>
+            )}
+          </motion.div>
+
+          {/* Powered by */}
+          <motion.p
+            className="mt-4 text-xs text-gray-500 font-space-grotesk"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.7, duration: 0.5 }}
+          >
+            Powered by opBNB &bull; Gas fees &lt; $0.01
+          </motion.p>
+        </div>
+      </section>
+
+      {/* ═══════ SECTION 2: CMS COUNTDOWN ═══════ */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8">
+        <motion.div
+          className="max-w-2xl mx-auto"
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-80px' }}
+          transition={{ duration: 0.6 }}
+        >
+          <GlassCard padding="lg" className="text-center relative overflow-hidden">
+            {/* Decorative gradient accent */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-px bg-gradient-to-r from-transparent via-neon-cyan/50 to-transparent" />
+
+            <h2 className="font-orbitron text-2xl md:text-3xl font-bold text-white mb-2">
+              Core Membership Subscription
+            </h2>
+            <p className="text-gray-400 text-sm mb-8 font-space-grotesk">Limited to 10,000 slots — claim yours before time runs out</p>
+
+            {/* Countdown timer */}
+            {cmsDeadline > 0 ? (
+              <div className="flex items-center justify-center gap-3 sm:gap-4 mb-8">
+                {[
+                  { label: 'DAYS', value: countdown.days },
+                  { label: 'HOURS', value: countdown.hours },
+                  { label: 'MINS', value: countdown.minutes },
+                  { label: 'SECS', value: countdown.seconds },
+                ].map((unit, i) => (
+                  <div key={unit.label} className="flex flex-col items-center">
+                    <div className="w-[68px] sm:w-[88px] h-[72px] sm:h-[92px] rounded-xl glass-card flex items-center justify-center border border-neon-cyan/10">
+                      <span className="font-mono text-4xl md:text-6xl font-bold text-neon-cyan drop-shadow-[0_0_12px_rgba(0,240,255,0.4)]">
+                        {String(unit.value).padStart(2, '0')}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-gray-500 mt-2 uppercase tracking-[0.2em] font-space-grotesk">
+                      {unit.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex justify-center gap-3 mb-8">
+                {[1, 2, 3, 4].map((i) => (
+                  <Skeleton key={i} variant="rect" width={88} height={92} />
+                ))}
+              </div>
+            )}
+
+            {/* Closing soon badge */}
+            {countdown.isClosingSoon && (
+              <motion.div
+                className="mb-6 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-neon-coral/10 border border-neon-coral/30"
+                animate={{ opacity: [0.7, 1, 0.7] }}
+                transition={{ repeat: Infinity, duration: 1.5 }}
+              >
+                <span className="w-2 h-2 rounded-full bg-neon-coral animate-pulse" aria-hidden="true" />
+                <span className="text-neon-coral text-sm font-semibold font-space-grotesk">CLOSING SOON</span>
+              </motion.div>
+            )}
+
+            {/* Progress bar */}
+            <div className="mb-4">
+              <ProgressBar value={fillPercent} variant="cyan" size="md" glow />
+            </div>
+            <p className="text-gray-400 text-sm mb-8 font-space-grotesk">
+              <AnimatedCounter value={remaining} decimals={0} className="text-white font-semibold" />
+              {' '}Subscriptions Remaining
+            </p>
+
+            {/* CTA */}
+            <Link href="/dashboard/cms">
+              <Button variant="primary" size="lg">Subscribe Now</Button>
             </Link>
-            <Link
-              href="/exchange"
-              className="px-8 py-3.5 rounded-xl bg-dark-800/80 hover:bg-dark-700 text-dark-200 font-semibold transition-all border border-dark-600 hover:border-dark-500 hover:scale-[1.02] active:scale-[0.98]"
-            >
-              Start Trading
-            </Link>
+          </GlassCard>
+        </motion.div>
+      </section>
+
+      {/* ═══════ SECTION 3: LIVE METRICS TICKER ═══════ */}
+      <section className="py-10 px-4 sm:px-6 lg:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-60px' }}
+          transition={{ duration: 0.6 }}
+        >
+          <GlassCard padding="md" className="max-w-5xl mx-auto">
+            <div className="flex items-center gap-6 overflow-x-auto scrollbar-hide">
+              {/* LIVE indicator */}
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="relative flex h-2.5 w-2.5" aria-hidden="true">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-neon-cyan opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-neon-cyan shadow-[0_0_6px_#00F0FF]" />
+                </span>
+                <span className="text-neon-cyan text-xs font-bold tracking-wider font-space-grotesk">LIVE</span>
+              </div>
+
+              {/* Divider */}
+              <div className="w-px h-10 bg-white/10 shrink-0" />
+
+              {/* KAIRO Price */}
+              <div className="flex flex-col shrink-0 min-w-[120px]">
+                <span className="text-[10px] text-gray-500 uppercase tracking-wider font-space-grotesk">KAIRO Price</span>
+                {priceLoading ? (
+                  <Skeleton variant="text" className="w-20 h-6 mt-1" />
+                ) : (
+                  <AnimatedCounter value={price} prefix="$" decimals={4} className="text-white text-lg font-bold" />
+                )}
+              </div>
+
+              <div className="w-px h-10 bg-white/10 shrink-0" />
+
+              {/* TVL */}
+              <div className="flex flex-col shrink-0 min-w-[120px]">
+                <span className="text-[10px] text-gray-500 uppercase tracking-wider font-space-grotesk">Total Value Locked</span>
+                {tvlLoading && tvlValue === 0 ? (
+                  <Skeleton variant="text" className="w-20 h-6 mt-1" />
+                ) : (
+                  <AnimatedCounter value={tvlValue} prefix="$" decimals={2} className="text-white text-lg font-bold" />
+                )}
+              </div>
+
+              <div className="w-px h-10 bg-white/10 shrink-0" />
+
+              {/* Burned */}
+              <div className="flex flex-col shrink-0 min-w-[140px]">
+                <span className="text-[10px] text-gray-500 uppercase tracking-wider font-space-grotesk">Total Burned 🔥</span>
+                {burnLoading && burnedValue === 0 ? (
+                  <Skeleton variant="text" className="w-24 h-6 mt-1" />
+                ) : (
+                  <AnimatedCounter value={burnedValue} suffix=" KAIRO" decimals={0} className="text-white text-lg font-bold" />
+                )}
+              </div>
+
+              <div className="w-px h-10 bg-white/10 shrink-0" />
+
+              {/* Active Stakes */}
+              <div className="flex flex-col shrink-0 min-w-[100px]">
+                <span className="text-[10px] text-gray-500 uppercase tracking-wider font-space-grotesk">CMS Filled</span>
+                <AnimatedCounter value={filled} decimals={0} className="text-white text-lg font-bold" />
+              </div>
+            </div>
+          </GlassCard>
+        </motion.div>
+      </section>
+
+      {/* ═══════ SECTION 4: FEATURE GRID ═══════ */}
+      <section className="py-20 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto">
+          <motion.div
+            className="text-center mb-14"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-60px' }}
+            transition={{ duration: 0.6 }}
+          >
+            <h2 className="font-orbitron text-3xl md:text-4xl font-bold text-white">The Protocol</h2>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {features.map((feat, i) => (
+              <motion.div
+                key={feat.title}
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-60px' }}
+                transition={{ delay: i * 0.15, duration: 0.5 }}
+              >
+                <GlassCard hover padding="lg" className="h-full group">
+                  {/* Icon */}
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-5 bg-${feat.color}/10 text-${feat.color} border border-${feat.color}/20`}
+                    style={{
+                      backgroundColor: feat.color === 'neon-cyan' ? 'rgba(0,240,255,0.1)' : feat.color === 'neon-purple' ? 'rgba(112,0,255,0.1)' : 'rgba(255,46,99,0.1)',
+                      color: feat.color === 'neon-cyan' ? '#00F0FF' : feat.color === 'neon-purple' ? '#7000FF' : '#FF2E63',
+                      borderColor: feat.color === 'neon-cyan' ? 'rgba(0,240,255,0.2)' : feat.color === 'neon-purple' ? 'rgba(112,0,255,0.2)' : 'rgba(255,46,99,0.2)',
+                    }}
+                  >
+                    {feat.icon}
+                  </div>
+
+                  {/* Subtitle label */}
+                  <p className="text-xs uppercase tracking-[0.15em] font-space-grotesk mb-2"
+                    style={{ color: feat.color === 'neon-cyan' ? '#00F0FF' : feat.color === 'neon-purple' ? '#7000FF' : '#FF2E63' }}
+                  >
+                    {feat.subtitle}
+                  </p>
+
+                  <h3 className="font-orbitron text-xl font-bold text-white mb-3">{feat.title}</h3>
+                  <p className="text-gray-300 text-sm leading-relaxed">{feat.description}</p>
+
+                  {/* Visual accent per card */}
+                  {feat.subtitle === 'The 3X Protocol' && (
+                    <div className="mt-5 flex items-center gap-1">
+                      {['1X', '2X', '3X'].map((label, j) => (
+                        <div key={label} className="flex-1">
+                          <motion.div
+                            className="h-1.5 rounded-full bg-gradient-to-r from-neon-cyan to-[#0080FF]"
+                            initial={{ width: 0 }}
+                            whileInView={{ width: '100%' }}
+                            viewport={{ once: true }}
+                            transition={{ delay: 0.3 + j * 0.3, duration: 0.6 }}
+                          />
+                          <span className="text-[10px] text-gray-500 mt-1 block text-center font-mono">{label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {feat.subtitle === 'Neural Referral Networks' && (
+                    <div className="mt-5 flex items-center justify-between px-2">
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <div key={n} className="flex items-center">
+                          <div className="w-3 h-3 rounded-full bg-neon-purple/40 border border-neon-purple/60" />
+                          {n < 5 && <div className="w-6 sm:w-8 h-px bg-neon-purple/30" />}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {feat.subtitle === 'Atomic P2P Exchange' && (
+                    <div className="mt-5 flex items-center justify-center gap-4">
+                      <span className="px-3 py-1 rounded-lg bg-matrix-green/10 text-matrix-green text-xs font-bold border border-matrix-green/20">BUY</span>
+                      <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                      </svg>
+                      <span className="px-3 py-1 rounded-lg bg-neon-coral/10 text-neon-coral text-xs font-bold border border-neon-coral/20">SELL</span>
+                    </div>
+                  )}
+                </GlassCard>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════ SECTION 5: CTA + CONTRACTS ═══════ */}
+      <section className="relative py-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-neon-cyan/[0.02] to-transparent pointer-events-none" />
+
+        <div className="relative max-w-4xl mx-auto text-center z-10">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-60px' }}
+            transition={{ duration: 0.6 }}
+          >
+            <h2 className="font-orbitron text-3xl md:text-5xl font-bold text-white mb-6">
+              Ready to Enter The DAO?
+            </h2>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+              {isConnected ? (
+                <Link href="/dashboard">
+                  <Button variant="primary" size="lg">Go to Dashboard</Button>
+                </Link>
+              ) : (
+                <ConnectButton.Custom>
+                  {({ openConnectModal, mounted }) => (
+                    <div {...(!mounted && { 'aria-hidden': true, style: { opacity: 0, pointerEvents: 'none' } })}>
+                      <Button variant="primary" size="lg" onClick={openConnectModal}>
+                        Connect Wallet
+                      </Button>
+                    </div>
+                  )}
+                </ConnectButton.Custom>
+              )}
+              <a href="#" target="_blank" rel="noopener noreferrer">
+                <Button variant="secondary" size="lg">Read Docs</Button>
+              </a>
+            </div>
+
+            {/* Smart Contracts */}
+            <div className="text-left">
+              <h3 className="font-orbitron text-lg font-semibold text-white mb-4 text-center">
+                Verified Smart Contracts
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {CONTRACT_LIST.map((c) => {
+                  const addr = CONTRACTS[c.key] || '';
+                  return (
+                    <div key={c.key} className="glass-card rounded-xl px-4 py-3 flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-xs text-gray-500 font-space-grotesk">{c.name}</p>
+                        <p className="text-sm text-gray-300 font-mono truncate">{truncateAddr(addr)}</p>
+                      </div>
+                      {addr && <CopyButton text={addr} />}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </motion.div>
         </div>
       </section>
 
-      {/* ─── CMS COUNTDOWN ─── */}
-      <AnimatedSection className="border-t border-dark-800/60">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
-          <motion.p variants={fadeUp} custom={0} className="text-primary-400 font-semibold text-sm uppercase tracking-widest mb-3">
-            Core Membership Subscription
-          </motion.p>
-          <motion.h2 variants={fadeUp} custom={1} className="text-3xl sm:text-4xl font-bold text-dark-50 mb-10">
-            Limited to 10,000 Subscriptions
-          </motion.h2>
-
-          {/* countdown boxes */}
-          <motion.div variants={fadeUp} custom={2} className="flex items-center justify-center gap-3 sm:gap-5 mb-10">
-            {[
-              { label: 'Days', value: countdown.days },
-              { label: 'Hours', value: countdown.hours },
-              { label: 'Minutes', value: countdown.minutes },
-              { label: 'Seconds', value: countdown.seconds },
-            ].map((unit) => (
-              <div key={unit.label} className="flex flex-col items-center">
-                <div className="w-[72px] sm:w-[90px] h-[80px] sm:h-[96px] rounded-xl bg-dark-800 border border-dark-700 flex items-center justify-center relative overflow-hidden">
-                  <div className="absolute inset-x-0 top-1/2 h-px bg-dark-700/50" />
-                  <span className="text-3xl sm:text-4xl font-bold font-mono text-dark-50">
-                    {String(unit.value).padStart(2, '0')}
-                  </span>
-                </div>
-                <span className="text-xs text-dark-500 mt-2 uppercase tracking-wider">{unit.label}</span>
-              </div>
-            ))}
-          </motion.div>
-
-          <motion.div variants={fadeUp} custom={3}>
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-primary-500 hover:bg-primary-600 text-white font-semibold transition-all shadow-lg shadow-primary-500/25 hover:shadow-primary-500/40"
-            >
-              Subscribe Now
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-              </svg>
+      {/* ═══════ SECTION 6: FOOTER ═══════ */}
+      <footer className="border-t border-white/5 py-10 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-5xl mx-auto text-center">
+          <div className="flex flex-wrap items-center justify-center gap-6 mb-6">
+            <Link href="/dashboard" className="text-sm text-gray-500 hover:text-gray-300 transition-colors font-space-grotesk">
+              Dashboard
             </Link>
-          </motion.div>
-        </div>
-      </AnimatedSection>
-
-      {/* ─── TOKENOMICS ─── */}
-      <AnimatedSection className="border-t border-dark-800/60">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-          <motion.div variants={fadeUp} custom={0} className="text-center mb-14">
-            <p className="text-primary-400 font-semibold text-sm uppercase tracking-widest mb-3">Tokenomics</p>
-            <h2 className="text-3xl sm:text-4xl font-bold text-dark-50">Transparent & Deflationary</h2>
-          </motion.div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
-            {/* Chart */}
-            <motion.div variants={fadeUp} custom={1} className="flex justify-center">
-              <div className="w-[280px] h-[280px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={tokenomicsData} cx="50%" cy="50%" innerRadius={70} outerRadius={120} paddingAngle={3} dataKey="value" stroke="none">
-                      {tokenomicsData.map((entry, i) => (
-                        <Cell key={i} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '0.75rem', color: '#f8fafc' }}
-                      formatter={(value: number) => [`${value.toLocaleString()} KAIRO`, '']}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </motion.div>
-
-            {/* Stat cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {[
-                { label: 'Total Supply', value: `${totalSupply > 0 ? Math.round(totalSupply).toLocaleString() : '—'} KAIRO`, sub: 'Dynamic minting via staking', icon: '📊' },
-                { label: 'Social Lock', value: `${socialLock > 0 ? Math.round(socialLock).toLocaleString() : '—'} KAIRO`, sub: 'Permanently locked forever', icon: '🔒' },
-                { label: 'Burned Tokens', value: `${totalBurned > 0 ? Math.round(totalBurned).toLocaleString() : '—'} KAIRO`, sub: 'Deflationary mechanism', icon: '🔥' },
-                { label: 'Price Formula', value: 'P = USDT / S', sub: 'S = Supply − Burned + Lock', icon: '📐' },
-              ].map((card, i) => (
-                <motion.div
-                  key={card.label}
-                  variants={fadeUp}
-                  custom={i + 2}
-                  className="rounded-xl bg-dark-800/60 backdrop-blur-xl border border-dark-700/50 p-5 hover:border-dark-600/50 transition-all duration-300"
-                >
-                  <span className="text-2xl mb-2 block">{card.icon}</span>
-                  <p className="text-dark-400 text-sm">{card.label}</p>
-                  <p className="text-xl font-bold text-dark-50 font-mono mt-1">{card.value}</p>
-                  <p className="text-dark-500 text-xs mt-1">{card.sub}</p>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </AnimatedSection>
-
-      {/* ─── HOW IT WORKS ─── */}
-      <AnimatedSection className="border-t border-dark-800/60">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-          <motion.div variants={fadeUp} custom={0} className="text-center mb-14">
-            <p className="text-primary-400 font-semibold text-sm uppercase tracking-widest mb-3">Getting Started</p>
-            <h2 className="text-3xl sm:text-4xl font-bold text-dark-50">How It Works</h2>
-          </motion.div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {steps.map((step, i) => (
-              <motion.div
-                key={step.num}
-                variants={fadeUp}
-                custom={i + 1}
-                className="relative rounded-xl bg-dark-800/60 backdrop-blur-xl border border-dark-700/50 p-6 hover:border-primary-500/30 transition-all duration-300 group"
-              >
-                <div className="flex items-center gap-3 mb-4">
-                  <span className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary-500/10 border border-primary-500/20 flex items-center justify-center text-primary-400 font-bold text-sm">
-                    {step.num}
-                  </span>
-                  <span className="text-primary-400 group-hover:text-primary-300 transition-colors">{step.icon}</span>
-                </div>
-                <h3 className="text-lg font-semibold text-dark-50 mb-2">{step.title}</h3>
-                <p className="text-dark-400 text-sm leading-relaxed">{step.desc}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </AnimatedSection>
-
-      {/* ─── STAKING TIERS ─── */}
-      <AnimatedSection className="border-t border-dark-800/60">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-          <motion.div variants={fadeUp} custom={0} className="text-center mb-14">
-            <p className="text-primary-400 font-semibold text-sm uppercase tracking-widest mb-3">Staking</p>
-            <h2 className="text-3xl sm:text-4xl font-bold text-dark-50">Choose Your Tier</h2>
-            <p className="text-dark-400 mt-3 max-w-lg mx-auto">All tiers earn 0.1% per compounding interval with a 3X hard cap on returns.</p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {tiers.map((tier, i) => (
-              <motion.div
-                key={tier.name}
-                variants={fadeUp}
-                custom={i + 1}
-                className={`relative rounded-xl bg-gradient-to-b ${tier.color} border ${tier.border} p-6 transition-all duration-300 hover:scale-[1.02] ${tier.popular ? 'ring-1 ring-primary-500/30' : ''}`}
-              >
-                {tier.popular && (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-primary-500 text-white text-xs font-bold uppercase tracking-wider">
-                    Most Popular
-                  </span>
-                )}
-                <h3 className="text-xl font-bold text-dark-50 mt-2">{tier.name}</h3>
-                <p className="text-3xl font-bold font-mono text-primary-400 mt-3">{tier.range}</p>
-                <div className="mt-6 space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-dark-400">Compound Interval</span>
-                    <span className="text-dark-200 font-mono">{tier.interval}</span>
-                  </div>
-                  <div className="h-px bg-dark-700/50" />
-                  <div className="flex justify-between text-sm">
-                    <span className="text-dark-400">Daily Closings</span>
-                    <span className="text-dark-200 font-mono">{tier.closings}</span>
-                  </div>
-                  <div className="h-px bg-dark-700/50" />
-                  <div className="flex justify-between text-sm">
-                    <span className="text-dark-400">Rate per Interval</span>
-                    <span className="text-primary-400 font-mono">0.1%</span>
-                  </div>
-                  <div className="h-px bg-dark-700/50" />
-                  <div className="flex justify-between text-sm">
-                    <span className="text-dark-400">Max Return</span>
-                    <span className="text-primary-400 font-mono font-bold">3X Cap</span>
-                  </div>
-                </div>
-                <Link
-                  href="/dashboard"
-                  className={`block text-center mt-6 py-2.5 rounded-lg font-semibold text-sm transition-all ${
-                    tier.popular
-                      ? 'bg-primary-500 hover:bg-primary-600 text-white shadow-lg shadow-primary-500/25'
-                      : 'bg-dark-700 hover:bg-dark-600 text-dark-200 border border-dark-600'
-                  }`}
-                >
-                  Start Staking
-                </Link>
-              </motion.div>
-            ))}
+            <Link href="/exchange" className="text-sm text-gray-500 hover:text-gray-300 transition-colors font-space-grotesk">
+              Exchange
+            </Link>
+            <a href="#" className="text-sm text-gray-500 hover:text-gray-300 transition-colors font-space-grotesk">
+              Docs
+            </a>
           </div>
 
-          {/* 3X cap explanation */}
-          <motion.div variants={fadeUp} custom={4} className="mt-10 rounded-xl bg-dark-800/40 border border-dark-700/50 p-6 text-center">
-            <h4 className="text-lg font-semibold text-dark-50 mb-2">What is the 3X Cap?</h4>
-            <p className="text-dark-400 text-sm max-w-2xl mx-auto leading-relaxed">
-              Your total earnings (staking profits + referral income) are capped at 3 times your original stake amount.
-              Once reached, your stake is automatically closed and 80% of principal is returned in KAIRO tokens at the live rate.
-              This ensures sustainable protocol economics and fair distribution.
-            </p>
-          </motion.div>
-        </div>
-      </AnimatedSection>
-
-      {/* ─── FOOTER ─── */}
-      <footer className="border-t border-dark-800/60 bg-dark-950/50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            {/* Brand */}
-            <div className="md:col-span-2">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-lg bg-primary-500 flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">K</span>
-                </div>
-                <span className="text-xl font-bold text-dark-50">
-                  KAIRO<span className="text-primary-400">DeFi</span>
-                </span>
-              </div>
-              <p className="text-dark-400 text-sm max-w-sm leading-relaxed">
-                Next-generation DeFi ecosystem on opBNB featuring 3X capped staking, referral rewards, and atomic P2P trading.
-              </p>
-              <div className="flex items-center gap-2 mt-4">
-                <span className="px-3 py-1 rounded-md bg-dark-800 border border-dark-700 text-dark-400 text-xs font-medium">
-                  Built on opBNB
-                </span>
-              </div>
-            </div>
-
-            {/* Links */}
-            <div>
-              <h4 className="text-dark-200 font-semibold text-sm mb-4">Platform</h4>
-              <ul className="space-y-2">
-                {[
-                  { label: 'Dashboard', href: '/dashboard' },
-                  { label: 'Exchange', href: '/exchange' },
-                  { label: 'Documentation', href: '#' },
-                ].map((link) => (
-                  <li key={link.label}>
-                    <Link href={link.href} className="text-dark-400 hover:text-dark-200 text-sm transition-colors">
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Social */}
-            <div>
-              <h4 className="text-dark-200 font-semibold text-sm mb-4">Community</h4>
-              <ul className="space-y-2">
-                {[
-                  { label: 'Twitter / X', href: 'https://twitter.com' },
-                  { label: 'Telegram', href: 'https://t.me' },
-                  { label: 'Discord', href: 'https://discord.gg' },
-                ].map((link) => (
-                  <li key={link.label}>
-                    <a href={link.href} target="_blank" rel="noopener noreferrer" className="text-dark-400 hover:text-dark-200 text-sm transition-colors">
-                      {link.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <span className="px-3 py-1 rounded-md glass-card text-xs text-gray-400 font-space-grotesk">
+              Built on opBNB
+            </span>
           </div>
 
-          <div className="mt-10 pt-6 border-t border-dark-800/60 text-center">
-            <p className="text-dark-500 text-sm">&copy; 2026 KAIRO. All rights reserved.</p>
-          </div>
+          <p className="text-gray-600 text-sm font-space-grotesk">
+            KAIRO DAO &copy; 2026
+          </p>
         </div>
       </footer>
     </div>

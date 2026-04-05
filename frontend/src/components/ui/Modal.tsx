@@ -1,61 +1,91 @@
 'use client';
 
-import { Fragment } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
 import { motion, AnimatePresence } from 'framer-motion';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { cn } from '@/lib/utils';
 
 interface ModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** @deprecated Use `open` instead */
+  isOpen?: boolean;
+  /** @deprecated Use `onOpenChange` instead */
+  onClose?: () => void;
   title?: string;
+  description?: string;
   children: React.ReactNode;
   className?: string;
 }
 
-export function Modal({ isOpen, onClose, title, children, className }: ModalProps) {
+export function Modal({ open, onOpenChange, isOpen, onClose, title, description, children, className }: ModalProps) {
+  const isVisible = open ?? isOpen ?? false;
+  const handleOpenChange = (val: boolean) => {
+    onOpenChange?.(val);
+    if (!val) onClose?.();
+  };
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <Fragment>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
-            onClick={onClose}
-          />
-          {/* Modal */}
-          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className={cn(
-                'w-full max-w-lg glass rounded-2xl p-6 shadow-2xl',
-                className,
-              )}
-            >
-              {/* Header */}
-              {title && (
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-semibold text-dark-50">{title}</h2>
-                  <button
-                    onClick={onClose}
-                    className="p-1 rounded-lg hover:bg-dark-700 transition-colors"
-                  >
-                    <XMarkIcon className="w-5 h-5 text-dark-400" />
-                  </button>
-                </div>
-              )}
-              {/* Content */}
-              {children}
-            </motion.div>
-          </div>
-        </Fragment>
-      )}
-    </AnimatePresence>
+    <Dialog.Root open={isVisible} onOpenChange={handleOpenChange}>
+      <AnimatePresence>
+        {isVisible && (
+          <Dialog.Portal forceMount>
+            <Dialog.Overlay asChild>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+              />
+            </Dialog.Overlay>
+
+            <Dialog.Content asChild>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                className={cn(
+                  'fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50',
+                  'w-[calc(100%-2rem)] max-w-lg',
+                  'glass-card p-6 shadow-2xl',
+                  'focus:outline-none',
+                  className,
+                )}
+              >
+                {/* Header */}
+                {(title || true) && (
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      {title && (
+                        <Dialog.Title className="text-xl font-semibold text-white">
+                          {title}
+                        </Dialog.Title>
+                      )}
+                      {description && (
+                        <Dialog.Description className="text-sm text-gray-400 mt-1">
+                          {description}
+                        </Dialog.Description>
+                      )}
+                    </div>
+                    <Dialog.Close asChild>
+                      <button
+                        className="shrink-0 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-white/5 transition-colors text-gray-400 hover:text-white focus-visible:ring-2 focus-visible:ring-neon-cyan/50 focus-visible:ring-offset-2 focus-visible:ring-offset-void"
+                        aria-label="Close"
+                      >
+                        <XMarkIcon className="w-5 h-5" />
+                      </button>
+                    </Dialog.Close>
+                  </div>
+                )}
+
+                {/* Content */}
+                {children}
+              </motion.div>
+            </Dialog.Content>
+          </Dialog.Portal>
+        )}
+      </AnimatePresence>
+    </Dialog.Root>
   );
 }

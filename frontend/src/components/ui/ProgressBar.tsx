@@ -3,44 +3,92 @@
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
+type ProgressVariant = 'cyan' | 'success' | 'warning' | 'danger' | 'auto';
+type ProgressSize = 'sm' | 'md' | 'lg';
+
 interface ProgressBarProps {
-  value: number; // 0-100
-  max?: number;
-  label?: string;
+  value: number;
+  variant?: ProgressVariant;
+  size?: ProgressSize;
+  showLabel?: boolean;
+  /** @deprecated Use showLabel instead */
   showPercentage?: boolean;
-  color?: 'primary' | 'accent' | 'danger';
+  label?: string;
+  /** @deprecated Use variant instead */
+  color?: string;
+  glow?: boolean;
   className?: string;
 }
 
-const colorStyles = {
-  primary: 'bg-primary-500',
-  accent: 'bg-accent-500',
-  danger: 'bg-red-500',
+const sizeStyles: Record<ProgressSize, string> = {
+  sm: 'h-1.5',
+  md: 'h-2.5',
+  lg: 'h-4',
 };
+
+function getVariantColor(variant: ProgressVariant, value: number): { bar: string; glow: string } {
+  if (variant === 'auto') {
+    if (value < 50) return { bar: 'from-matrix-green to-[#00CC82]', glow: 'shadow-matrix-green/40' };
+    if (value < 80) return { bar: 'from-solar-amber to-[#FF9500]', glow: 'shadow-solar-amber/40' };
+    return { bar: 'from-neon-coral to-[#FF6B6B]', glow: 'shadow-neon-coral/40' };
+  }
+
+  const colors: Record<Exclude<ProgressVariant, 'auto'>, { bar: string; glow: string }> = {
+    cyan: { bar: 'from-neon-cyan to-[#0080FF]', glow: 'shadow-neon-cyan/40' },
+    success: { bar: 'from-matrix-green to-[#00CC82]', glow: 'shadow-matrix-green/40' },
+    warning: { bar: 'from-solar-amber to-[#FF9500]', glow: 'shadow-solar-amber/40' },
+    danger: { bar: 'from-neon-coral to-[#FF6B6B]', glow: 'shadow-neon-coral/40' },
+  };
+
+  return colors[variant];
+}
 
 export function ProgressBar({
   value,
-  max = 100,
+  variant = 'cyan',
+  size = 'md',
+  showLabel = false,
+  showPercentage,
   label,
-  showPercentage = true,
-  color = 'primary',
+  color,
+  glow = false,
   className,
 }: ProgressBarProps) {
-  const percentage = Math.min((value / max) * 100, 100);
+  // Map legacy color prop to variant
+  const resolvedVariant: ProgressVariant = color
+    ? (color === 'primary' ? 'cyan' : color === 'accent' ? 'cyan' : color === 'danger' ? 'danger' : variant)
+    : variant;
+  const resolvedShowLabel = showLabel || showPercentage || false;
+  const percentage = Math.min(Math.max(value, 0), 100);
+  const colors = getVariantColor(resolvedVariant, percentage);
 
   return (
     <div className={cn('w-full', className)}>
-      {(label || showPercentage) && (
+      {(label || resolvedShowLabel) && (
         <div className="flex justify-between items-center mb-2">
-          {label && <span className="text-sm text-dark-300">{label}</span>}
-          {showPercentage && (
-            <span className="text-sm font-mono text-dark-200">{percentage.toFixed(1)}%</span>
+          {label && <span className="text-sm text-gray-400">{label}</span>}
+          {resolvedShowLabel && (
+            <span className="text-sm font-mono text-gray-300">{percentage.toFixed(1)}%</span>
           )}
         </div>
       )}
-      <div className="w-full h-2 bg-dark-700 rounded-full overflow-hidden">
+      <div
+        className={cn(
+          'w-full rounded-full overflow-hidden bg-white/5 backdrop-blur-sm',
+          sizeStyles[size],
+        )}
+        role="progressbar"
+        aria-valuenow={Math.round(percentage)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={label || `${percentage.toFixed(1)}% progress`}
+      >
         <motion.div
-          className={cn('h-full rounded-full', colorStyles[color])}
+          className={cn(
+            'h-full rounded-full bg-gradient-to-r',
+            colors.bar,
+            glow && `shadow-lg ${colors.glow}`,
+          )}
           initial={{ width: 0 }}
           animate={{ width: `${percentage}%` }}
           transition={{ duration: 0.8, ease: 'easeOut' }}
