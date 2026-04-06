@@ -54,3 +54,38 @@ export function formatUSD(value: number): string {
 export function formatPercent(value: number, decimals: number = 2): string {
   return `${value.toFixed(decimals)}%`;
 }
+
+/**
+ * Format a number with compact notation for large values.
+ * e.g., 1234 -> "1,234", 1500000 -> "1.50M", 2300000000 -> "2.30B"
+ */
+export function formatCompact(value: number, decimals: number = 2): string {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? '-' : '';
+
+  if (abs >= 1e12) return `${sign}${(abs / 1e12).toFixed(decimals)}T`;
+  if (abs >= 1e9) return `${sign}${(abs / 1e9).toFixed(decimals)}B`;
+  if (abs >= 1e6) return `${sign}${(abs / 1e6).toFixed(decimals)}M`;
+  if (abs >= 1e4) return `${sign}${abs.toLocaleString('en-US', { maximumFractionDigits: decimals })}`;
+
+  return `${sign}${abs.toLocaleString('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })}`;
+}
+
+/**
+ * Format price with appropriate precision based on magnitude.
+ * Tiny prices get more decimals, huge prices get compact notation.
+ */
+export function formatPrice(value: number): string {
+  const abs = Math.abs(value);
+  if (abs === 0) return '0.0000';
+  if (abs >= 1e12) return `${(value / 1e12).toFixed(2)}T`;
+  if (abs >= 1e9) return `${(value / 1e9).toFixed(2)}B`;
+  if (abs >= 1e6) return `${(value / 1e6).toFixed(2)}M`;
+  if (abs >= 1000) return value.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  if (abs >= 1) return value.toFixed(4);
+  if (abs >= 0.0001) return value.toFixed(6);
+  return value.toExponential(2);
+}

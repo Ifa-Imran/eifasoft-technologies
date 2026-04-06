@@ -10,6 +10,7 @@ import { useApproval } from '@/hooks/useApproval';
 import { useTokenBalances } from '@/hooks/useTokenBalances';
 import { contracts, KAIRO_DECIMALS, USDT_DECIMALS, SWAP_FEE_BPS } from '@/config/contracts';
 import { parseUnits, formatUnits } from 'viem';
+import { formatPrice, formatCompact } from '@/lib/utils';
 import {
   ArrowsRightLeftIcon,
   ArrowDownIcon,
@@ -74,11 +75,11 @@ export default function SwapPage() {
         <div className="grid grid-cols-2 gap-3">
           <GlassCard padding="p-3" variant="cyan">
             <p className="text-[10px] uppercase tracking-wider text-surface-400">Pool KAIRO</p>
-            <p className="text-lg font-mono font-bold text-surface-900">{poolKairo.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+            <p className="text-lg font-mono font-bold text-surface-900">{formatCompact(poolKairo, 0)}</p>
           </GlassCard>
           <GlassCard padding="p-3" variant="gold">
             <p className="text-[10px] uppercase tracking-wider text-surface-400">Pool USDT</p>
-            <p className="text-lg font-mono font-bold text-surface-900">${poolUsdt.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+            <p className="text-lg font-mono font-bold text-surface-900">${formatCompact(poolUsdt, 0)}</p>
           </GlassCard>
         </div>
 
@@ -139,17 +140,17 @@ export default function SwapPage() {
               <div className="p-4 rounded-xl bg-white/60 border border-surface-200 space-y-2 text-xs">
                 <div className="flex justify-between text-surface-500">
                   <span>Rate</span>
-                  <span className="font-mono">1 KAIRO = ${price.toFixed(4)} USDT</span>
+                  <span className="font-mono">1 KAIRO = ${formatPrice(price)} USDT</span>
                 </div>
                 <div className="flex justify-between text-surface-500">
                   <span className="flex items-center gap-1">
                     <FireIcon className="w-3 h-3 text-danger-400" /> Fee (3%)
                   </span>
-                  <span className="font-mono">${fee.toFixed(4)}</span>
+                  <span className="font-mono">${formatCompact(fee, 4)}</span>
                 </div>
                 <div className="flex justify-between text-surface-500">
                   <span>Min Output ({slippage}% slippage)</span>
-                  <span className="font-mono">${minOutput.toFixed(4)}</span>
+                  <span className="font-mono">${formatCompact(minOutput, 4)}</span>
                 </div>
                 {priceImpact > 0.01 && (
                   <div className={`flex justify-between ${priceImpact > 5 ? 'text-danger-500 font-semibold' : 'text-surface-500'}`}>

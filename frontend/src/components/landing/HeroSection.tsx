@@ -5,6 +5,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { AnimatedCounter } from '@/components/ui';
 import { useKairoPrice } from '@/hooks/useKairoPrice';
 import { useGlobalStats } from '@/hooks/useGlobalStats';
+import { formatPrice } from '@/lib/utils';
 
 export function HeroSection() {
   const { price } = useKairoPrice();
@@ -58,12 +59,9 @@ export function HeroSection() {
             <div className="inline-flex items-center gap-2 card px-5 py-2.5 !border-primary-300/50 bg-gradient-to-r from-primary-50/80 to-white/80">
               <div className="w-2.5 h-2.5 rounded-full bg-success-500 animate-pulse shadow-sm shadow-success-400" />
               <span className="text-surface-500 text-sm">KAIRO</span>
-              <AnimatedCounter
-                value={price}
-                prefix="$"
-                decimals={4}
-                className="text-xl font-mono font-bold text-surface-900"
-              />
+              <span className="text-xl font-mono font-bold text-surface-900">
+                ${formatPrice(price)}
+              </span>
             </div>
           )}
           {Number(tvlFormatted) > 0 && (

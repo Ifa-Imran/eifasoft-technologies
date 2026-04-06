@@ -1,7 +1,8 @@
 'use client';
 
 import { useReadContract } from 'wagmi';
-import { contracts } from '@/config/contracts';
+import { formatUnits } from 'viem';
+import { contracts, USDT_DECIMALS } from '@/config/contracts';
 import { LiquidityPoolABI } from '@/config/abis/LiquidityPool';
 
 export function useKairoPrice() {
@@ -15,7 +16,10 @@ export function useKairoPrice() {
     },
   });
 
-  const price = priceData ? Number(priceData) / 1e6 : 0;
+  // getLivePrice returns (usdtBalance * 1e18) / kairoTotalSupply
+  // To convert to USD per KAIRO, divide by 10^USDT_DECIMALS (1e6)
+  // Use formatUnits for safe BigInt -> number conversion (avoids Number() precision loss)
+  const price = priceData ? Number(formatUnits(priceData as bigint, USDT_DECIMALS)) : 0;
 
   return { price, isLoading, refetch };
 }

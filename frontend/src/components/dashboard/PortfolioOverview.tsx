@@ -8,6 +8,7 @@ import { useGlobalStats } from '@/hooks/useGlobalStats';
 import { useSwap } from '@/hooks/useSwap';
 import { formatUnits } from 'viem';
 import { KAIRO_DECIMALS, USDT_DECIMALS } from '@/config/contracts';
+import { formatPrice, formatCompact } from '@/lib/utils';
 import {
   CurrencyDollarIcon,
   BanknotesIcon,
@@ -46,7 +47,7 @@ export function PortfolioOverview() {
           <div>
             <p className="text-sm text-primary-600 mb-2 uppercase tracking-wider font-semibold">Total Portfolio Value</p>
             <p className="text-4xl lg:text-5xl font-mono font-bold gradient-text">
-              ${totalPortfolioUsd.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+              ${formatCompact(totalPortfolioUsd, 2)}
             </p>
           </div>
           <div className="text-right">
@@ -94,21 +95,21 @@ export function PortfolioOverview() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
           label="KAIRO Price"
-          value={price.toFixed(4)}
+          value={formatPrice(price)}
           prefix="$"
           icon={<ChartBarIcon className="w-5 h-5" />}
           gradient="cyan"
         />
         <StatCard
           label="Pool Liquidity"
-          value={totalLiquidity > 1000000 ? (totalLiquidity / 1000000).toFixed(2) + 'M' : totalLiquidity.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+          value={formatCompact(totalLiquidity, 2)}
           prefix="$"
           icon={<BeakerIcon className="w-5 h-5" />}
           gradient="purple"
         />
         <StatCard
           label="Total Circulation"
-          value={totalCirculation > 1000000 ? (totalCirculation / 1000000).toFixed(2) + 'M' : totalCirculation.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+          value={formatCompact(totalCirculation, 0)}
           suffix=" KAIRO"
           icon={<CircleStackIcon className="w-5 h-5" />}
           gradient="gold"

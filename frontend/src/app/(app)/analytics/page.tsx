@@ -6,6 +6,7 @@ import { useKairoPrice } from '@/hooks/useKairoPrice';
 import { useCMS } from '@/hooks/useCMS';
 import { USDT_DECIMALS, KAIRO_DECIMALS, CMS_MAX_SUBSCRIPTIONS } from '@/config/contracts';
 import { formatUnits } from 'viem';
+import { formatPrice, formatCompact } from '@/lib/utils';
 import {
   FireIcon,
   BanknotesIcon,
@@ -51,28 +52,28 @@ export default function AnalyticsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="KAIRO Price"
-          value={price.toFixed(4)}
+          value={formatPrice(price)}
           prefix="$"
           icon={<CurrencyDollarIcon className="w-5 h-5" />}
           gradient="cyan"
         />
         <StatCard
           label="Market Cap"
-          value={marketCap > 1000000 ? (marketCap / 1000000).toFixed(2) + 'M' : marketCap.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+          value={formatCompact(marketCap, 2)}
           prefix="$"
           icon={<ArrowTrendingUpIcon className="w-5 h-5" />}
           gradient="purple"
         />
         <StatCard
           label="Total Value Locked"
-          value={Number(tvlFormatted).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+          value={formatCompact(Number(tvlFormatted), 0)}
           prefix="$"
           icon={<BanknotesIcon className="w-5 h-5" />}
           gradient="gold"
         />
         <StatCard
           label="Total Burned"
-          value={totalBurnedNum.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+          value={formatCompact(totalBurnedNum, 0)}
           suffix=" KAIRO"
           icon={<FireIcon className="w-5 h-5" />}
           gradient="success"
@@ -96,11 +97,11 @@ export default function AnalyticsPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="p-3 rounded-xl bg-gradient-to-br from-white/70 to-primary-50/30 border border-primary-100/50">
                 <p className="text-[10px] uppercase tracking-wider text-surface-400">Circulating</p>
-                <p className="text-lg font-mono font-bold text-surface-900">{totalSupplyNum.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+                <p className="text-lg font-mono font-bold text-surface-900">{formatCompact(totalSupplyNum, 0)}</p>
               </div>
               <div className="p-3 rounded-xl bg-gradient-to-br from-danger-100/60 to-danger-50/40 border border-danger-200/50">
                 <p className="text-[10px] uppercase tracking-wider text-danger-400">Burned</p>
-                <p className="text-lg font-mono font-bold text-danger-600">{totalBurnedNum.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+                <p className="text-lg font-mono font-bold text-danger-600">{formatCompact(totalBurnedNum, 0)}</p>
               </div>
             </div>
             <div>
@@ -129,15 +130,15 @@ export default function AnalyticsPage() {
             <div className="grid grid-cols-3 gap-3">
               <div className="p-3 rounded-xl bg-gradient-to-br from-white/70 to-primary-50/30 border border-primary-100/50 text-center">
                 <p className="text-[10px] uppercase tracking-wider text-surface-400">Staked</p>
-                <p className="text-lg font-mono font-bold text-surface-900">${globalTotalStaked.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+                <p className="text-lg font-mono font-bold text-surface-900">${formatCompact(globalTotalStaked, 0)}</p>
               </div>
               <div className="p-3 rounded-xl bg-gradient-to-br from-success-100/60 to-success-50/40 border border-success-200/50 text-center">
                 <p className="text-[10px] uppercase tracking-wider text-surface-400">Paid Out</p>
-                <p className="text-lg font-mono font-bold text-success-600">${globalTotalPaid.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+                <p className="text-lg font-mono font-bold text-success-600">${formatCompact(globalTotalPaid, 0)}</p>
               </div>
               <div className="p-3 rounded-xl bg-gradient-to-br from-accent-100/60 to-accent-50/40 border border-accent-200/50 text-center">
                 <p className="text-[10px] uppercase tracking-wider text-surface-400">3X Cap</p>
-                <p className="text-lg font-mono font-bold text-accent-600">${globalCapLimit.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+                <p className="text-lg font-mono font-bold text-accent-600">${formatCompact(globalCapLimit, 0)}</p>
               </div>
             </div>
             {globalCapLimit > 0 && (
@@ -169,19 +170,19 @@ export default function AnalyticsPage() {
           <div className="grid grid-cols-2 gap-3">
             <div className="p-3 rounded-xl bg-gradient-to-br from-primary-50/60 to-white border border-primary-100/50">
               <p className="text-[10px] uppercase tracking-wider text-surface-400">Total Swaps</p>
-              <p className="text-lg font-mono font-bold text-primary-700">{totalSwaps.toLocaleString()}</p>
+              <p className="text-lg font-mono font-bold text-primary-700">{formatCompact(totalSwaps, 0)}</p>
             </div>
             <div className="p-3 rounded-xl bg-gradient-to-br from-secondary-50/60 to-white border border-secondary-100/50">
               <p className="text-[10px] uppercase tracking-wider text-surface-400">KAIRO Swapped</p>
-              <p className="text-lg font-mono font-bold text-secondary-700">{totalSwappedKairo.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+              <p className="text-lg font-mono font-bold text-secondary-700">{formatCompact(totalSwappedKairo, 0)}</p>
             </div>
             <div className="p-3 rounded-xl bg-gradient-to-br from-success-50/60 to-white border border-success-100/50">
               <p className="text-[10px] uppercase tracking-wider text-surface-400">USDT Volume</p>
-              <p className="text-lg font-mono font-bold text-success-700">${totalSwappedUsdt.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+              <p className="text-lg font-mono font-bold text-success-700">${formatCompact(totalSwappedUsdt, 0)}</p>
             </div>
             <div className="p-3 rounded-xl bg-gradient-to-br from-accent-100/60 to-accent-50/40 border border-accent-200/50">
               <p className="text-[10px] uppercase tracking-wider text-surface-400">Fees Earned</p>
-              <p className="text-lg font-mono font-bold text-accent-600">${totalFees.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+              <p className="text-lg font-mono font-bold text-accent-600">${formatCompact(totalFees, 0)}</p>
             </div>
           </div>
         </GlassCard>

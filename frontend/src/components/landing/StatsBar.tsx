@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { AnimatedCounter } from '@/components/ui';
 import { useGlobalStats } from '@/hooks/useGlobalStats';
 import { useKairoPrice } from '@/hooks/useKairoPrice';
+import { formatPrice } from '@/lib/utils';
 import {
   CurrencyDollarIcon,
   BanknotesIcon,
@@ -57,13 +58,20 @@ export function StatsBar() {
                 </div>
                 <p className="text-surface-500 text-xs font-medium">{stat.label}</p>
               </div>
-              <AnimatedCounter
-                value={values[stat.key] || 0}
-                prefix={stat.prefix}
-                suffix={stat.suffix}
-                decimals={stat.key === 'price' ? 4 : stat.key === 'tvl' ? 2 : 0}
-                className="text-xl md:text-2xl font-mono font-bold text-surface-900"
-              />
+              {stat.key === 'price' ? (
+                <span className="text-xl md:text-2xl font-mono font-bold text-surface-900">
+                  ${formatPrice(values[stat.key] || 0)}
+                </span>
+              ) : (
+                <AnimatedCounter
+                  value={values[stat.key] || 0}
+                  prefix={stat.prefix}
+                  suffix={stat.suffix}
+                  decimals={stat.key === 'tvl' ? 2 : 0}
+                  compact
+                  className="text-xl md:text-2xl font-mono font-bold text-surface-900"
+                />
+              )}
             </motion.div>
           );
         })}

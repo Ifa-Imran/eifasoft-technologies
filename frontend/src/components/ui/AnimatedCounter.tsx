@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { formatCompact } from '@/lib/utils';
 
 interface AnimatedCounterProps {
   value: number;
@@ -9,6 +10,7 @@ interface AnimatedCounterProps {
   prefix?: string;
   suffix?: string;
   className?: string;
+  compact?: boolean;
 }
 
 export function AnimatedCounter({
@@ -18,6 +20,7 @@ export function AnimatedCounter({
   prefix = '',
   suffix = '',
   className,
+  compact = false,
 }: AnimatedCounterProps) {
   const [displayValue, setDisplayValue] = useState(0);
   const startRef = useRef(0);
@@ -42,13 +45,17 @@ export function AnimatedCounter({
     requestAnimationFrame(animate);
   }, [value, duration]);
 
+  const formatted = (compact || Math.abs(displayValue) >= 1e6)
+    ? formatCompact(displayValue, decimals)
+    : displayValue.toLocaleString('en-US', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      });
+
   return (
     <span className={className}>
       {prefix}
-      {displayValue.toLocaleString('en-US', {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals,
-      })}
+      {formatted}
       {suffix}
     </span>
   );
