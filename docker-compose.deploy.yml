@@ -1,0 +1,99 @@
+services:
+  postgres:
+    image: timescale/timescaledb:latest-pg14
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kairo_admin
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: kairo_prod
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - kairo_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kairo_admin -d kairo_prod"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD} --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - kairo_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: kairodao-backend
+    pull_policy: never
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - DATABASE_URL=postgresql://kairo_admin:${DB_PASSWORD}@postgres:5432/kairo_prod
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
+      - RPC_URL=${RPC_URL}
+      - RPC_WS_URL=${RPC_WS_URL}
+      - CHAIN_ID=${CHAIN_ID}
+      - INDEXER_PRIVATE_KEY=${INDEXER_PRIVATE_KEY}
+      - KAIRO_TOKEN_ADDRESS=${KAIRO_TOKEN_ADDRESS}
+      - LIQUIDITY_POOL_ADDRESS=${LIQUIDITY_POOL_ADDRESS}
+      - STAKING_MANAGER_ADDRESS=${STAKING_MANAGER_ADDRESS}
+      - AFFILIATE_DISTRIBUTOR_ADDRESS=${AFFILIATE_DISTRIBUTOR_ADDRESS}
+      - CMS_ADDRESS=${CMS_ADDRESS}
+      - ATOMIC_P2P_ADDRESS=${ATOMIC_P2P_ADDRESS}
+      - SYSTEM_WALLET=${SYSTEM_WALLET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - kairo_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=kairodao_kairo_network"
+      - "traefik.http.routers.kairodao-api.rule=(Host(`kairodao.com`) || Host(`dev.kairodao.com`)) && PathPrefix(`/api`)"
+      - "traefik.http.routers.kairodao-api.entrypoints=websecure"
+      - "traefik.http.routers.kairodao-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.kairodao-api.loadbalancer.server.port=4000"
+      - "traefik.http.routers.kairodao-ws.rule=(Host(`kairodao.com`) || Host(`dev.kairodao.com`)) && PathPrefix(`/ws`)"
+      - "traefik.http.routers.kairodao-ws.entrypoints=websecure"
+      - "traefik.http.routers.kairodao-ws.tls.certresolver=letsencrypt"
+      - "traefik.http.services.kairodao-ws.loadbalancer.server.port=4000"
+      - "traefik.http.routers.kairodao-health.rule=(Host(`kairodao.com`) || Host(`dev.kairodao.com`)) && PathPrefix(`/health`)"
+      - "traefik.http.routers.kairodao-health.entrypoints=websecure"
+      - "traefik.http.routers.kairodao-health.tls.certresolver=letsencrypt"
+      - "traefik.http.services.kairodao-health.loadbalancer.server.port=4000"
+
+  frontend:
+    image: kairodao-frontend
+    pull_policy: never
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - kairo_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=kairodao_kairo_network"
+      - "traefik.http.routers.kairodao-frontend.rule=Host(`kairodao.com`) || Host(`www.kairodao.com`) || Host(`dev.kairodao.com`)"
+      - "traefik.http.routers.kairodao-frontend.entrypoints=websecure"
+      - "traefik.http.routers.kairodao-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.kairodao-frontend.loadbalancer.server.port=3000"
+      - "traefik.http.routers.kairodao-frontend.priority=1"
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  kairo_network:
+    driver: bridge

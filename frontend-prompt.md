@@ -1,287 +1,233 @@
-KAIRO DAO - Futuristic DeFi Interface Development Prompt
-Project Identity & Aesthetic Direction
-Name: Kairo DAO
-Theme: "Neural Nexus" - Cybernetic DeFi Interface
-Vibe: Blade Runner meets Wall Street. Deep space aesthetics with holographic data visualization.
-Color Palette:
-Primary Background: #050507 (Deep Void Black)
-Secondary Background: #0A0A0F (Cosmic Navy)
-Accent Primary: #00F0FF (Neon Cyan - Interactions)
-Accent Secondary: #7000FF (Plasma Purple - Rewards/Income)
-Accent Tertiary: #FF2E63 (Neon Coral - Alerts/3X Cap warnings)
-Success: #00FFA3 (Matrix Green)
-Warning: #FFB800 (Solar Amber)
-Glassmorphism: rgba(10, 10, 15, 0.7) with backdrop-filter: blur(20px)
-Typography:
-Headers: "Orbitron" or "Space Grotesk" (Geometric, futuristic)
-Body: "Inter" or "SF Pro Display" (Clean, readable)
-Numbers: "JetBrains Mono" or "Roboto Mono" (Tabular figures for financial data)
-Technical Stack Requirements
-TypeScript
+KAIRO DeFi Frontend Redesign
+Project Context
+You are redesigning the frontend for KAIRO - a sophisticated DeFi ecosystem with:
+StakingManager: 3-tier staking with 0.1% compounding, 3X FIFO hard cap, 80% return on unstake
+AffiliateDistributor: 15-level referral system with rank salaries, weekly/monthly qualifiers
+AtomicP2P: Decentralized P2P trading with atomic settlement
+CoreMembershipSubscription (CMS): 10 USDT subscription with loyalty rewards
+LiquidityPool: One-way DEX (KAIRO→USDT only) with 3% fees and deflationary mechanics
+KAIROToken: ERC20 with social lock, price-aware minting, burn tracking
+🎯 Design Philosophy
+"Aurora Financial" - A futuristic, light-themed DeFi interface that feels like trading in a premium space station observatory. Clean, breathable, with subtle energy pulses indicating live blockchain activity.
+🌈 Color Palette (Light Theme)
+Table
+Role	Color	Hex	Usage
+Primary	Aurora Cyan	#06B6D4	CTAs, active states, links
+Secondary	Cosmic Purple	#8B5CF6	Rank tiers, special badges
+Accent	Solar Gold	#F59E0B	Rewards, yields, positive values
+Success	Emerald Pulse	#10B981	Confirmed, active stakes
+Warning	Amber Alert	#F97316	Alerts, pending actions
+Danger	Ruby Red	#EF4444	Errors, unstaking, burns
+Background	Pure Light	#FAFBFC	Main background
+Surface	Frost White	#FFFFFF	Cards, modals
+Surface Elevated	Cloud White	#F1F5F9	Hover states, secondary surfaces
+Border	Ethereal Gray	#E2E8F0	Subtle dividers
+Text Primary	Deep Space	#0F172A	Headlines, important text
+Text Secondary	Nebula Gray	#64748B	Descriptions, labels
+Text Tertiary	Mist Gray	#94A3B8	Timestamps, hints
+Gradient Accents:
+Primary Gradient: linear-gradient(135deg, #06B6D4 0%, #8B5CF6 100%)
+Success Gradient: linear-gradient(135deg, #10B981 0%, #06B6D4 100%)
+Gold Gradient: linear-gradient(135deg, #F59E0B 0%, #F97316 100%)
+🖥️ Layout Architecture
+Dashboard Structure (Single-Page Application with Deep Linking):
+plain
 Copy
-// Core Framework
-- Next.js 14 (App Router)
-- TypeScript (Strict mode)
-- Tailwind CSS (Custom design system)
-
-// Web3 Integration  
-- RainbowKit (Custom themed) + wagmi + viem
-- Wallet Support: MetaMask, WalletConnect, Coinbase, Trust Wallet, TokenPocket, OKX Wallet
-- Chain: opBNB (Chain ID: 204) + opBNB Testnet
-
-// State & Data
-- Zustand (Global state)
-- TanStack Query (Server state caching)
-- WebSocket connection for real-time stake updates
-
-// Animation & 3D
-- Framer Motion (Page transitions, micro-interactions)
-- Three.js / React Three Fiber (Background neural network visualization)
-- GSAP (ScrollTrigger for landing page)
-
-// Charts & Visualization
-- TradingView Lightweight Charts (P2P price history)
-- Recharts (Staking analytics, team volume)
-
-// UI Components
-- Radix UI primitives (Accessibility first)
-- Custom glassmorphic components
-Global Design System Specifications
-1. Glassmorphic Card Component
-TypeScript
+┌─────────────────────────────────────────────────────────────┐
+│  [Logo]  Dashboard  Staking  P2P Trade  Affiliate  CMS  [Wallet] │
+├─────────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────────┐  │
+│  │  HERO STATS BAR (Live Price + Global Stats)            │  │
+│  │  KAIRO $X.XXXX  |  TVL $XXX,XXX  |  Total Burned XXX   │  │
+│  └─────────────────────────────────────────────────────────┘  │
+│                                                              │
+│  ┌─────────────────────┐  ┌─────────────────────────────┐  │
+│  │  PORTFOLIO CARD     │  │  ACTIVE STAKES (Scrollable) │  │
+│  │  • Total Staked     │  │  ┌─────────────────────┐    │  │
+│  │  • Total Earned     │  │  │  Stake #1 [TIER 2]  │    │  │
+│  │  • Harvestable      │  │  │  Progress to 3X Cap │    │  │
+│  │  • KAIRO Balance    │  │  │  [Compound] [Harvest]│   │  │
+│  │  • USDT Balance     │  │  └─────────────────────┘    │  │
+│  │  • Next Compound    │  │  ┌─────────────────────┐    │  │
+│  │    Countdown        │  │  │  Stake #2 [TIER 1]  │    │  │
+│  └─────────────────────┘  │  └─────────────────────┘    │  │
+│                           └─────────────────────────────┘  │
+│  ┌─────────────────────────────────────────────────────────┐  │
+│  │  QUICK ACTIONS ROW                                      │  │
+│  │  [🎯 Stake] [⚡ Compound All] [💰 Harvest All] [🔄 Swap] │  │
+│  └─────────────────────────────────────────────────────────────┘
+✨ Component Specifications
+1. Cards (Glassmorphism Light)
+css
 Copy
-// All content containers must use:
-- Background: rgba(10, 10, 15, 0.6)
-- Backdrop-filter: blur(20px) saturate(180%)
-- Border: 1px solid rgba(255, 255, 255, 0.08)
-- Box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37)
-- Border-radius: 16px (mobile: 12px)
-- Hover state: Border glows with accent color, subtle lift transform
-2. Neon Button Variants
-Primary: Cyan gradient background (#00F0FF to #0080FF), black text, glow effect on hover
-Secondary: Transparent with cyan border, cyan text, fill animation on hover
-Warning (3X Cap): Pulsing coral gradient (#FF2E63 to #FF6B6B), urgent micro-animations
-Disabled: Grayed out with "LOCKED" holographic overlay
-3. Data Visualization Style
-All numbers use mono-spaced fonts
-Large figures (TVL, Prices) have animated counting on load
-Percentage changes use arrow indicators with color coding
-"Live" indicators use pulsing cyan dots
-4. Background Effects
-Primary: Dark gradient mesh with subtle floating particles
-Dashboard: Interactive neural network visualization (Three.js) showing connected nodes representing team referrals
-Mobile: Simplified gradient to preserve battery
-Page Architecture & Features
-PAGE 1: LANDING PAGE (/)
-Hero Section:
-Headline: "The Future of Deflationary Wealth" (Kinetic typography animation)
-Subheadline: "3X Capped Staking • Neural Referral Networks • Atomic P2P Exchange"
-CMS Countdown Timer:
-Large holographic display showing time remaining until deadline (May 1, 2026)
-Progress bar showing subscription fill (10,000 max)
-Live counter: "X,XXX Subscriptions Remaining"
-Critical UI: Warning badge if deadline approaching (< 7 days)
-Live Metrics Ticker:
-Floating glass bar showing: KAIRO Price | Total Value Locked | Total Burned | Active Stakes
-Updates every 30 seconds with smooth number transitions
-Feature Grid (3 Cards):
-"The 3X Protocol" - Explain hard cap mechanism with animated diagram
-"Neural Networks" - 5-level referral visualization
-"Atomic Exchange" - Zero-slippage P2P trading preview
-CTA Section:
-"Enter The DAO" button with wallet connection modal
-Footer with contract addresses (click to copy) and security badges
-PAGE 2: DASHBOARD (/dashboard)
-Layout: Sidebar navigation (collapsible on mobile) + Main content grid
-Header Stats Cards (4-column grid, stack on mobile):
-Portfolio Value: USD equivalent of all stakes + rewards (large cyan numbers)
-Active Stakes: Count + Next compound timer (countdown)
-3X Cap Status: Visual circular progress bar showing proximity to 3X cap (coral warning when >80%)
-Claimable Rewards: Breakdown by type (Direct/Team/Rank/Qualifier)
-Main Sections:
-A. Staking Control Center
-Tier Selection Visualizer:
-3 horizontal cards showing Tier 1 (8h), Tier 2 (6h), Tier 3 (4h)
-Auto-highlight based on input amount
-"Current APY" display (dynamic based on compound frequency)
-Active Stakes Table:
-Columns: Stake ID | Amount | Tier | Current Value | Next Compound | 3X Progress | Actions
-3X Progress Column: Mini progress bar with color coding (Green <50%, Yellow 50-80%, Red >90%)
-Actions: Compound (manual), Harvest, Unstake (with 20% penalty warning modal)
-Compound Animation: When triggered, show particle explosion effect with "+X.XX USDT" floating text
-B. Affiliate Neural Network
-Referral Link Generator: Copy button with "copied" confirmation
-5-Level Tree Visualization:
-Interactive collapsible tree diagram
-Each node shows: Address (truncated) | Volume | Direct Count
-Color-coded by activity level
-Mobile: Vertical accordion list instead of tree
-Income Breakdown Cards:
+/* Frosted glass effect for light theme */
+.card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 16px;
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.02),
+    0 2px 4px -1px rgba(0, 0, 0, 0.02),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 20px 25px -5px rgba(6, 182, 212, 0.1),
+    0 10px 10px -5px rgba(6, 182, 212, 0.04);
+  border-color: rgba(6, 182, 212, 0.3);
+}
+2. Live Price Ticker
+Design: Floating pill-shaped badge with pulsing dot
+Animation: Subtle pulse on price update (green flash for up, red for down)
+Format: KAIRO $2.4582 ▲ 2.4% with 6 decimal precision
+3. Stake Cards (Tier Visual System)
+Table
+Tier	Visual Treatment	Color Code
+Tier 0 (10-499 USDT)	Bronze shimmer border	#CD7F32
+Tier 1 (500-1999 USDT)	Silver glow + icon	#C0C0C0
+Tier 2 (2000+ USDT)	Gold aura + crown icon	#FFD700
+Stake Card Elements:
+Circular progress ring showing 3X cap progress (0-100%)
+Live countdown to next compound (animated)
+"Compound" button with lightning bolt icon (disabled until ready)
+"Harvest" button only shows when ≥$10 harvestable
+4. 3X Cap Visualization
+Design: Liquid fill animation inside card border
+Colors: Blue (0-50%) → Purple (50-80%) → Gold (80-100%)
+At 100%: Card gets "completed" state with sparkle animation, auto-close notice
+5. Referral Tree (Affiliate Page)
+Visual: Collapsible tree structure with connected lines
+Levels: Color-coded depth indicators (L1: Cyan, L5: Purple, L15: Deep Purple)
+Stats: Direct count badge, Team volume with animated number counting
+Rank Badge: Current rank with progress to next tier
+6. P2P Trading Interface
+Order Book: Split-pane design (Buy orders left / Sell orders right)
+Order Cards: Clean list with price, amount, "Fill" action
+Create Order: Modal with amount input, live preview of receive amount
+Price Indicator: Live LiquidityPool price comparison (fair price indicator)
+7. CMS Subscription Card
+Visual: Limited edition feel - "10,000 MAX" counter
+Progress Bar: Global subscription fill (visual scarcity)
+Reward Preview: 5 KAIRO loyalty + potential referral rewards
+Countdown: Deadline timer if active
+🎬 Animations & Micro-interactions
+Page Load Sequence
+Background gradient subtle shift (infinite slow animation)
+Cards stagger-fade in (100ms delay between each)
+Numbers count up from 0 to actual values
+Live price ticker starts pulsing
+Interaction Feedback
+Buttons: Scale 0.98 on press, ripple effect from click point
+Cards: Lift 2px + shadow intensify on hover
+Success States: Checkmark draw animation + confetti burst (subtle)
+Loading: Skeleton screens with shimmer gradient (never spinning wheels)
+Transactions: Toast notifications slide in from top-right with progress
+Data Updates
+Price changes: Smooth number transition (count animation)
+Stake progress: Liquid fill animation (CSS transitions)
+New stakes: Card slides in with spring physics
+Compounds: Flash effect on card + "⚡" particle burst
+📱 Responsive Breakpoints
+Table
+Breakpoint	Layout Changes
+Desktop (>1280px)	Full 3-column dashboard, side-by-side P2P order books
+Tablet (768-1279px)	2-column layout, collapsible sidebar navigation
+Mobile (<768px)	Single column, bottom tab navigation, swipeable stake cards
+Mobile-Specific:
+Stake cards become horizontal swipeable carousel
+Quick actions become floating action button (FAB) with expand menu
+Wallet connection prominent top bar
+Pull-to-refresh for data updates
+🔤 Typography
+Table
+Element	Font	Weight	Size	Line Height
+Display	Inter	800	48px	1.1
+H1	Inter	700	32px	1.2
+H2	Inter	600	24px	1.3
+Card Title	Inter	600	18px	1.4
+Body	Inter	400	16px	1.5
+Numbers	JetBrains Mono	500	14px	1.2
+Captions	Inter	500	12px	1.4
+Number Formatting:
+Currency: $12,345.67 (always 2 decimals for USD)
+KAIRO: 1,234.567890 (6 decimals)
+Percentages: 12.34% (always 2 decimals)
+Large numbers: 1.2M, 456K abbreviations
+🧩 Page Specifications
+Dashboard (Home)
+Hero: Live KAIRO price with 24h chart sparkline
+Portfolio Overview: Total value in USD + KAIRO breakdown
+Active Stakes: Sortable list (by tier, by progress, by time)
+Quick Actions: Stake modal, Compound All, Harvest All
+Recent Activity: Last 5 transactions with status
+Staking Page
+Stake Creation: Stepper modal (Amount → Tier Preview → Referrer → Confirm)
+Tier Comparison: Visual table showing 8h/6h/4h compound intervals
+My Stakes: Detailed grid with compound buttons per stake
+3X Cap Dashboard: Visual representation of FIFO queue
+Affiliate Page
+Rank Card: Current rank, salary amount, next claim countdown
+Referral Tree: Interactive collapsible tree (lazy load deep levels)
+Income Breakdown: 5 income types with harvest buttons
 Direct Dividends (5%)
-Team Dividends (L1: 10%, L2-10: 5%, L11-15: 2%)
-Rank Salary (Weekly)
-Qualifier Bonuses (Weekly/Monthly)
-Harvest Button: Per category, disabled if < $10, shows USD → KAIRO conversion preview
-C. CMS Status Widget
-Subscription count owned
-Loyalty rewards (5 KAIRO per sub)
-Leadership rewards (accumulated)
-CRITICAL UI ELEMENT: "Claim Status"
-Green: Ready to claim (active stake detected)
-Red: "NO ACTIVE STAKE - CLAIM WILL BE FORFEITED"
-Warning modal: "You are about to permanently lose X KAIRO due to insufficient stake"
-PAGE 3: STAKING INTERFACE (/stake)
-Step-by-Step Flow:
-Step 1: Amount Input
-Large numeric input with USDT suffix
-Slider for quick selection (10 - 10,000 USDT)
-Tier Auto-Detection: Visual highlight of which tier the amount qualifies for
-Info tooltip: "Higher tiers compound faster (more daily closings)"
-Step 2: Referrer Input
-Optional field with validation
-"Check" button to verify referrer exists
-Warning: "No self-referral allowed"
-Step 3: Confirmation Modal
-Summary: Amount | Tier | Compound Interval | Estimated 3X Date
-Risk Disclosure: Checkbox required: "I understand that unstaking before 3X cap returns only 80% of value"
-Gas estimation display (opBNB: ~$0.01)
-Post-Stake Animation:
-Success screen with "Stake Activated" holographic badge
-Auto-redirect to dashboard after 3 seconds
-PAGE 4: ATOMIC P2P EXCHANGE (/exchange)
-Layout: Split-screen (Order Book Left, Chart Right) - Stacks on mobile
-Price Chart (Top):
-TradingView Lightweight Chart
-KAIRO/USDT pair
-Timeframes: 1H, 4H, 1D, 1W
-Volume bars at bottom
-Order Book Interface:
-Create Order Panel:
-Tabs: Buy KAIRO | Sell KAIRO
-Buy Form: USDT Amount input → Calculates KAIRO received at live price
-Sell Form: KAIRO Amount input → Calculates USDT received
-Price Display: "Current Oracle Price: $X.XXXX"
-Fee Display: "Network Fee: 2% (1% Burn, 1% LP)"
-Note: One-way swap warning if trying to buy KAIRO directly (redirect to P2P)
-Order Book List:
-Buy Orders: Green gradient rows (Price | Available | Total | Action)
-Sell Orders: Red gradient rows
-Matching Interface: Click order to auto-fill trade form
-Partial Fill Support: Show "Fill X%" slider
-My Orders Section:
-Active orders with cancel button
-Trade history with status badges
-PAGE 5: RANK & QUALIFIERS (/rank)
-Rank Progress Visualization:
-10-level pyramid diagram (Starlight → Nova → Galaxy → Universe tiers)
-Current rank highlighted with neon glow
-Progress to next rank: "XXX USDT Volume Needed"
-50% Leg Rule Visualization: Pie chart showing team volume distribution by leg
-Qualifier Status:
-Weekly qualifier progress bar (3% pool share)
-Monthly qualifier progress bar (2% pool share)
-Countdown to next distribution
-Critical UI/UX Requirements
-Mobile Responsiveness
-Breakpoint Strategy:
-Desktop: 1440px+ (Full sidebar, multi-column grids)
-Tablet: 768px-1439px (Collapsed sidebar, 2-column grids)
-Mobile: <768px (Bottom navigation bar, single column, swipeable tabs)
-Touch Targets: Minimum 48px for all buttons
-Wallet Connection: Deep linking for mobile wallets (MetaMask app, Trust Wallet)
-Wallet Integration Deep Dive
-TypeScript
-Copy
-// Required Wallet Support:
-- Injected (MetaMask, Trust Wallet)
-- WalletConnect v2 (Support ALL wallets via QR + mobile deep link)
-- Coinbase Wallet
-- TokenPocket
-- OKX Wallet
-- Safe (Gnosis) for multisig users
-
-// Connection UI:
-- RainbowKit custom theme matching Kairo DAO colors
-- "Connecting" state with animated loading
-- Network auto-switch to opBNB (prompt user if wrong network)
-- Display connected wallet icon + truncated address in header
-Real-Time Features
-WebSocket Connections:
-Stake compounding events (live notification when compound happens)
-New P2P orders
-Price updates from LiquidityPool
-Toast Notifications:
-Transaction pending (cyan, spinning)
-Transaction success (green, checkmark)
-Transaction failed (red, error details)
-3X Cap reached (urgent coral alert with sound effect)
-Critical Warning Modals
-3X Cap Approaching: When user reaches 90% of 3X cap, show persistent banner: "Cap imminent. Compound or unstake to secure rewards."
-CMS Forfeiture Warning: Before claim, force 2-step confirmation if excess will be burned
-Unstake Penalty: Clear breakdown: "You will receive 80% minus harvested rewards. X USDT will be forfeited."
-Loading States & Skeletons
-All data-fetching components use shimmer skeletons matching the glassmorphic style
-Transaction buttons show "Confirm in Wallet..." → "Processing..." → "Confirmed" states
-Never show empty states; use "Connect Wallet" placeholders or "-"
-Smart Contract Interaction Mapping
-Contract Addresses (Environment Variables)
-env
-Copy
-NEXT_PUBLIC_KAIRO_TOKEN=0x...
-NEXT_PUBLIC_CMS=0x...
-NEXT_PUBLIC_STAKING_MANAGER=0x...
-NEXT_PUBLIC_AFFILIATE_DISTRIBUTOR=0x...
-NEXT_PUBLIC_LIQUIDITY_POOL=0x...
-NEXT_PUBLIC_ATOMIC_P2P=0x...
-NEXT_PUBLIC_USDT=0x...
-Key Function Implementations
-Staking Flow:
-TypeScript
-Copy
-// Approve USDT → Stake → Update UI optimistically
-// Handle events: StakeCreated, Compounded, CapReached
-// Calculate 3X progress: (totalEarned / (originalAmount * 3)) * 100
-CMS Claim Flow:
-TypeScript
-Copy
-// Check: stakingManager.getTotalActiveStakeValue(user) > 0
-// Calculate max claimable: (stakeValue * 1e18) / livePrice
-// If rewards > max → Show "Burn Warning" with exact amount to be lost
-// Execute claim → Clear loyalty/leadership balances
-Harvest Flow:
-TypeScript
-Copy
-// Check minimum $10 per type
-// Show preview: "Harvest X USD = Y KAIRO at current price"
-// Batch harvest option (harvest all types in one tx if possible)
-Performance & Security Requirements
-Optimization
-Image Optimization: WebP format, lazy loading
-Code Splitting: Dynamic imports for heavy components (Three.js, Charts)
-RPC Fallbacks: Primary (opBNB official) → Backup (Ankr/NodeReal) → Local
-Caching: TanStack Query with 30s stale time for blockchain data
-Security UI Patterns
-Transaction Preview: Always show exact token amounts before signing
-Contract Verification: Badge showing "Verified Contract" with link to explorer
-Slippage Protection: User-configurable (0.5%, 1%, 2%) with warning if high
-Approval Limits: Use exact approvals instead of unlimited (UI toggle for "Use exact amount")
-Accessibility Requirements
+Team Dividends (15 levels)
+Rank Salary
+Weekly Qualifier (3% pool)
+Monthly Qualifier (2% pool)
+Fresh Business Tracker: Weekly/monthly progress bars to $50k/$500k thresholds
+P2P Trading Page
+Market Overview: Best buy/sell prices, spread indicator
+Order Book: Live order lists with fill buttons
+My Orders: Active orders with cancel option
+Trade History: Completed trades with price executed
+CMS Page
+Subscription Card: Price (10 USDT), remaining slots counter
+Referral Link: Copy button with QR code option
+Rewards Preview: Loyalty + leadership reward calculator
+Claim Section: One-time claim UI with stake requirement warning
+⚡ Technical Requirements
+Framework: Next.js 14+ with App Router
+Styling: Tailwind CSS with custom design tokens
+Animation: Framer Motion for page transitions, CSS for micro-interactions
+Charts: Recharts or TradingView lightweight charts for price history
+Web3: wagmi/viem for contract interactions (preserve existing hooks)
+State: React Query for server state, Zustand for UI state
+Performance Targets:
+First Contentful Paint < 1.5s
+Time to Interactive < 3s
+Lighthouse Score > 90
+Smooth 60fps animations
+Accessibility:
 WCAG 2.1 AA compliance
-Keyboard navigation support (Tab through all interactive elements)
-Screen reader labels for all crypto-specific terms ("3X Cap" explained as "Triple your stake limit")
-Color contrast ratio minimum 4.5:1 (adjust neon colors with dark backgrounds)
-Reduced motion option (disable Three.js and heavy animations if user prefers)
-Deliverables Checklist
-[ ] Next.js 14 project setup with TypeScript
-[ ] Complete component library (Storybook preferred)
-[ ] All 5 pages with full functionality
-[ ] RainbowKit integration with 8+ wallets
-[ ] Mobile-responsive layouts (tested on iOS Safari + Android Chrome)
-[ ] Real-time WebSocket connections for stake updates
-[ ] Three.js background animation (desktop only)
-[ ] Complete interaction with all 6 smart contracts
-[ ] Error handling for all transaction failures
-[ ] Loading states and optimistic updates
-[ ] SEO optimization (meta tags, Open Graph images)
-Final Instruction for AI Agent:
-Build this as if it's going to handle $10M+ in TVL on day one. Every button click must feel satisfying, every number must update in real-time, and every warning must be impossible to ignore. The 3X cap mechanism and CMS forfeiture warnings are legally critical—make them unmistakably clear. Make opBNB feel like a premium chain, not a secondary network.
+Keyboard navigation for all actions
+Screen reader optimized transaction flows
+Reduced motion support
+🎁 Special Features to Implement
+Live Compound Countdown: Per-stake timer showing "Next compound in 04:32:18"
+3X Cap Predictor: "At current rate, cap reached in ~12 days"
+Rank Progress Visual: Team volume bar with 50% max-leg rule indicator
+Affiliate Link Generator: One-click copy with social sharing
+Transaction Receipts: Beautiful success modals with shareable cards
+Price Alert Toast: When KAIRO moves >5% in 5 minutes
+Gas Estimation: Show estimated BNB cost for each transaction
+Multi-language Support: i18n ready (English, Chinese, Spanish, Russian)
+🚫 Anti-Patterns to Avoid
+❌ Dark mode (stick to premium light theme)
+❌ Pure black text (use #0F172A soft black)
+❌ Harsh shadows (use diffuse, colored shadows)
+❌ Loading spinners (use skeleton screens)
+❌ Alert fatigue (batch notifications, use gentle badges)
+❌ Cluttered dashboards (progressive disclosure, collapsible sections)
+❌ Technical jargon (use "Earn" not "Compound", "Claim" not "Harvest" where possible)
+✅ Success Metrics
+The redesign should feel:
+Premium: Like using a luxury fintech app, not a typical DeFi interface
+Alive: Data feels live, responsive, connected to blockchain
+Trustworthy: Clear risk indicators, transparent fees, honest APY displays
+Effortless: 3-tap maximum for common actions (stake, compound, claim)
+Delightful: Small moments of joy in animations and micro-interactions
+Execute this design system across all pages, ensuring every interaction feels intentional and every piece of data is beautifully presented. The KAIRO ecosystem is sophisticated - the UI should match that sophistication with clarity and elegance.

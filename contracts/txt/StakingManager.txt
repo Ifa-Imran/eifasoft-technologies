@@ -36,20 +36,30 @@ interface ILiquidityPool {
 interface IAffiliateDistributor {
     function distributeDirect(address _referrer, uint256 _stakeAmount) external;
     function distributeTeamDividend(address _staker, uint256 _profit) external;
+    function addTeamVolume(address _staker, uint256 _amount) external;
+    function removeTeamVolume(address _staker, uint256 _amount) external;
+    function addProfit(uint256 _profit) external;
+    function tryCloseEpochs() external;
+    function genesisAccount() external view returns (address);
 }
 
 /**
  * @title StakingManager - Core Staking Engine for the KAIRO DeFi Ecosystem
  * @dev Implements a 3-tier staking system with 0.1% compounding per interval,
  *      3X hard cap auto-close, 80% return on unstake, and affiliate integration.
+ *      Fully decentralized: all operations are user-triggered, no backend roles needed.
  *
  * Features:
  * - 3-tier system with different compound intervals (8h / 6h / 4h)
  * - 0.1% profit per compound interval
- * - 3X hard cap: auto-closes stake when totalEarned >= 3 * originalAmount
+ * - 3X hard cap: FIFO model — all income types (compound, direct, team, rank,
+ *   weekly/monthly qualifier, CMS loyalty/leadership) fill oldest stake first.
+ *   When a stake's attributed earnings reach 3X originalAmount, it auto-closes.
  * - 80% return on unstake with harvested rewards deduction
+ * - Fund distribution: 90% LP, 5% to 5 DAO wallets (1% each), 5% to development fund wallet
  * - Affiliate direct dividends (5%) and team dividends on compound
- * - COMPOUNDER_ROLE for backend-triggered compounding
+ * - Permissionless compounding: anyone can compound for anyone (time-gated)
+ * - On-chain team volume propagation and profit tracking
  * - Pausable + ReentrancyGuard + AccessControl
  */
 contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
@@ -73,7 +83,8 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
         uint256 startTime;
         uint256 lastCompoundTime;
         uint256 harvestedRewards;  // Tracks harvested amounts (for unstake deduction)
-        uint256 totalEarned;       // Tracks total earned (for 3X cap)
+        uint256 totalEarned;       // FIFO cap tracker (all income types attributed via FIFO)
+        uint256 compoundEarned;    // Compound profit on THIS stake (for harvest)
         bool active;
         uint8 tier;
     }
@@ -86,7 +97,9 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
     ILiquidityPool public liquidityPool;
     IERC20 public usdt;
     address public affiliateDistributor;
-    address public systemWallet;
+    address public cmsContract;
+    address public developmentFundWallet;
+    address[5] public daoWallets;
 
     // ============ Constants ============
     uint256 public constant MIN_STAKE = 10 * 10 ** 18;       // 10 USDT minimum
@@ -103,26 +116,35 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
     event CapReached(address indexed user, uint256 stakeId, uint256 totalEarned);
     event Harvested(address indexed user, uint256 stakeId, uint256 amount);
     event AffiliateDistributorSet(address indexed distributor);
-    event SystemWalletSet(address indexed wallet);
+    event DevelopmentFundWalletSet(address indexed wallet);
+    event DaoWalletsSet(address[5] wallets);
+    event CMSSet(address indexed cms);
+    event EarningsApplied(address indexed user, uint256 amount);
 
     // ============ Constructor ============
     constructor(
         address _kairoToken,
         address _liquidityPool,
         address _usdt,
-        address _systemWallet,
+        address _developmentFundWallet,
+        address[5] memory _daoWallets,
         address _admin
     ) {
         require(_kairoToken != address(0), "StakingManager: Invalid KAIRO token");
         require(_liquidityPool != address(0), "StakingManager: Invalid LiquidityPool");
         require(_usdt != address(0), "StakingManager: Invalid USDT");
-        require(_systemWallet != address(0), "StakingManager: Invalid system wallet");
+        require(_developmentFundWallet != address(0), "StakingManager: Invalid development fund wallet");
         require(_admin != address(0), "StakingManager: Invalid admin");
+
+        for (uint256 i = 0; i < 5; i++) {
+            require(_daoWallets[i] != address(0), "StakingManager: Invalid DAO wallet");
+        }
 
         kairoToken = IKAIROToken(_kairoToken);
         liquidityPool = ILiquidityPool(_liquidityPool);
         usdt = IERC20(_usdt);
-        systemWallet = _systemWallet;
+        developmentFundWallet = _developmentFundWallet;
+        daoWallets = _daoWallets;
 
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
 
@@ -143,6 +165,16 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
      */
     function stake(uint256 _usdtAmount, address _referrer) external nonReentrant whenNotPaused {
         require(_usdtAmount >= MIN_STAKE, "StakingManager: Below minimum stake");
+        require(_referrer != address(0), "StakingManager: Referrer required");
+        require(_referrer != msg.sender, "StakingManager: No self-referral");
+
+        // Genesis account (first registered, root of referral tree) cannot stake
+        if (affiliateDistributor != address(0)) {
+            require(
+                msg.sender != IAffiliateDistributor(affiliateDistributor).genesisAccount(),
+                "StakingManager: Genesis account cannot stake"
+            );
+        }
 
         // Auto-detect tier
         uint8 tierIndex = _detectTier(_usdtAmount);
@@ -150,11 +182,23 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
         // Transfer USDT from user to this contract
         require(usdt.transferFrom(msg.sender, address(this), _usdtAmount), "StakingManager: USDT transfer failed");
 
-        // Forward 60% of staking funds to LiquidityPool for liquidity backing
-        uint256 liquidityPoolShare = (_usdtAmount * 60) / 100;
+        // --- Fund Distribution: 90% LP, 5% DAO wallets, 5% support wallet ---
+
+        // Forward 90% of staking funds to LiquidityPool for liquidity backing
+        uint256 liquidityPoolShare = (_usdtAmount * 90) / 100;
         require(usdt.approve(address(liquidityPool), liquidityPoolShare), "StakingManager: USDT approve failed");
         require(usdt.transfer(address(liquidityPool), liquidityPoolShare), "StakingManager: LiquidityPool transfer failed");
         liquidityPool.receiveStakingFunds(liquidityPoolShare);
+
+        // Forward 5% split equally to 5 DAO wallets (1% each)
+        uint256 daoSharePerWallet = (_usdtAmount * 1) / 100;
+        for (uint256 i = 0; i < 5; i++) {
+            require(usdt.transfer(daoWallets[i], daoSharePerWallet), "StakingManager: DAO wallet transfer failed");
+        }
+
+        // Forward 5% to development fund wallet
+        uint256 developmentFundShare = (_usdtAmount * 5) / 100;
+        require(usdt.transfer(developmentFundWallet, developmentFundShare), "StakingManager: Development fund transfer failed");
 
         // Create new stake
         uint256 stakeId = userStakes[msg.sender].length;
@@ -165,6 +209,7 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
             lastCompoundTime: block.timestamp,
             harvestedRewards: 0,
             totalEarned: 0,
+            compoundEarned: 0,
             active: true,
             tier: tierIndex
         }));
@@ -172,11 +217,17 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
         totalActiveStakeValue[msg.sender] += _usdtAmount;
 
         // Distribute 5% direct dividend to referrer via AffiliateDistributor
-        if (affiliateDistributor != address(0) && _referrer != address(0) && _referrer != msg.sender) {
+        if (affiliateDistributor != address(0)) {
             IAffiliateDistributor(affiliateDistributor).distributeDirect(_referrer, _usdtAmount);
         }
 
         emit StakeCreated(msg.sender, stakeId, _usdtAmount, tierIndex);
+
+        // Propagate team volume to ancestors & trigger epoch closings
+        if (affiliateDistributor != address(0)) {
+            IAffiliateDistributor(affiliateDistributor).addTeamVolume(msg.sender, _usdtAmount);
+            IAffiliateDistributor(affiliateDistributor).tryCloseEpochs();
+        }
     }
 
     /**
@@ -188,17 +239,17 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
     }
 
     /**
-     * @dev Compound on behalf of a user (backend COMPOUNDER_ROLE)
+     * @dev Compound on behalf of any user (permissionless, time-gated on-chain)
      * @param _user Address of the stake owner
      * @param _stakeId Index of the stake to compound
      */
-    function compoundFor(address _user, uint256 _stakeId) external nonReentrant whenNotPaused onlyRole(COMPOUNDER_ROLE) {
+    function compoundFor(address _user, uint256 _stakeId) external nonReentrant whenNotPaused {
         require(_user != address(0), "StakingManager: Invalid user");
         _compound(_user, _stakeId);
     }
 
     /**
-     * @dev Internal compound logic
+     * @dev Internal compound logic with FIFO cap integration
      * @param _user Stake owner
      * @param _stakeId Index of the stake
      */
@@ -222,36 +273,40 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
             uint256 profit = (currentAmount * PROFIT_NUMERATOR) / PROFIT_DENOMINATOR;
             currentAmount += profit;
             totalProfit += profit;
-
-            // Check 3X cap per iteration
-            if (stk.totalEarned + totalProfit >= CAP_MULTIPLIER * stk.originalAmount) {
-                // Cap the profit to exactly hit 3X
-                uint256 maxEarnable = (CAP_MULTIPLIER * stk.originalAmount) - stk.totalEarned;
-                totalProfit = maxEarnable;
-                currentAmount = stk.amount + totalProfit;
-                break;
-            }
         }
 
-        // Update stake
+        // Cap compound profit against total remaining FIFO cap across all active stakes
+        uint256 remainingCap = _getTotalRemainingCap(_user);
+        if (totalProfit > remainingCap) {
+            totalProfit = remainingCap;
+            currentAmount = stk.amount + totalProfit;
+        }
+
+        // Update stake's amount and compound tracking
         stk.amount = currentAmount;
-        stk.totalEarned += totalProfit;
+        stk.compoundEarned += totalProfit;
         stk.lastCompoundTime += intervals * tier.compoundInterval;
 
         // Update totalActiveStakeValue with the profit added
         totalActiveStakeValue[_user] += totalProfit;
 
-        // Distribute team dividends via AffiliateDistributor
+        // Apply compound profit to FIFO cap (may auto-close oldest stakes)
+        if (totalProfit > 0) {
+            _applyEarningsToFIFO(_user, totalProfit);
+        }
+
+        // Distribute team dividends and track profits via AffiliateDistributor
         if (affiliateDistributor != address(0) && totalProfit > 0) {
             IAffiliateDistributor(affiliateDistributor).distributeTeamDividend(_user, totalProfit);
+            IAffiliateDistributor(affiliateDistributor).addProfit(totalProfit);
+        }
+
+        // Trigger epoch closings
+        if (affiliateDistributor != address(0)) {
+            IAffiliateDistributor(affiliateDistributor).tryCloseEpochs();
         }
 
         emit Compounded(_user, _stakeId, totalProfit, stk.amount);
-
-        // 3X CAP CHECK: auto-close if reached
-        if (stk.totalEarned >= CAP_MULTIPLIER * stk.originalAmount) {
-            _autoCloseStake(_user, _stakeId);
-        }
     }
 
     /**
@@ -269,6 +324,11 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
             kairoToken.mintTo(_user, returnAmount);
         }
 
+        // Remove team volume from ancestors on auto-close
+        if (affiliateDistributor != address(0)) {
+            IAffiliateDistributor(affiliateDistributor).removeTeamVolume(_user, stk.originalAmount);
+        }
+
         // Mark stake inactive
         stk.active = false;
         totalActiveStakeValue[_user] -= stk.amount;
@@ -277,7 +337,8 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
     }
 
     /**
-     * @dev Unstake and receive 80% of current stake value minus harvested rewards
+     * @dev Unstake and receive 80% of current stake value as KAIRO.
+     *      Harvested amounts already reduce stk.amount, so no double-deduction needed.
      * @param _stakeId Index of the stake to unstake
      */
     function unstake(uint256 _stakeId) external nonReentrant {
@@ -285,19 +346,18 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
         Stake storage stk = userStakes[msg.sender][_stakeId];
         require(stk.active, "StakingManager: Stake not active");
 
-        uint256 grossReturn = (stk.amount * RETURN_PERCENT) / 100;
-
-        // Deduct harvested rewards from the return
-        uint256 returnAmount;
-        if (stk.harvestedRewards >= grossReturn) {
-            returnAmount = 0;
-        } else {
-            returnAmount = grossReturn - stk.harvestedRewards;
-        }
+        // stk.amount already reflects deductions from harvesting
+        uint256 returnAmount = (stk.amount * RETURN_PERCENT) / 100;
 
         // Mint KAIRO to user at live rate (USD value → KAIRO)
         if (returnAmount > 0) {
             kairoToken.mintTo(msg.sender, returnAmount);
+        }
+
+        // Remove team volume from ancestors & trigger epoch closings
+        if (affiliateDistributor != address(0)) {
+            IAffiliateDistributor(affiliateDistributor).removeTeamVolume(msg.sender, stk.originalAmount);
+            IAffiliateDistributor(affiliateDistributor).tryCloseEpochs();
         }
 
         // Mark stake inactive
@@ -317,20 +377,45 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
         require(_stakeId < userStakes[msg.sender].length, "StakingManager: Invalid stake ID");
         require(_amount >= MIN_HARVEST, "StakingManager: Below minimum harvest ($10)");
 
+        // Trigger epoch closings
+        if (affiliateDistributor != address(0)) {
+            IAffiliateDistributor(affiliateDistributor).tryCloseEpochs();
+        }
+
         Stake storage stk = userStakes[msg.sender][_stakeId];
         require(stk.active, "StakingManager: Stake not active");
 
-        // Available to harvest = totalEarned - harvestedRewards
-        uint256 available = stk.totalEarned - stk.harvestedRewards;
+        // Available to harvest = compoundEarned - harvestedRewards
+        uint256 available = stk.compoundEarned - stk.harvestedRewards;
         require(_amount <= available, "StakingManager: Insufficient harvestable amount");
 
-        // Track harvested amount
+        // Track harvested amount and reduce compounding base
         stk.harvestedRewards += _amount;
+        stk.amount -= _amount;
+        totalActiveStakeValue[msg.sender] -= _amount;
 
         // Mint KAIRO to user at live rate
         kairoToken.mintTo(msg.sender, _amount);
 
         emit Harvested(msg.sender, _stakeId, _amount);
+    }
+
+    // ============ External Earnings (called by AffiliateDistributor & CMS) ============
+
+    /**
+     * @dev Report external earnings to the FIFO 3X cap system.
+     *      Called by AffiliateDistributor and CMS when income is accrued.
+     * @param _user User whose earnings are being reported
+     * @param _usdAmount USD value of the earnings (18 decimals)
+     */
+    function addEarnings(address _user, uint256 _usdAmount) external {
+        require(
+            msg.sender == affiliateDistributor || msg.sender == cmsContract,
+            "StakingManager: Unauthorized"
+        );
+        if (_usdAmount == 0) return;
+        _applyEarningsToFIFO(_user, _usdAmount);
+        emit EarningsApplied(_user, _usdAmount);
     }
 
     // ============ View Functions ============
@@ -379,6 +464,24 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
     }
 
     /**
+     * @dev Get global FIFO cap progress across all active stakes
+     * @param _user User address
+     * @return totalEarned Sum of totalEarned across active stakes
+     * @return totalCap Sum of 3X caps across active stakes
+     * @return remaining Remaining earnable amount before all stakes cap
+     */
+    function getGlobalCapProgress(address _user) external view returns (
+        uint256 totalEarned, uint256 totalCap, uint256 remaining
+    ) {
+        for (uint256 i = 0; i < userStakes[_user].length; i++) {
+            if (!userStakes[_user][i].active) continue;
+            totalEarned += userStakes[_user][i].totalEarned;
+            totalCap += CAP_MULTIPLIER * userStakes[_user][i].originalAmount;
+        }
+        remaining = totalCap > totalEarned ? totalCap - totalEarned : 0;
+    }
+
+    /**
      * @dev Get the number of stakes for a user
      * @param _user User address
      * @return Number of stakes
@@ -400,13 +503,43 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
     }
 
     /**
-     * @dev Set the system wallet address
-     * @param _wallet System wallet address
+     * @dev Set the CMS contract address (for addEarnings authorization)
+     * @param _cms CMS contract address
      */
-    function setSystemWallet(address _wallet) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setCMS(address _cms) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_cms != address(0), "StakingManager: Invalid CMS address");
+        cmsContract = _cms;
+        emit CMSSet(_cms);
+    }
+
+    /**
+     * @dev Set the development fund wallet address
+     * @param _wallet Development fund wallet address
+     */
+    function setDevelopmentFundWallet(address _wallet) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(_wallet != address(0), "StakingManager: Invalid wallet address");
-        systemWallet = _wallet;
-        emit SystemWalletSet(_wallet);
+        developmentFundWallet = _wallet;
+        emit DevelopmentFundWalletSet(_wallet);
+    }
+
+    /**
+     * @dev Set the 5 DAO wallet addresses
+     * @param _daoWallets Array of 5 DAO wallet addresses
+     */
+    function setDaoWallets(address[5] calldata _daoWallets) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        for (uint256 i = 0; i < 5; i++) {
+            require(_daoWallets[i] != address(0), "StakingManager: Invalid DAO wallet");
+        }
+        daoWallets = _daoWallets;
+        emit DaoWalletsSet(_daoWallets);
+    }
+
+    /**
+     * @dev Get all 5 DAO wallet addresses
+     * @return Array of 5 DAO wallet addresses
+     */
+    function getDaoWallets() external view returns (address[5] memory) {
+        return daoWallets;
     }
 
     /**
@@ -424,6 +557,48 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
     }
 
     // ============ Internal Functions ============
+
+    /**
+     * @dev Apply earnings to active stakes using FIFO order (oldest first).
+     *      When a stake's totalEarned reaches 3X originalAmount, it auto-closes
+     *      and remaining earnings roll to the next active stake.
+     */
+    function _applyEarningsToFIFO(address _user, uint256 _amount) internal {
+        uint256 remaining = _amount;
+        for (uint256 i = 0; i < userStakes[_user].length && remaining > 0; i++) {
+            Stake storage stk = userStakes[_user][i];
+            if (!stk.active) continue;
+
+            uint256 cap = CAP_MULTIPLIER * stk.originalAmount;
+            if (stk.totalEarned >= cap) continue;
+
+            uint256 space = cap - stk.totalEarned;
+            uint256 toApply = remaining > space ? space : remaining;
+
+            stk.totalEarned += toApply;
+            remaining -= toApply;
+
+            if (stk.totalEarned >= cap) {
+                _autoCloseStake(_user, i);
+            }
+        }
+    }
+
+    /**
+     * @dev Calculate total remaining cap across all active stakes.
+     *      Used to cap compound profit so it doesn't exceed what can be absorbed.
+     */
+    function _getTotalRemainingCap(address _user) internal view returns (uint256) {
+        uint256 remaining = 0;
+        for (uint256 i = 0; i < userStakes[_user].length; i++) {
+            if (!userStakes[_user][i].active) continue;
+            uint256 cap = CAP_MULTIPLIER * userStakes[_user][i].originalAmount;
+            if (userStakes[_user][i].totalEarned < cap) {
+                remaining += cap - userStakes[_user][i].totalEarned;
+            }
+        }
+        return remaining;
+    }
 
     /**
      * @dev Auto-detect tier based on USDT stake amount

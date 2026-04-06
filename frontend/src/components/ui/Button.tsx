@@ -1,83 +1,64 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { motion, type HTMLMotionProps } from 'framer-motion';
-import { forwardRef } from 'react';
+import { motion } from 'framer-motion';
+import { MouseEventHandler, forwardRef } from 'react';
 
-type ButtonVariant = 'primary' | 'secondary' | 'warning' | 'ghost' | 'danger';
-type ButtonSize = 'sm' | 'md' | 'lg';
-
-interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'children'> {
-  variant?: ButtonVariant;
-  size?: ButtonSize;
+interface ButtonProps {
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'success';
+  size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
-  children: React.ReactNode;
+  icon?: React.ReactNode;
+  children?: React.ReactNode;
+  className?: string;
   disabled?: boolean;
+  onClick?: MouseEventHandler<HTMLButtonElement>;
+  type?: 'button' | 'submit' | 'reset';
 }
 
-const variantStyles: Record<ButtonVariant, string> = {
-  primary: [
-    'bg-gradient-to-r from-neon-cyan to-[#0080FF] text-black font-semibold',
-    'shadow-lg shadow-neon-cyan/25',
-  ].join(' '),
-  secondary: [
-    'bg-transparent border border-neon-cyan text-neon-cyan',
-    'relative overflow-hidden',
-  ].join(' '),
-  warning: [
-    'bg-gradient-to-r from-neon-coral to-[#FF6B6B] text-white font-semibold',
-    'animate-glow-pulse shadow-lg shadow-neon-coral/25',
-  ].join(' '),
-  danger: [
-    'bg-gradient-to-r from-neon-coral to-[#FF6B6B] text-white font-semibold',
-    'shadow-lg shadow-neon-coral/25',
-  ].join(' '),
-  ghost: 'bg-transparent text-white hover:bg-white/5',
+const variants = {
+  primary: 'gradient-primary text-white hover:shadow-lg hover:shadow-primary-500/25',
+  secondary: 'bg-white border border-surface-200 text-surface-700 hover:border-primary-300 hover:text-primary-600 hover:shadow-soft',
+  danger: 'bg-danger-50 border border-danger-200 text-danger-600 hover:bg-danger-100',
+  ghost: 'bg-transparent text-surface-500 hover:text-surface-900 hover:bg-surface-100',
+  success: 'gradient-success text-white hover:shadow-lg hover:shadow-success-500/25',
 };
 
-const sizeStyles: Record<ButtonSize, string> = {
-  sm: 'px-3 py-1.5 text-xs rounded-lg gap-1.5',
-  md: 'px-5 py-2.5 text-sm rounded-xl gap-2',
-  lg: 'px-7 py-3.5 text-base rounded-xl gap-2.5',
+const sizes = {
+  sm: 'px-3 py-1.5 text-sm rounded-lg',
+  md: 'px-5 py-2.5 text-sm rounded-xl',
+  lg: 'px-6 py-3 text-base rounded-xl',
 };
-
-const Spinner = ({ className }: { className?: string }) => (
-  <svg className={cn('animate-spin', className)} viewBox="0 0 24 24" fill="none">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-  </svg>
-);
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = 'primary', size = 'md', loading = false, className, children, disabled, ...props }, ref) => {
-    const isDisabled = disabled || loading;
-
+  ({ children, variant = 'primary', size = 'md', loading, disabled, icon, className, onClick, type = 'button' }, ref) => {
     return (
       <motion.button
         ref={ref}
-        whileHover={isDisabled ? undefined : { scale: 1.05 }}
-        whileTap={isDisabled ? undefined : { scale: 0.97 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+        whileTap={{ scale: 0.98 }}
+        disabled={disabled || loading}
+        type={type}
+        onClick={onClick}
         className={cn(
-          'inline-flex items-center justify-center font-medium transition-all duration-200',
-          'focus:outline-none focus-visible:ring-2 focus-visible:ring-neon-cyan/50 focus-visible:ring-offset-2 focus-visible:ring-offset-void',
-          variantStyles[variant],
-          sizeStyles[size],
-          isDisabled && 'opacity-40 cursor-not-allowed saturate-0',
-          className,
+          'font-semibold transition-all duration-200 inline-flex items-center justify-center gap-2',
+          'disabled:opacity-50 disabled:cursor-not-allowed',
+          variants[variant],
+          sizes[size],
+          className
         )}
-        disabled={isDisabled}
-        {...props}
       >
-        {/* Secondary fill hover effect */}
-        {variant === 'secondary' && (
-          <span className="absolute inset-0 bg-neon-cyan/10 scale-x-0 origin-left transition-transform duration-300 group-hover:scale-x-100 hover:scale-x-100 pointer-events-none" />
-        )}
-        {loading && <Spinner className="h-4 w-4 shrink-0" />}
-        <span className="relative z-10">{children}</span>
+        {loading ? (
+          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        ) : icon ? (
+          icon
+        ) : null}
+        {children}
       </motion.button>
     );
-  },
+  }
 );
 
 Button.displayName = 'Button';

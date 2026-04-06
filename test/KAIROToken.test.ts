@@ -25,9 +25,9 @@ describe("KAIROToken", function () {
 
     describe("Social Lock", function () {
         it("should mint 10,000 KAIRO to LP on mintInitialSupply", async function () {
-            const { kairoToken, auxFund } = await loadFixture(deployFullEcosystemFixture);
-            const auxFundAddress = await auxFund.getAddress();
-            const balance = await kairoToken.balanceOf(auxFundAddress);
+            const { kairoToken, liquidityPool } = await loadFixture(deployFullEcosystemFixture);
+            const lpAddress = await liquidityPool.getAddress();
+            const balance = await kairoToken.balanceOf(lpAddress);
             expect(balance).to.equal(ethers.parseEther("10000"));
         });
 
@@ -49,8 +49,8 @@ describe("KAIROToken", function () {
 
     describe("setLiquidityPool", function () {
         it("should set liquidityPool correctly", async function () {
-            const { kairoToken, auxFund } = await loadFixture(deployFullEcosystemFixture);
-            expect(await kairoToken.liquidityPool()).to.equal(await auxFund.getAddress());
+            const { kairoToken, liquidityPool } = await loadFixture(deployFullEcosystemFixture);
+            expect(await kairoToken.liquidityPool()).to.equal(await liquidityPool.getAddress());
         });
 
         it("should revert on second setLiquidityPool call", async function () {
@@ -100,10 +100,10 @@ describe("KAIROToken", function () {
 
     describe("mintTo", function () {
         it("should calculate correct KAIRO amount based on price", async function () {
-            const { kairoToken, owner, user1, auxFund, MINTER_ROLE } = await loadFixture(deployFullEcosystemFixture);
+            const { kairoToken, owner, user1, liquidityPool, MINTER_ROLE } = await loadFixture(deployFullEcosystemFixture);
             await kairoToken.grantRole(MINTER_ROLE, owner.address);
 
-            const price = await auxFund.getLivePrice(); // 1 USDT/KAIRO initially
+            const price = await liquidityPool.getLivePrice(); // 1 USDT/KAIRO initially
             const usdAmount = ethers.parseEther("100");
             const expectedKairo = (usdAmount * ethers.parseEther("1")) / price;
 

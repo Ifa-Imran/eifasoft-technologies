@@ -1,0 +1,22 @@
+{
+  "zone": [
+    {
+      "name": "@",
+      "records": [{"content": "148.230.66.58", "is_disabled": false}],
+      "ttl": 300,
+      "type": "A"
+    },
+    {
+      "name": "www",
+      "records": [{"content": "kairodao.com.", "is_disabled": false}],
+      "ttl": 300,
+      "type": "CNAME"
+    },
+    {
+      "name": "dev",
+      "records": [{"content": "148.230.66.58", "is_disabled": false}],
+      "ttl": 300,
+      "type": "A"
+    }
+  ]
+}

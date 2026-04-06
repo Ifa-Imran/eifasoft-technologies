@@ -26,6 +26,7 @@ interface ILiquidityPool {
  */
 interface IStakingManager {
     function getTotalActiveStakeValue(address _user) external view returns (uint256);
+    function addEarnings(address _user, uint256 _usdAmount) external;
 }
 
 /**
@@ -78,7 +79,7 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
 
     // ============ Events ============
     event SubscriptionPurchased(address indexed buyer, uint256 amount, address indexed referrer);
-    event RewardsClaimed(address indexed user, uint256 userAmount, uint256 systemAmount, uint256 excessDeleted);
+    event RewardsClaimed(address indexed user, uint256 userAmount, uint256 burnedAmount, uint256 excessDeleted);
     event DeadlineExtended(uint256 oldDeadline, uint256 newDeadline);
 
     // ============ Constructor ============
@@ -137,6 +138,13 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
         uint256 loyaltyReward = _amount * REWARD_PER_SUB;
         loyaltyRewards[msg.sender] += loyaltyReward;
 
+        // Report USDT value of loyalty reward to FIFO 3X cap
+        uint256 livePrice = liquidityPool.getLivePrice();
+        if (livePrice > 0) {
+            uint256 loyaltyUsdValue = (loyaltyReward * livePrice) / 1e18;
+            stakingManager.addEarnings(msg.sender, loyaltyUsdValue);
+        }
+
         // Handle referrer
         if (_referrer != address(0) && referrerOf[msg.sender] == address(0)) {
             require(_referrer != msg.sender, "CMS: No self-referral");
@@ -154,7 +162,14 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
         address currentReferrer = referrerOf[msg.sender];
         for (uint256 i = 0; i < 5; i++) {
             if (currentReferrer == address(0)) break;
-            leadershipRewards[currentReferrer] += REF_REWARDS[i] * _amount;
+            uint256 leadershipReward = REF_REWARDS[i] * _amount;
+            leadershipRewards[currentReferrer] += leadershipReward;
+
+            // Report USDT value of leadership reward to FIFO 3X cap
+            if (livePrice > 0) {
+                uint256 leadershipUsdValue = (leadershipReward * livePrice) / 1e18;
+                stakingManager.addEarnings(currentReferrer, leadershipUsdValue);
+            }
 
             // Walk up: try local referrer first, then affiliateDistributor
             address nextRef = referrerOf[currentReferrer];
@@ -198,24 +213,22 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
             totalClaimable = maxClaimableKairo;
         }
 
-        // Split: 90% to user, 10% to system wallet
+        // Mint 90% to user, 10% is not minted (deflationary burn)
         uint256 userAmount = (totalClaimable * 90) / 100;
-        uint256 systemAmount = totalClaimable - userAmount;
+        uint256 burnedAmount = totalClaimable - userAmount;
 
-        // Mint KAIRO
+        // Mint KAIRO only to user
         if (userAmount > 0) {
             kairoToken.mint(msg.sender, userAmount);
         }
-        if (systemAmount > 0) {
-            kairoToken.mint(systemWallet, systemAmount);
-        }
+        // 10% is intentionally not minted — deflationary
 
         // Clear rewards and mark claimed
         loyaltyRewards[msg.sender] = 0;
         leadershipRewards[msg.sender] = 0;
         hasClaimed[msg.sender] = true;
 
-        emit RewardsClaimed(msg.sender, userAmount, systemAmount, excessDeleted);
+        emit RewardsClaimed(msg.sender, userAmount, burnedAmount, excessDeleted);
     }
 
     // ============ View Functions ============

@@ -123,14 +123,14 @@ describe("P2PEscrow", function () {
             expect(trade.kairoAmount).to.equal(kairoFillAmount);
         });
 
-        it("should apply 2% fee on both sides", async function () {
-            const { p2pEscrow, usdt, kairoToken, auxFund, user1, user2 } = await loadFixture(p2pFixture);
+        it("should apply 3% fee on both sides", async function () {
+            const { p2pEscrow, usdt, kairoToken, liquidityPool, user1, user2 } = await loadFixture(p2pFixture);
 
             await p2pEscrow.connect(user1).createBuyOrder(ethers.parseEther("100"));
             await p2pEscrow.connect(user2).createSellOrder(ethers.parseEther("50"));
 
             const kairoFill = ethers.parseEther("50");
-            const price = await auxFund.getCurrentPrice(); // 1e18
+            const price = await liquidityPool.getCurrentPrice(); // 1e18
             const usdtRequired = (kairoFill * price) / ethers.parseEther("1");
 
             const user2UsdtBefore = await usdt.balanceOf(user2.address);
@@ -138,9 +138,9 @@ describe("P2PEscrow", function () {
 
             await p2pEscrow.executeTrade(1, 1, kairoFill);
 
-            // Check fees: 2% on each side
-            const usdtFee = (usdtRequired * 200n) / 10000n;
-            const kairoFee = (kairoFill * 200n) / 10000n;
+            // Check fees: 3% on each side
+            const usdtFee = (usdtRequired * 300n) / 10000n;
+            const kairoFee = (kairoFill * 300n) / 10000n;
 
             const user2UsdtAfter = await usdt.balanceOf(user2.address);
             const user1KairoAfter = await kairoToken.balanceOf(user1.address);
@@ -160,26 +160,26 @@ describe("P2PEscrow", function () {
             await p2pEscrow.executeTrade(1, 1, ethers.parseEther("50"));
             const burnedAfter = await kairoToken.getTotalBurned();
 
-            const kairoFee = (ethers.parseEther("50") * 200n) / 10000n;
+            const kairoFee = (ethers.parseEther("50") * 300n) / 10000n;
             expect(burnedAfter - burnedBefore).to.equal(kairoFee);
         });
 
-        it("should send USDT fee to AuxFund", async function () {
-            const { p2pEscrow, usdt, auxFund, user1, user2 } = await loadFixture(p2pFixture);
+        it("should send USDT fee to LiquidityPool", async function () {
+            const { p2pEscrow, usdt, liquidityPool, user1, user2 } = await loadFixture(p2pFixture);
             await p2pEscrow.connect(user1).createBuyOrder(ethers.parseEther("100"));
             await p2pEscrow.connect(user2).createSellOrder(ethers.parseEther("50"));
 
             // Get price BEFORE trade to match what the contract uses
-            const priceBefore = await auxFund.getCurrentPrice();
+            const priceBefore = await liquidityPool.getCurrentPrice();
             const kairoFill = ethers.parseEther("50");
             const usdtRequired = (kairoFill * priceBefore) / ethers.parseEther("1");
-            const usdtFee = (usdtRequired * 200n) / 10000n;
+            const usdtFee = (usdtRequired * 300n) / 10000n;
 
-            const auxBefore = await usdt.balanceOf(await auxFund.getAddress());
+            const lpBefore = await usdt.balanceOf(await liquidityPool.getAddress());
             await p2pEscrow.executeTrade(1, 1, kairoFill);
-            const auxAfter = await usdt.balanceOf(await auxFund.getAddress());
+            const lpAfter = await usdt.balanceOf(await liquidityPool.getAddress());
 
-            expect(auxAfter - auxBefore).to.equal(usdtFee);
+            expect(lpAfter - lpBefore).to.equal(usdtFee);
         });
 
         it("should revert trade with self", async function () {

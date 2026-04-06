@@ -106,7 +106,7 @@ contract LiquidityPool is ReentrancyGuard, AccessControl {
     event PrematureExitPaid(address indexed recipient, uint256 amount, uint256 timestamp);
     event P2PFeeReceived(uint256 amount, uint256 timestamp);
     
-    // Pool balances for AchieversPools (0 = Elite, 1 = Peak)
+    // Pool balances (0 = Weekly Qualifiers Dividend, 1 = Monthly Qualifiers Dividend)
     mapping(uint256 => uint256) public poolBalances;
     
     constructor(address _kairoToken, address _usdtToken) {
@@ -134,20 +134,16 @@ contract LiquidityPool is ReentrancyGuard, AccessControl {
     
     /**
      * @dev Get current KAIRO price based on LiquidityPool formula
-     * P = USDT_balance / (KAIRO_effectiveSupply + 5000 KAIRO social lock)
+     * P = USDT_balance / totalSupply (includes 10,000 KAIRO social lock)
+     * The 10,000 KAIRO social lock ensures totalSupply is never zero after initialization.
      * @return price Current KAIRO price in USDT (with 18 decimals precision)
      */
     function getCurrentPrice() public view returns (uint256 price) {
         uint256 usdtBalance = usdtToken.balanceOf(address(this));
-        uint256 kairoSupply = kairoToken.totalSupply();
+        uint256 effectiveSupply = kairoToken.totalSupply();
         
-        // Add 5000 KAIRO social lock to supply for price calculation
-        uint256 effectiveSupply = kairoSupply;
-
-        // Fix for division by zero when effectiveSupply is zero
-        if (effectiveSupply == 0) {
-            return 1e18; // 1 USDT per KAIRO fallback
-        }
+        // effectiveSupply is guaranteed non-zero after mintInitialSupply() (10,000 KAIRO social lock)
+        require(effectiveSupply > 0, "LiquidityPool: Supply not initialized");
         
         price = (usdtBalance * PRICE_PRECISION) / effectiveSupply;
     }
@@ -541,7 +537,7 @@ contract LiquidityPool is ReentrancyGuard, AccessControl {
 
     /**
      * @dev Reserve pool contribution (called by Staking via AchieversPools)
-     * @param poolType 0 = Elite, 1 = Peak
+     * @param poolType 0 = Weekly Qualifiers Dividend, 1 = Monthly Qualifiers Dividend
      * @param amount USDT amount to reserve
      */
     function reservePoolContribution(uint256 poolType, uint256 amount) external onlyRole(POOL_ROLE) {
@@ -551,7 +547,7 @@ contract LiquidityPool is ReentrancyGuard, AccessControl {
     /**
      * @dev Distribute pool reward to recipient
      * @param recipient Reward recipient
-     * @param poolType 0 = Elite, 1 = Peak  
+     * @param poolType 0 = Weekly Qualifiers Dividend, 1 = Monthly Qualifiers Dividend
      * @param amount USDT amount to distribute
      */
     function distributePoolReward(address recipient, uint256 poolType, uint256 amount) external onlyRole(POOL_ROLE) {

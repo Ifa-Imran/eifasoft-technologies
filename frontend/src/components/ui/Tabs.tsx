@@ -1,80 +1,45 @@
 'use client';
 
-import * as TabsPrimitive from '@radix-ui/react-tabs';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
+import * as RadixTabs from '@radix-ui/react-tabs';
 import { cn } from '@/lib/utils';
+import { ReactNode } from 'react';
 
-interface TabItem {
+interface Tab {
   value: string;
   label: string;
-  content: React.ReactNode;
+  icon?: ReactNode;
 }
 
 interface TabsProps {
-  tabs: TabItem[];
-  defaultValue?: string;
+  tabs: Tab[];
+  value: string;
+  onValueChange: (value: string) => void;
+  children: ReactNode;
   className?: string;
-  onValueChange?: (value: string) => void;
 }
 
-export function Tabs({ tabs, defaultValue, className, onValueChange }: TabsProps) {
-  const [activeTab, setActiveTab] = useState(defaultValue || tabs[0]?.value || '');
-
-  const handleChange = (value: string) => {
-    setActiveTab(value);
-    onValueChange?.(value);
-  };
-
+export function Tabs({ tabs, value, onValueChange, children, className }: TabsProps) {
   return (
-    <TabsPrimitive.Root
-      value={activeTab}
-      onValueChange={handleChange}
-      className={cn('w-full', className)}
-    >
-      <TabsPrimitive.List className="flex gap-1 p-1 rounded-xl bg-glass backdrop-blur-sm border border-glass-border mb-4">
+    <RadixTabs.Root value={value} onValueChange={onValueChange} className={className}>
+      <RadixTabs.List className="flex gap-1 p-1 bg-surface-100 rounded-xl mb-4">
         {tabs.map((tab) => (
-          <TabsPrimitive.Trigger
+          <RadixTabs.Trigger
             key={tab.value}
             value={tab.value}
             className={cn(
-              'relative flex-1 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors duration-200',
-              'text-gray-400 hover:text-gray-200',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-neon-cyan/50',
-              'data-[state=active]:text-neon-cyan',
+              'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
+              'text-surface-500 hover:text-surface-700',
+              'data-[state=active]:bg-white data-[state=active]:text-primary-600 data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-surface-200'
             )}
           >
-            {activeTab === tab.value && (
-              <motion.div
-                layoutId="tab-indicator"
-                className="absolute inset-0 rounded-lg bg-neon-cyan/10 border-b-2 border-neon-cyan"
-                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              />
-            )}
-            <span className="relative z-10">{tab.label}</span>
-          </TabsPrimitive.Trigger>
+            {tab.icon}
+            {tab.label}
+          </RadixTabs.Trigger>
         ))}
-      </TabsPrimitive.List>
-
-      <AnimatePresence mode="wait">
-        {tabs.map((tab) => (
-          <TabsPrimitive.Content
-            key={tab.value}
-            value={tab.value}
-            forceMount
-            className="data-[state=inactive]:hidden"
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-            >
-              {tab.content}
-            </motion.div>
-          </TabsPrimitive.Content>
-        ))}
-      </AnimatePresence>
-    </TabsPrimitive.Root>
+      </RadixTabs.List>
+      {children}
+    </RadixTabs.Root>
   );
 }
+
+export const TabContent = RadixTabs.Content;

@@ -1,273 +1,211 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
-import { parseUnits, formatUnits, isAddress } from 'viem';
-import { useRouter } from 'next/navigation';
-import { useReferral } from '@/hooks/useReferral';
+import { useState, useEffect, Suspense } from 'react';
+import { useAccount } from 'wagmi';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { GlassCard, Button, Input } from '@/components/ui';
 import { useRegistration } from '@/hooks/useRegistration';
-import { CONTRACTS, SYSTEM_WALLET, StakingManagerABI, USDTABI, AffiliateDistributorABI } from '@/lib/contracts';
+import { contracts, SYSTEM_WALLET } from '@/config/contracts';
+import { isAddress, zeroAddress } from 'viem';
+import { AffiliateDistributorABI } from '@/config/abis/AffiliateDistributor';
+import { useReadContract } from 'wagmi';
 
-const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
-
-export default function RegisterPage() {
-  const { address, isConnected } = useAccount();
+function RegisterPageInner() {
   const router = useRouter();
-  const { referrer: storedReferrer } = useReferral();
-  const { isRegistered, isLoading: regLoading } = useRegistration();
+  const searchParams = useSearchParams();
+  const { isConnected, address } = useAccount();
+  const { isRegistered, isLoading: regLoading, isGenesisMode, register } = useRegistration();
 
-  const [referrerInput, setReferrerInput] = useState('');
-  const [stakeAmount, setStakeAmount] = useState('10');
-  const [step, setStep] = useState<'idle' | 'approving' | 'staking' | 'done'>('idle');
+  const refParam = searchParams.get('ref') || '';
+  const [referrer, setReferrer] = useState(refParam);
+  const [referrerError, setReferrerError] = useState('');
+  const hasRefLink = !!refParam && isAddress(refParam);
 
-  // ── Check if anyone has already registered (staked with system wallet as referrer) ──
-  // directDividends(SYSTEM_WALLET) > 0 means at least one user staked with system wallet referrer
-  const { data: systemDividends, isLoading: divLoading } = useReadContract({
-    address: CONTRACTS.AFFILIATE_DISTRIBUTOR,
-    abi: AffiliateDistributorABI,
-    functionName: 'directDividends',
-    args: [SYSTEM_WALLET],
-    query: { enabled: !!CONTRACTS.AFFILIATE_DISTRIBUTOR && !!SYSTEM_WALLET },
-  });
-
-  // Also check directCount in case setReferrer was called via CMS
-  const { data: systemDirectCount, isLoading: countLoading } = useReadContract({
-    address: CONTRACTS.AFFILIATE_DISTRIBUTOR,
-    abi: AffiliateDistributorABI,
-    functionName: 'directCount',
-    args: [SYSTEM_WALLET],
-    query: { enabled: !!CONTRACTS.AFFILIATE_DISTRIBUTOR && !!SYSTEM_WALLET },
-  });
-
-  const isGenesisMode = useMemo(() => {
-    if (divLoading || countLoading) return false;
-    const dividends = systemDividends ? Number(systemDividends) : 0;
-    const count = systemDirectCount ? Number(systemDirectCount) : 0;
-    return dividends === 0 && count === 0; // No one has registered yet
-  }, [systemDividends, systemDirectCount, divLoading, countLoading]);
-
-  // ── Validate that the referrer address is actually registered on-chain ──
-  const referrerAddr = referrerInput.trim() as `0x${string}`;
-  const referrerIsValidFormat = referrerInput ? isAddress(referrerInput) : false;
-
-  // Check if referrer has a referrer set (registered via CMS path)
-  const { data: referrerOnChain, isLoading: refCheckLoading } = useReadContract({
-    address: CONTRACTS.AFFILIATE_DISTRIBUTOR,
+  // Validate referrer is registered on-chain
+  const referrerAddr = referrer && isAddress(referrer) ? (referrer as `0x${string}`) : undefined;
+  const { data: referrerOfReferrer } = useReadContract({
+    address: contracts.affiliateDistributor,
     abi: AffiliateDistributorABI,
     functionName: 'referrerOf',
-    args: [referrerAddr],
-    query: {
-      enabled: !!referrerIsValidFormat && !!CONTRACTS.AFFILIATE_DISTRIBUTOR && !isGenesisMode,
-    },
+    args: referrerAddr ? [referrerAddr] : undefined,
+    query: { enabled: !!referrerAddr && contracts.affiliateDistributor !== '0x' },
   });
 
-  // Check if referrer has any stakes (registered via staking path)
-  const { data: referrerStakeCount, isLoading: refStakeLoading } = useReadContract({
-    address: CONTRACTS.STAKING_MANAGER,
-    abi: StakingManagerABI,
-    functionName: 'getUserStakeCount',
-    args: [referrerAddr],
-    query: {
-      enabled: !!referrerIsValidFormat && !!CONTRACTS.STAKING_MANAGER && !isGenesisMode,
-    },
-  });
-
-  const referrerCheckLoading = refCheckLoading || refStakeLoading;
-
-  // A referrer is valid if they have a referrer set OR have staked OR are the SYSTEM_WALLET
-  const referrerIsRegistered = useMemo(() => {
-    if (isGenesisMode) return true;
-    if (!referrerIsValidFormat) return false;
-    if (referrerAddr.toLowerCase() === SYSTEM_WALLET.toLowerCase()) return true;
-    if (referrerCheckLoading) return false;
-    const ref = referrerOnChain as `0x${string}` | undefined;
-    const hasReferrer = !!ref && ref.toLowerCase() !== ZERO_ADDRESS.toLowerCase();
-    const hasStake = !!referrerStakeCount && Number(referrerStakeCount) > 0;
-    return hasReferrer || hasStake;
-  }, [isGenesisMode, referrerIsValidFormat, referrerAddr, referrerOnChain, referrerStakeCount, referrerCheckLoading]);
-
-  // The actual referrer address to use on-chain
-  const effectiveReferrer = isGenesisMode ? SYSTEM_WALLET : (referrerAddr as `0x${string}`);
-
-  // ── Pre-fill from localStorage referral link ──
-  useEffect(() => {
-    if (storedReferrer && !referrerInput && !isGenesisMode) {
-      setReferrerInput(storedReferrer);
-    }
-  }, [storedReferrer, isGenesisMode]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Redirect if already registered
+  // Redirect to dashboard if already registered
   useEffect(() => {
     if (isRegistered && !regLoading) {
-      router.push('/dashboard');
+      router.replace('/dashboard');
     }
   }, [isRegistered, regLoading, router]);
 
-  // ── USDT allowance & balance ──
-  const { data: usdtAllowance, refetch: refetchAllowance } = useReadContract({
-    address: CONTRACTS.USDT,
-    abi: USDTABI,
-    functionName: 'allowance',
-    args: address ? [address, CONTRACTS.STAKING_MANAGER] : undefined,
-    query: { enabled: !!address && !!CONTRACTS.USDT && !!CONTRACTS.STAKING_MANAGER },
-  });
-
-  const { data: usdtBalance } = useReadContract({
-    address: CONTRACTS.USDT,
-    abi: USDTABI,
-    functionName: 'balanceOf',
-    args: address ? [address] : undefined,
-    query: { enabled: !!address && !!CONTRACTS.USDT },
-  });
-
-  const { writeContract, data: txHash, isPending } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
-
-  const parsedAmount = parseFloat(stakeAmount) || 0;
-  const amountBig = parseUnits(parsedAmount.toString(), 18);
-  const allowance = usdtAllowance ? Number(formatUnits(usdtAllowance as bigint, 18)) : 0;
-  const balance = usdtBalance ? Number(formatUnits(usdtBalance as bigint, 18)) : 0;
-  const needsApproval = parsedAmount > allowance;
-
+  // Validate referrer on change
   useEffect(() => {
-    if (isSuccess && step === 'approving') {
-      refetchAllowance();
-      setStep('idle');
+    if (!referrer) {
+      setReferrerError('');
+      return;
     }
-    if (isSuccess && step === 'staking') {
-      setStep('done');
-      setTimeout(() => router.push('/dashboard'), 2000);
+    if (!isAddress(referrer)) {
+      setReferrerError('Invalid address format');
+      return;
     }
-  }, [isSuccess, step, refetchAllowance, router]);
+    if (referrer.toLowerCase() === address?.toLowerCase()) {
+      setReferrerError('Cannot refer yourself');
+      return;
+    }
+    // Genesis mode: system wallet is always valid
+    if (referrer.toLowerCase() === SYSTEM_WALLET.toLowerCase()) {
+      setReferrerError('');
+      return;
+    }
+    // Check referrer is registered on-chain
+    if (referrerOfReferrer !== undefined) {
+      if (referrerOfReferrer === zeroAddress) {
+        setReferrerError('This address is not registered in the system');
+      } else {
+        setReferrerError('');
+      }
+    }
+  }, [referrer, referrerOfReferrer, address]);
 
-  const handleApprove = () => {
-    setStep('approving');
-    writeContract({
-      address: CONTRACTS.USDT,
-      abi: USDTABI,
-      functionName: 'approve',
-      args: [CONTRACTS.STAKING_MANAGER, amountBig],
-    });
-  };
-
-  const handleStake = () => {
-    if (!isGenesisMode && !referrerIsRegistered) return;
-    setStep('staking');
-    writeContract({
-      address: CONTRACTS.STAKING_MANAGER,
-      abi: StakingManagerABI,
-      functionName: 'stake',
-      args: [amountBig, effectiveReferrer],
-    });
-  };
-
-  const isWorking = isPending || isConfirming;
-  const canStake = parsedAmount >= 10 && (isGenesisMode || (referrerIsValidFormat && referrerIsRegistered));
-
+  // --- Not connected ---
   if (!isConnected) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="glass rounded-2xl p-8 max-w-md text-center">
-          <h2 className="text-xl font-bold text-dark-50 mb-2">Connect Your Wallet</h2>
-          <p className="text-dark-400 text-sm">Connect your wallet to register for KAIRO DeFi</p>
+      <main className="min-h-screen bg-surface-50 flex items-center justify-center">
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-gradient-to-br from-primary-200/30 to-primary-100/20 rounded-full blur-[120px]" />
+          <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-gradient-to-br from-secondary-200/30 to-secondary-100/20 rounded-full blur-[120px]" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-accent-100/20 rounded-full blur-[100px]" />
         </div>
-      </div>
+        <GlassCard className="relative z-10 max-w-md w-full mx-4 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center mx-auto mb-4">
+            <span className="text-2xl font-orbitron font-bold text-white">K</span>
+          </div>
+          <h1 className="text-3xl font-orbitron font-bold gradient-text mb-3">Join KAIRO</h1>
+          <p className="text-surface-500 mb-8">Connect your wallet to get started with the KAIRO DeFi Ecosystem.</p>
+          <div className="flex justify-center">
+            <ConnectButton />
+          </div>
+        </GlassCard>
+      </main>
     );
   }
 
-  if (step === 'done') {
+  // --- Loading ---
+  if (regLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="glass rounded-2xl p-8 max-w-md text-center">
-          <div className="text-5xl mb-4">&#127881;</div>
-          <h2 className="text-xl font-bold text-primary-400 mb-2">Registration Complete!</h2>
-          <p className="text-dark-400 text-sm">Redirecting to dashboard...</p>
+      <main className="min-h-screen bg-surface-50 flex items-center justify-center">
+        <div className="text-surface-500 text-center">
+          <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p>Checking registration status...</p>
         </div>
-      </div>
+      </main>
     );
   }
+
+  // --- Registration form ---
+  const effectiveReferrer = isGenesisMode && !referrer ? SYSTEM_WALLET : referrer;
+  // For non-genesis: require on-chain proof that the referrer is registered
+  const referrerVerifiedOnChain = referrerOfReferrer !== undefined && referrerOfReferrer !== zeroAddress;
+  const canSubmit = !referrerError && (
+    isGenesisMode || (effectiveReferrer && isAddress(effectiveReferrer) && referrerVerifiedOnChain)
+  );
+
+  const handleRegister = () => {
+    if (!canSubmit) return;
+    const ref = effectiveReferrer && isAddress(effectiveReferrer) ? effectiveReferrer : SYSTEM_WALLET;
+    register(ref);
+    router.replace('/dashboard');
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="glass rounded-2xl p-8 max-w-lg w-full">
-        <h1 className="text-2xl font-bold text-dark-50 mb-2">Register for KAIRO DeFi</h1>
-        <p className="text-dark-400 text-sm mb-6">
-          {isGenesisMode
-            ? 'You are the first to register! No referrer needed.'
-            : 'Enter a registered referrer address and stake to join the platform.'}
-        </p>
+    <main className="min-h-screen bg-surface-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary-100/40 rounded-full blur-[120px]" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-violet-100/40 rounded-full blur-[120px]" />
+      </div>
+
+      <GlassCard className="relative z-10 max-w-lg w-full">
+        <div className="text-center mb-6">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center mx-auto mb-3">
+            <span className="text-xl font-orbitron font-bold text-white">K</span>
+          </div>
+          <h1 className="text-2xl font-orbitron font-bold gradient-text mb-2">Join KAIRO</h1>
+          <p className="text-surface-500 text-sm">
+            Register for free and join the KAIRO DeFi Ecosystem.
+          </p>
+        </div>
+
+        {!isGenesisMode && !hasRefLink && (
+          <div className="mb-4 p-3 rounded-xl bg-primary-50 border border-primary-200 text-xs text-surface-600 text-center">
+            Enter the referral address shared by an existing KAIRO member, or use a referral link: <span className="text-primary-600 font-mono">domain.com/register?ref=0x...</span>
+          </div>
+        )}
+
+        {isGenesisMode && (
+          <div className="mb-4 p-3 rounded-xl bg-accent-50 border border-accent-200 text-xs text-accent-700 text-center">
+            Genesis Mode — You are the first to register! No referrer required.
+          </div>
+        )}
 
         <div className="space-y-4">
-          {/* Referrer — hidden in genesis mode */}
           {!isGenesisMode && (
             <div>
-              <label className="block text-sm text-dark-400 mb-1">Referrer Address *</label>
-              <input
-                type="text"
-                value={referrerInput}
-                onChange={(e) => setReferrerInput(e.target.value)}
-                placeholder="0x..."
-                className="w-full px-4 py-3 rounded-lg bg-dark-900 border border-dark-700 text-dark-100 text-sm font-mono focus:outline-none focus:border-primary-500 transition-colors"
+              <Input
+                label="Referred By"
+                placeholder="0x... referrer address"
+                value={referrer}
+                onChange={(e) => setReferrer(e.target.value)}
+                error={referrerError}
+                disabled={hasRefLink}
               />
-              {referrerInput && !referrerIsValidFormat && (
-                <p className="text-xs text-red-400 mt-1">Invalid Ethereum address</p>
-              )}
-              {referrerIsValidFormat && !referrerCheckLoading && !referrerIsRegistered && (
-                <p className="text-xs text-red-400 mt-1">This address is not a registered member</p>
-              )}
-              {referrerIsValidFormat && referrerCheckLoading && (
-                <p className="text-xs text-dark-500 mt-1">Validating referrer...</p>
-              )}
-              {referrerIsValidFormat && referrerIsRegistered && (
-                <p className="text-xs text-primary-400 mt-1">Valid registered referrer</p>
+              {hasRefLink && !referrerError && (
+                <p className="text-xs text-accent-600 mt-1">Referrer verified from your link</p>
               )}
             </div>
           )}
 
-          {isGenesisMode && (
-            <div className="px-4 py-3 rounded-lg bg-primary-500/10 border border-primary-500/30">
-              <p className="text-sm text-primary-300">
-                Genesis Registration — you will be registered under the system wallet.
-              </p>
-            </div>
-          )}
-
-          {/* Stake Amount */}
-          <div>
-            <label className="block text-sm text-dark-400 mb-1">Initial Stake Amount (USDT)</label>
-            <input
-              type="number"
-              min={10}
-              value={stakeAmount}
-              onChange={(e) => setStakeAmount(e.target.value)}
-              placeholder="10"
-              className="w-full px-4 py-3 rounded-lg bg-dark-900 border border-dark-700 text-dark-100 text-lg font-mono focus:outline-none focus:border-primary-500 transition-colors"
-            />
-            <p className="text-xs text-dark-500 mt-1">
-              Balance: {balance.toLocaleString('en-US', { minimumFractionDigits: 2 })} USDT &middot; Min: 10 USDT
-            </p>
+          <div className="p-4 rounded-xl bg-gradient-to-r from-primary-50/50 to-secondary-50/50 border border-primary-100/50 space-y-3">
+            <h4 className="text-sm font-semibold text-surface-900">What happens next?</h4>
+            <ul className="space-y-2 text-xs text-surface-500">
+              <li className="flex items-start gap-3">
+                <span className="w-5 h-5 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center flex-shrink-0 text-[10px] font-bold">1</span>
+                <span>Register for free (this step)</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="w-5 h-5 rounded-full bg-secondary-100 text-secondary-600 flex items-center justify-center flex-shrink-0 text-[10px] font-bold">2</span>
+                <span>Purchase CMS subscriptions to earn loyalty rewards</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="w-5 h-5 rounded-full bg-accent-100 text-accent-600 flex items-center justify-center flex-shrink-0 text-[10px] font-bold">3</span>
+                <span>Staking opens after CMS phase completes</span>
+              </li>
+            </ul>
           </div>
 
-          {/* Action Buttons */}
-          {needsApproval ? (
-            <button
-              onClick={handleApprove}
-              disabled={isWorking || parsedAmount < 10}
-              className="w-full py-3.5 rounded-xl bg-dark-700 hover:bg-dark-600 text-dark-200 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isWorking && step === 'approving' ? 'Approving...' : `Approve ${parsedAmount} USDT`}
-            </button>
-          ) : (
-            <button
-              onClick={handleStake}
-              disabled={isWorking || !canStake}
-              className="w-full py-3.5 rounded-xl bg-primary-500 hover:bg-primary-600 text-white font-semibold transition-all shadow-lg shadow-primary-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isWorking && step === 'staking' ? 'Registering...' : `Register & Stake ${parsedAmount} USDT`}
-            </button>
-          )}
+          <Button
+            onClick={handleRegister}
+            disabled={!canSubmit}
+            className="w-full"
+          >
+            Register for Free
+          </Button>
         </div>
-      </div>
-    </div>
+      </GlassCard>
+    </main>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-surface-50 flex items-center justify-center">
+          <div className="text-surface-500">Loading...</div>
+        </main>
+      }
+    >
+      <RegisterPageInner />
+    </Suspense>
   );
 }

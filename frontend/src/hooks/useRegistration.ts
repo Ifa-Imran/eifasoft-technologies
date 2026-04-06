@@ -1,54 +1,110 @@
 'use client';
 
-import { useReadContract } from 'wagmi';
-import { useAccount } from 'wagmi';
-import { CONTRACTS, AffiliateDistributorABI, StakingManagerABI } from '@/lib/contracts';
+import { useReadContract, useAccount } from 'wagmi';
+import { zeroAddress } from 'viem';
+import { contracts, SYSTEM_WALLET } from '@/config/contracts';
+import { AffiliateDistributorABI } from '@/config/abis/AffiliateDistributor';
+import { useState, useEffect, useCallback } from 'react';
 
-const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+const STORAGE_KEY = 'kairo_registration';
 
-/**
- * Hook to check if the connected wallet is registered.
- * A user is considered registered if:
- *   - referrerOf(address) != address(0) in AffiliateDistributor, OR
- *   - getUserStakeCount(address) > 0 in StakingManager (staking is the registration action)
- */
+interface RegistrationData {
+  address: string;
+  referrer: string;
+  timestamp: number;
+}
+
+/** Read saved registration from localStorage */
+function getSavedRegistration(address: string | undefined): RegistrationData | null {
+  if (!address || typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const data: RegistrationData = JSON.parse(raw);
+    if (data.address?.toLowerCase() === address.toLowerCase()) return data;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Save registration to localStorage */
+function saveRegistration(address: string, referrer: string) {
+  if (typeof window === 'undefined') return;
+  const data: RegistrationData = { address: address.toLowerCase(), referrer, timestamp: Date.now() };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
 export function useRegistration() {
-  const { address } = useAccount();
+  const { address, isConnected } = useAccount();
+  const [localRegistered, setLocalRegistered] = useState(false);
+  const [storedReferrer, setStoredReferrer] = useState<string>('');
 
-  const { data: referrerData, isLoading: refLoading, refetch } = useReadContract({
-    address: CONTRACTS.AFFILIATE_DISTRIBUTOR,
+  // Check localStorage on mount and address change
+  useEffect(() => {
+    const saved = getSavedRegistration(address);
+    if (saved) {
+      setLocalRegistered(true);
+      setStoredReferrer(saved.referrer);
+    } else {
+      setLocalRegistered(false);
+      setStoredReferrer('');
+    }
+  }, [address]);
+
+  // Check if user has a referrer set on-chain (meaning they already interacted)
+  const { data: onChainReferrer, isLoading: referrerLoading } = useReadContract({
+    address: contracts.affiliateDistributor,
     abi: AffiliateDistributorABI,
     functionName: 'referrerOf',
     args: address ? [address] : undefined,
     query: {
-      enabled: !!address && !!CONTRACTS.AFFILIATE_DISTRIBUTOR,
-      refetchInterval: 15_000,
+      enabled: !!address && contracts.affiliateDistributor !== '0x',
+      refetchInterval: 15000,
     },
   });
 
-  const { data: stakeCount, isLoading: stakeLoading } = useReadContract({
-    address: CONTRACTS.STAKING_MANAGER,
-    abi: StakingManagerABI,
-    functionName: 'getUserStakeCount',
-    args: address ? [address] : undefined,
+  // Genesis mode detection: check if system wallet has any direct referrals
+  const { data: systemDirectCount } = useReadContract({
+    address: contracts.affiliateDistributor,
+    abi: AffiliateDistributorABI,
+    functionName: 'directCount',
+    args: SYSTEM_WALLET !== '0x' ? [SYSTEM_WALLET] : undefined,
     query: {
-      enabled: !!address && !!CONTRACTS.STAKING_MANAGER,
-      refetchInterval: 15_000,
+      enabled: SYSTEM_WALLET !== '0x' && contracts.affiliateDistributor !== '0x',
+      refetchInterval: 30000,
     },
   });
 
-  const referrer = referrerData as `0x${string}` | undefined;
-  const hasReferrer = !!referrer && referrer.toLowerCase() !== ZERO_ADDRESS.toLowerCase();
-  const hasStake = !!stakeCount && Number(stakeCount) > 0;
+  const hasOnChainReferrer = onChainReferrer !== undefined && onChainReferrer !== zeroAddress;
+  const isRegistered = localRegistered || hasOnChainReferrer;
+  const isGenesisMode = systemDirectCount !== undefined && (systemDirectCount as bigint) === 0n;
+  const isLoading = referrerLoading;
 
-  // User is registered if they have a referrer OR have staked
-  const isRegistered = hasReferrer || hasStake;
-  const isLoading = refLoading || stakeLoading;
+  // Register: save referrer to localStorage
+  const register = useCallback((referrer: string) => {
+    if (!address) return;
+    saveRegistration(address, referrer);
+    setLocalRegistered(true);
+    setStoredReferrer(referrer);
+  }, [address]);
+
+  // If on-chain referrer is set but no local data, sync it
+  useEffect(() => {
+    if (hasOnChainReferrer && !localRegistered && address && onChainReferrer) {
+      saveRegistration(address, onChainReferrer as string);
+      setLocalRegistered(true);
+      setStoredReferrer(onChainReferrer as string);
+    }
+  }, [hasOnChainReferrer, localRegistered, address, onChainReferrer]);
 
   return {
     isRegistered,
-    referrer: hasReferrer ? referrer : null,
     isLoading,
-    refetch,
+    isConnected,
+    isGenesisMode,
+    hasOnChainReferrer,
+    storedReferrer,
+    register,
   };
 }

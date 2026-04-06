@@ -1,27 +1,21 @@
 'use client';
 
 import { useReadContract } from 'wagmi';
-import { formatUnits } from 'viem';
-import { CONTRACTS, LiquidityPoolABI } from '@/lib/contracts';
+import { contracts } from '@/config/contracts';
+import { LiquidityPoolABI } from '@/config/abis/LiquidityPool';
 
 export function useKairoPrice() {
-  const { data, isLoading, isError, refetch } = useReadContract({
-    address: CONTRACTS.LIQUIDITY_POOL,
+  const { data: priceData, isLoading, refetch } = useReadContract({
+    address: contracts.liquidityPool,
     abi: LiquidityPoolABI,
     functionName: 'getLivePrice',
     query: {
-      enabled: !!CONTRACTS.LIQUIDITY_POOL,
-      refetchInterval: 15_000, // Refresh every 15 seconds
+      refetchInterval: 5000,
+      enabled: contracts.liquidityPool !== '0x',
     },
   });
 
-  const price = data ? Number(formatUnits(data, 18)) : 0;
+  const price = priceData ? Number(priceData) / 1e6 : 0;
 
-  return {
-    price,
-    rawPrice: data,
-    isLoading,
-    isError,
-    refetch,
-  };
+  return { price, isLoading, refetch };
 }

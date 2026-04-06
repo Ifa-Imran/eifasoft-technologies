@@ -36,7 +36,7 @@ contract AtomicP2p is ReentrancyGuard, AccessControl {
     IERC20 public immutable usdtToken;
     ILiquidityPool public immutable liquidityPool;
 
-    uint256 public constant FEE_PERCENTAGE = 200; // 2% = 200 basis points
+    uint256 public constant FEE_PERCENTAGE = 300; // 3% = 300 basis points
     uint256 public constant FEE_DENOMINATOR = 10000;
 
     uint256 public nextBuyOrderId = 1;
@@ -305,8 +305,8 @@ contract AtomicP2p is ReentrancyGuard, AccessControl {
         // FEE CALCULATION
         // ==========================================
         
-        uint256 usdtFee = (usdtRequired * FEE_PERCENTAGE) / FEE_DENOMINATOR; // 2% USDT fee
-        uint256 kairoFee = (kairoAmount * FEE_PERCENTAGE) / FEE_DENOMINATOR;   // 2% KAIRO fee
+        uint256 usdtFee = (usdtRequired * FEE_PERCENTAGE) / FEE_DENOMINATOR; // 3% USDT fee
+        uint256 kairoFee = (kairoAmount * FEE_PERCENTAGE) / FEE_DENOMINATOR;   // 3% KAIRO fee
         
         uint256 netUsdt = usdtRequired - usdtFee; // Net USDT to seller (caller)
         uint256 netKairo = kairoAmount - kairoFee;   // Net KAIRO to buyer (order creator)
@@ -424,8 +424,8 @@ contract AtomicP2p is ReentrancyGuard, AccessControl {
         // FEE CALCULATION
         // ==========================================
         
-        uint256 usdtFee = (usdtRequired * FEE_PERCENTAGE) / FEE_DENOMINATOR; // 2% USDT fee
-        uint256 kairoFee = (kairoAmount * FEE_PERCENTAGE) / FEE_DENOMINATOR;   // 2% KAIRO fee
+        uint256 usdtFee = (usdtRequired * FEE_PERCENTAGE) / FEE_DENOMINATOR; // 3% USDT fee
+        uint256 kairoFee = (kairoAmount * FEE_PERCENTAGE) / FEE_DENOMINATOR;   // 3% KAIRO fee
         
         uint256 netUsdt = usdtRequired - usdtFee; // Net USDT to seller (order creator)
         uint256 netKairo = kairoAmount - kairoFee;   // Net KAIRO to buyer (caller)
@@ -710,9 +710,8 @@ contract AtomicP2p is ReentrancyGuard, AccessControl {
     function _getValidatedPrice() internal view returns (uint256 price) {
         price = liquidityPool.getCurrentPrice();
         
-        // Sanity checks
+        // Sanity check: lower bound only (no upper limit — let price appreciate freely)
         require(price > 0, "P2P: Zero price from oracle");
-        require(price < 1000e18, "P2P: Price too high (>1000 USDT/KAIRO)");
         require(price > 1e12, "P2P: Price too low (<0.000001 USDT/KAIRO)");
         
         return price;

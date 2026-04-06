@@ -1,39 +1,32 @@
-'use client';
-
 import { cn } from '@/lib/utils';
-
-type SkeletonVariant = 'text' | 'circle' | 'card' | 'rect';
 
 interface SkeletonProps {
   className?: string;
-  variant?: SkeletonVariant;
+  variant?: 'text' | 'circular' | 'rectangular';
   width?: string | number;
   height?: string | number;
 }
-
-const variantStyles: Record<SkeletonVariant, string> = {
-  text: 'h-4 w-full rounded-md',
-  circle: 'rounded-full',
-  card: 'h-32 w-full rounded-2xl',
-  rect: 'rounded-xl',
-};
 
 export function Skeleton({ className, variant = 'text', width, height }: SkeletonProps) {
   return (
     <div
       className={cn(
-        'relative overflow-hidden bg-glass',
-        'before:absolute before:inset-0',
-        'before:bg-gradient-to-r before:from-transparent before:via-white/[0.06] before:to-transparent',
-        'before:animate-shimmer before:bg-[length:200%_100%]',
-        variantStyles[variant],
-        className,
+        'animate-shimmer bg-gradient-to-r from-surface-200 via-surface-100 to-surface-200 bg-[length:200%_100%]',
+        variant === 'text' && 'h-4 rounded-md',
+        variant === 'circular' && 'rounded-full',
+        variant === 'rectangular' && 'rounded-xl',
+        className
       )}
-      style={{
-        width: typeof width === 'number' ? `${width}px` : width,
-        height: typeof height === 'number' ? `${height}px` : height,
-      }}
-      aria-hidden="true"
+      style={{ width, height }}
     />
+  );
+}
+
+export function StatCardSkeleton() {
+  return (
+    <div className="card p-5 space-y-3">
+      <Skeleton width="60%" className="h-3" />
+      <Skeleton width="80%" className="h-7" />
+    </div>
   );
 }

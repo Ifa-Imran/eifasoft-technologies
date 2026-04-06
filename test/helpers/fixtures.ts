@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 
 export async function deployFullEcosystemFixture() {
-    const [owner, systemWallet, user1, user2, user3, user4, user5, ...others] = await ethers.getSigners();
+    const [owner, systemWallet, user1, user2, user3, user4, user5, dao1, dao2, dao3, dao4, dao5, ...others] = await ethers.getSigners();
 
     // Step 1: Deploy MockUSDT
     const MockUSDT = await ethers.getContractFactory("MockUSDT");
@@ -13,32 +13,34 @@ export async function deployFullEcosystemFixture() {
     const kairoToken = await KAIROToken.deploy(owner.address);
     await kairoToken.waitForDeployment();
 
-    // Step 3: Deploy AuxFund
-    const AuxFund = await ethers.getContractFactory("AuxFund");
-    const auxFund = await AuxFund.deploy(await kairoToken.getAddress(), await usdt.getAddress());
-    await auxFund.waitForDeployment();
+    // Step 3: Deploy LiquidityPool
+    const LiquidityPool = await ethers.getContractFactory("LiquidityPool");
+    const liquidityPool = await LiquidityPool.deploy(await kairoToken.getAddress(), await usdt.getAddress());
+    await liquidityPool.waitForDeployment();
 
     // Step 4: Configure KAIROToken
-    await kairoToken.setLiquidityPool(await auxFund.getAddress());
+    await kairoToken.setLiquidityPool(await liquidityPool.getAddress());
     await kairoToken.mintInitialSupply();
 
     // Step 5: Deploy AffiliateDistributor
     const AffiliateDistributor = await ethers.getContractFactory("AffiliateDistributor");
     const affiliateDistributor = await AffiliateDistributor.deploy(
         await kairoToken.getAddress(),
-        await auxFund.getAddress(),
+        await liquidityPool.getAddress(),
         owner.address,
         systemWallet.address
     );
     await affiliateDistributor.waitForDeployment();
 
     // Step 6: Deploy StakingManager
+    const daoWallets = [dao1.address, dao2.address, dao3.address, dao4.address, dao5.address] as [string, string, string, string, string];
     const StakingManager = await ethers.getContractFactory("StakingManager");
     const stakingManager = await StakingManager.deploy(
         await kairoToken.getAddress(),
-        await auxFund.getAddress(),
+        await liquidityPool.getAddress(),
         await usdt.getAddress(),
         systemWallet.address,
+        daoWallets,
         owner.address
     );
     await stakingManager.waitForDeployment();
@@ -52,7 +54,7 @@ export async function deployFullEcosystemFixture() {
     const cms = await CMS.deploy(
         await kairoToken.getAddress(),
         await usdt.getAddress(),
-        await auxFund.getAddress(),
+        await liquidityPool.getAddress(),
         await stakingManager.getAddress(),
         await affiliateDistributor.getAddress(),
         systemWallet.address,
@@ -60,12 +62,15 @@ export async function deployFullEcosystemFixture() {
     );
     await cms.waitForDeployment();
 
-    // Step 8: Deploy P2PEscrow
-    const P2PEscrow = await ethers.getContractFactory("P2PEscrow");
-    const p2pEscrow = await P2PEscrow.deploy(
+    // Link StakingManager -> CMS (for addEarnings authorization)
+    await stakingManager.setCMS(await cms.getAddress());
+
+    // Step 8: Deploy AtomicP2p
+    const AtomicP2p = await ethers.getContractFactory("AtomicP2p");
+    const p2pEscrow = await AtomicP2p.deploy(
         await kairoToken.getAddress(),
         await usdt.getAddress(),
-        await auxFund.getAddress()
+        await liquidityPool.getAddress()
     );
     await p2pEscrow.waitForDeployment();
 
@@ -76,26 +81,31 @@ export async function deployFullEcosystemFixture() {
     await kairoToken.grantRole(MINTER_ROLE, await stakingManager.getAddress());
     await kairoToken.grantRole(MINTER_ROLE, await affiliateDistributor.getAddress());
     await kairoToken.grantRole(MINTER_ROLE, await cms.getAddress());
-    await kairoToken.grantRole(BURNER_ROLE, await auxFund.getAddress());
+    await kairoToken.grantRole(BURNER_ROLE, await liquidityPool.getAddress());
     await kairoToken.grantRole(BURNER_ROLE, await p2pEscrow.getAddress());
 
-    const RANK_UPDATER_ROLE = await affiliateDistributor.RANK_UPDATER_ROLE();
-    await affiliateDistributor.grantRole(RANK_UPDATER_ROLE, owner.address);
+    const RANK_UPDATER_ROLE = ethers.ZeroHash; // placeholder, role no longer exists
 
     const COMPOUNDER_ROLE = await stakingManager.COMPOUNDER_ROLE();
     await stakingManager.grantRole(COMPOUNDER_ROLE, owner.address);
 
-    await auxFund.grantCoreRole(await stakingManager.getAddress());
-    await auxFund.grantCoreRole(await cms.getAddress());
-    await auxFund.grantP2PRole(await p2pEscrow.getAddress());
+    await liquidityPool.grantCoreRole(await stakingManager.getAddress());
+    await liquidityPool.grantCoreRole(await cms.getAddress());
+    await liquidityPool.grantP2PRole(await p2pEscrow.getAddress());
 
     // Grant STAKING_ROLE to CMS in AffiliateDistributor so setReferrer works from CMS
     const STAKING_ROLE = await affiliateDistributor.STAKING_ROLE();
     await affiliateDistributor.grantRole(STAKING_ROLE, await cms.getAddress());
 
-    // Step 10: Seed AuxFund with 10,000 USDT liquidity
+    // Register genesis account (root of referral tree) — uses others[0] so it doesn't interfere with tests
+    // Genesis account cannot stake but serves as the root ancestor.
+    await affiliateDistributor.grantRole(STAKING_ROLE, owner.address);
+    const genesisAccount = others[0];
+    await affiliateDistributor.setReferrer(genesisAccount.address, ethers.ZeroAddress);
+
+    // Step 10: Seed LiquidityPool with 10,000 USDT liquidity
     const INITIAL_LIQUIDITY = ethers.parseEther("10000");
-    await usdt.transfer(await auxFund.getAddress(), INITIAL_LIQUIDITY);
+    await usdt.transfer(await liquidityPool.getAddress(), INITIAL_LIQUIDITY);
 
     // Extend CMS deadline far into the future for testing (year 2030)
     await cms.extendDeadline(1893456000);
@@ -107,8 +117,9 @@ export async function deployFullEcosystemFixture() {
     }
 
     return {
-        owner, systemWallet, user1, user2, user3, user4, user5, others,
-        kairoToken, usdt, auxFund, stakingManager,
+        owner, systemWallet, user1, user2, user3, user4, user5,
+        dao1, dao2, dao3, dao4, dao5, daoWallets, others, genesisAccount,
+        kairoToken, usdt, liquidityPool, stakingManager,
         affiliateDistributor, cms, p2pEscrow,
         MINTER_ROLE, BURNER_ROLE, COMPOUNDER_ROLE, RANK_UPDATER_ROLE, STAKING_ROLE
     };

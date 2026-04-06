@@ -3,161 +3,135 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   HomeIcon,
-  BanknotesIcon,
+  CurrencyDollarIcon,
   ArrowsRightLeftIcon,
-  TrophyIcon,
   UserGroupIcon,
-  TicketIcon,
+  TrophyIcon,
+  CreditCardIcon,
+  ArrowPathIcon,
+  ChartBarIcon,
   ChevronLeftIcon,
-  ChevronRightIcon,
 } from '@heroicons/react/24/outline';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect } from 'react';
-import * as RadixTooltip from '@radix-ui/react-tooltip';
 
-const sidebarLinks = [
+const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: HomeIcon },
-  { href: '/stake', label: 'Stake', icon: BanknotesIcon },
+  { href: '/stake', label: 'Stake', icon: CurrencyDollarIcon },
   { href: '/exchange', label: 'Exchange', icon: ArrowsRightLeftIcon },
-  { href: '/rank', label: 'Rank', icon: TrophyIcon },
-  { href: '/dashboard/referrals', label: 'Referrals', icon: UserGroupIcon },
-  { href: '/dashboard/cms', label: 'CMS', icon: TicketIcon },
+  { href: '/referrals', label: 'Referrals', icon: UserGroupIcon },
+  { href: '/qualifiers', label: 'Qualifiers', icon: TrophyIcon },
+  { href: '/cms', label: 'CMS', icon: CreditCardIcon },
+  { href: '/swap', label: 'Swap', icon: ArrowPathIcon },
+  { href: '/analytics', label: 'Analytics', icon: ChartBarIcon },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  collapsed: boolean;
+  onToggle: () => void;
+  mobileOpen: boolean;
+  onMobileClose: () => void;
+}
+
+export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
-  const [expanded, setExpanded] = useState(true);
-  const [isDesktop, setIsDesktop] = useState(false);
-  const [isTablet, setIsTablet] = useState(false);
 
-  useEffect(() => {
-    const check = () => {
-      const w = window.innerWidth;
-      setIsDesktop(w >= 1440);
-      setIsTablet(w >= 768 && w < 1440);
-    };
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
-  }, []);
+  const sidebarContent = (
+    <div className="flex flex-col h-full">
+      {/* Logo area */}
+      <div className="flex items-center justify-between px-4 py-5">
+        {!collapsed && (
+          <Link href="/" className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
+              <span className="text-white font-bold text-sm">K</span>
+            </div>
+            <span className="font-orbitron text-lg font-bold gradient-text">KAIRO</span>
+          </Link>
+        )}
+        <button
+          onClick={onToggle}
+          className="hidden lg:flex text-surface-400 hover:text-surface-700 p-1.5 rounded-lg hover:bg-surface-100 transition-colors"
+        >
+          <ChevronLeftIcon
+            className={cn('w-4 h-4 transition-transform duration-300', collapsed && 'rotate-180')}
+          />
+        </button>
+      </div>
 
-  // Auto-collapse on tablet
-  useEffect(() => {
-    if (isTablet) setExpanded(false);
-    if (isDesktop) setExpanded(true);
-  }, [isTablet, isDesktop]);
+      <nav className="flex-1 px-3 space-y-1">
+        {navItems.map((item) => {
+          const isActive = pathname === item.href;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={onMobileClose}
+              className={cn(
+                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
+                isActive
+                  ? 'bg-gradient-to-r from-primary-100 to-secondary-100 text-primary-700 border-2 border-primary-300/60 shadow-md shadow-primary-200/30'
+                  : 'text-surface-500 hover:text-primary-700 hover:bg-primary-50/50',
+                collapsed && 'justify-center'
+              )}
+            >
+              <item.icon className={cn('w-5 h-5 flex-shrink-0', isActive && 'text-primary-600')} />
+              {!collapsed && <span>{item.label}</span>}
+            </Link>
+          );
+        })}
+      </nav>
 
-  const isActive = (href: string) =>
-    pathname === href || (href !== '/dashboard' && pathname.startsWith(href)) ||
-    (href === '/dashboard' && pathname === '/dashboard');
-
-  // Hidden on mobile
-  if (!isDesktop && !isTablet) return null;
-
-  const sidebarWidth = expanded ? 240 : 64;
+      {/* Bottom section */}
+      {!collapsed && (
+        <div className="p-4">
+          <div className="p-3 rounded-xl bg-gradient-to-br from-primary-100 to-secondary-100 border-2 border-primary-200/60">
+            <p className="text-xs text-surface-600 font-medium">opBNB Testnet</p>
+            <div className="flex items-center gap-1.5 mt-1">
+              <div className="w-2 h-2 rounded-full bg-success-500 animate-pulse" />
+              <span className="text-xs text-success-600 font-medium">Connected</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
   return (
-    <RadixTooltip.Provider delayDuration={200}>
-      <motion.aside
-        initial={false}
-        animate={{ width: sidebarWidth }}
-        transition={{ duration: 0.2, ease: 'easeInOut' }}
-        className="fixed left-0 top-16 bottom-0 z-40 hidden md:flex flex-col bg-glass backdrop-blur-[20px] border-r border-glass-border"
+    <>
+      {/* Desktop Sidebar */}
+      <aside
+        className={cn(
+          'hidden lg:flex flex-col bg-gradient-to-b from-white/90 via-primary-50/20 to-secondary-50/20 backdrop-blur-xl border-r border-primary-200/50 transition-all duration-300',
+          collapsed ? 'w-[72px]' : 'w-[240px]'
+        )}
       >
-        {/* Navigation items */}
-        <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto overflow-x-hidden">
-          {sidebarLinks.map((link) => {
-            const Icon = link.icon;
-            const active = isActive(link.href);
+        {sidebarContent}
+      </aside>
 
-            const linkContent = (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={cn(
-                  'group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative',
-                  active
-                    ? 'text-neon-cyan bg-neon-cyan/10'
-                    : 'text-gray-400 hover:text-gray-200 hover:bg-white/5',
-                )}
-              >
-                {/* Active left border */}
-                {active && (
-                  <motion.span
-                    layoutId="sidebar-active"
-                    className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-neon-cyan rounded-full shadow-[0_0_8px_rgba(0,240,255,0.6)]"
-                    transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-                  />
-                )}
-                <Icon className={cn('w-5 h-5 shrink-0', active && 'drop-shadow-[0_0_4px_rgba(0,240,255,0.5)]')} />
-                <AnimatePresence>
-                  {expanded && (
-                    <motion.span
-                      initial={{ opacity: 0, width: 0 }}
-                      animate={{ opacity: 1, width: 'auto' }}
-                      exit={{ opacity: 0, width: 0 }}
-                      transition={{ duration: 0.15 }}
-                      className="whitespace-nowrap overflow-hidden font-space-grotesk"
-                    >
-                      {link.label}
-                    </motion.span>
-                  )}
-                </AnimatePresence>
-              </Link>
-            );
-
-            // Tooltip when collapsed
-            if (!expanded) {
-              return (
-                <RadixTooltip.Root key={link.href}>
-                  <RadixTooltip.Trigger asChild>
-                    {linkContent}
-                  </RadixTooltip.Trigger>
-                  <RadixTooltip.Portal>
-                    <RadixTooltip.Content
-                      side="right"
-                      sideOffset={8}
-                      className="px-3 py-1.5 rounded-lg bg-cosmic border border-glass-border text-sm text-gray-200 font-medium shadow-lg z-[100]"
-                    >
-                      {link.label}
-                      <RadixTooltip.Arrow className="fill-cosmic" />
-                    </RadixTooltip.Content>
-                  </RadixTooltip.Portal>
-                </RadixTooltip.Root>
-              );
-            }
-
-            return <div key={link.href}>{linkContent}</div>;
-          })}
-        </nav>
-
-        {/* Collapse toggle */}
-        <div className="p-2 border-t border-glass-border">
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-colors focus-visible:ring-2 focus-visible:ring-neon-cyan/50 focus-visible:ring-offset-2 focus-visible:ring-offset-void"
-            aria-label={expanded ? 'Collapse sidebar' : 'Expand sidebar'}
-          >
-            {expanded ? (
-              <>
-                <ChevronLeftIcon className="w-4 h-4" />
-                <motion.span
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="text-xs font-medium"
-                >
-                  Collapse
-                </motion.span>
-              </>
-            ) : (
-              <ChevronRightIcon className="w-4 h-4" />
-            )}
-          </button>
-        </div>
-      </motion.aside>
-    </RadixTooltip.Provider>
+      {/* Mobile Overlay */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={onMobileClose}
+              className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 lg:hidden"
+            />
+            <motion.aside
+              initial={{ x: -280 }}
+              animate={{ x: 0 }}
+              exit={{ x: -280 }}
+              transition={{ type: 'spring', damping: 25 }}
+              className="fixed left-0 top-0 bottom-0 w-[240px] bg-gradient-to-b from-white/95 via-primary-50/30 to-secondary-50/30 backdrop-blur-xl border-r border-primary-200/50 z-50 lg:hidden"
+            >
+              {sidebarContent}
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

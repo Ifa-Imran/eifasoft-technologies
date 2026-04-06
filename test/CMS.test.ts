@@ -4,17 +4,20 @@ import { loadFixture, time } from "@nomicfoundation/hardhat-toolbox/network-help
 import { deployFullEcosystemFixture } from "./helpers/fixtures";
 
 describe("CoreMembershipSubscription", function () {
+    // Non-zero referrer address for mandatory referrer parameter
+    const REF = "0x0000000000000000000000000000000000000001";
+
     async function cmsFixture() {
         const f = await deployFullEcosystemFixture();
-        // Approve CMS (actually AuxFund since USDT goes there) from users
-        const auxFundAddress = await f.auxFund.getAddress();
+        // Approve CMS (actually LiquidityPool since USDT goes there) from users
+        const lpAddress = await f.liquidityPool.getAddress();
         const cmsAddress = await f.cms.getAddress();
         const stakingAddress = await f.stakingManager.getAddress();
 
         // Users approve spending for CMS and staking
         for (const user of [f.user1, f.user2, f.user3, f.user4, f.user5]) {
             await f.usdt.connect(user).approve(cmsAddress, ethers.MaxUint256);
-            await f.usdt.connect(user).approve(auxFundAddress, ethers.MaxUint256);
+            await f.usdt.connect(user).approve(lpAddress, ethers.MaxUint256);
             await f.usdt.connect(user).approve(stakingAddress, ethers.MaxUint256);
         }
         return f;
@@ -22,12 +25,12 @@ describe("CoreMembershipSubscription", function () {
 
     describe("Subscription", function () {
         it("should purchase a subscription with correct USDT transfer", async function () {
-            const { cms, usdt, auxFund, user1 } = await loadFixture(cmsFixture);
-            const auxFundAddr = await auxFund.getAddress();
-            const balBefore = await usdt.balanceOf(auxFundAddr);
+            const { cms, usdt, liquidityPool, user1 } = await loadFixture(cmsFixture);
+            const lpAddr = await liquidityPool.getAddress();
+            const balBefore = await usdt.balanceOf(lpAddr);
             await cms.connect(user1).subscribe(1, ethers.ZeroAddress);
-            const balAfter = await usdt.balanceOf(auxFundAddr);
-            // 10 USDT per sub transferred to AuxFund
+            const balAfter = await usdt.balanceOf(lpAddr);
+            // 10 USDT per sub transferred to LiquidityPool
             expect(balAfter - balBefore).to.equal(ethers.parseEther("10"));
         });
 
@@ -59,11 +62,11 @@ describe("CoreMembershipSubscription", function () {
 
     describe("Referral Rewards", function () {
         it("should distribute 5-level referral rewards", async function () {
-            const { cms, affiliateDistributor, owner, user1, user2, user3, user4, user5, STAKING_ROLE } = await loadFixture(cmsFixture);
+            const { cms, affiliateDistributor, owner, user1, user2, user3, user4, user5, genesisAccount, STAKING_ROLE } = await loadFixture(cmsFixture);
 
             // Build referral chain: user5 -> user4 -> user3 -> user2 -> user1
-            // Set referrers in AffiliateDistributor
-            await affiliateDistributor.grantRole(STAKING_ROLE, owner.address);
+            // Register top-down: user1 under genesis, then user2 under user1, etc.
+            await affiliateDistributor.setReferrer(user1.address, genesisAccount.address);
             await affiliateDistributor.setReferrer(user2.address, user1.address);
             await affiliateDistributor.setReferrer(user3.address, user2.address);
             await affiliateDistributor.setReferrer(user4.address, user3.address);
@@ -132,7 +135,7 @@ describe("CoreMembershipSubscription", function () {
             const f = await cmsFixture();
             // User1 subscribes and stakes
             await f.cms.connect(f.user1).subscribe(5, ethers.ZeroAddress);
-            await f.stakingManager.connect(f.user1).stake(ethers.parseEther("1000"), ethers.ZeroAddress);
+            await f.stakingManager.connect(f.user1).stake(ethers.parseEther("1000"), REF);
             return f;
         }
 
@@ -163,7 +166,7 @@ describe("CoreMembershipSubscription", function () {
             await expect(cms.connect(user1).claimCMSRewards()).to.be.revertedWith("CMS: No subscriptions");
         });
 
-        it("should apply 90/10 split (user/system)", async function () {
+        it("should apply 90/10 split (user receives 90%, 10% burned)", async function () {
             const { cms, kairoToken, user1, systemWallet } = await loadFixture(claimFixture);
             const sysBalBefore = await kairoToken.balanceOf(systemWallet.address);
             const userBalBefore = await kairoToken.balanceOf(user1.address);
@@ -172,11 +175,9 @@ describe("CoreMembershipSubscription", function () {
             const userBalAfter = await kairoToken.balanceOf(user1.address);
 
             const userGain = userBalAfter - userBalBefore;
-            const sysGain = sysBalAfter - sysBalBefore;
-            // user should get 9x what system gets
-            // Due to integer division rounding, use approximate check
-            expect(sysGain).to.be.gt(0);
-            expect(userGain).to.be.gt(sysGain);
+            // System wallet should receive NOTHING (10% is burned, not minted)
+            expect(sysBalAfter).to.equal(sysBalBefore);
+            expect(userGain).to.be.gt(0);
         });
 
         it("should cap at stake value and delete excess", async function () {
@@ -184,7 +185,7 @@ describe("CoreMembershipSubscription", function () {
             // Subscribe with many subs to create large rewards
             await f.cms.connect(f.user1).subscribe(100, ethers.ZeroAddress); // 500 KAIRO loyalty
             // Stake only a small amount
-            await f.stakingManager.connect(f.user1).stake(ethers.parseEther("10"), ethers.ZeroAddress);
+            await f.stakingManager.connect(f.user1).stake(ethers.parseEther("10"), REF);
 
             // The max claimable KAIRO = stakeValue / price = 10 / 1 = 10 KAIRO
             // But totalClaimable = 500 KAIRO, so excess = 490
@@ -195,6 +196,41 @@ describe("CoreMembershipSubscription", function () {
             // After claim, rewards should be zeroed
             const [loyalty, leadership, total] = await f.cms.getClaimableRewards(f.user1.address);
             expect(total).to.equal(0);
+        });
+    });
+
+    describe("3X Cap Integration", function () {
+        it("should report loyalty USDT value to FIFO cap on subscribe", async function () {
+            const { cms, stakingManager, user1 } = await loadFixture(cmsFixture);
+
+            // user1 stakes first so there's a cap to track against
+            await stakingManager.connect(user1).stake(ethers.parseEther("1000"), REF);
+
+            // Subscribe 2 subs => 2 * 5 = 10 KAIRO loyalty
+            // livePrice ≈ 1e18 (1 USDT/KAIRO at start), so loyaltyUsdValue ≈ 10 USDT
+            await cms.connect(user1).subscribe(2, ethers.ZeroAddress);
+
+            const [totalEarned] = await stakingManager.getGlobalCapProgress(user1.address);
+            // totalEarned should include the loyalty USDT value
+            expect(totalEarned).to.be.gt(0);
+        });
+
+        it("should report leadership USDT value to FIFO cap on referral subscribe", async function () {
+            const { cms, affiliateDistributor, stakingManager, owner, user1, user2, genesisAccount, STAKING_ROLE } = await loadFixture(cmsFixture);
+
+            // Setup referral chain (register user1 under genesis first)
+            await affiliateDistributor.setReferrer(user1.address, genesisAccount.address);
+            await affiliateDistributor.setReferrer(user2.address, user1.address);
+
+            // user1 stakes so they have a cap to track against
+            await stakingManager.connect(user1).stake(ethers.parseEther("1000"), REF);
+
+            // user2 subscribes with user1 as referrer
+            await cms.connect(user2).subscribe(1, user1.address);
+
+            // user1 gets leadership reward (L1: 1 KAIRO * livePrice)
+            const [totalEarned] = await stakingManager.getGlobalCapProgress(user1.address);
+            expect(totalEarned).to.be.gt(0);
         });
     });
 
@@ -240,7 +276,7 @@ describe("CoreMembershipSubscription", function () {
             expect(reason).to.equal("No active stake");
 
             // Now stake
-            await stakingManager.connect(user1).stake(ethers.parseEther("100"), ethers.ZeroAddress);
+            await stakingManager.connect(user1).stake(ethers.parseEther("100"), REF);
             [eligible, reason] = await cms.canClaim(user1.address);
             expect(eligible).to.be.true;
             expect(reason).to.equal("Eligible");

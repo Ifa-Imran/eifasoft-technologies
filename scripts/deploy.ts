@@ -10,6 +10,16 @@ async function main() {
     // Use deployer as system wallet for testnet; override with env var for production
     const systemWallet = process.env.SYSTEM_WALLET || deployer.address;
     console.log("System Wallet:", systemWallet);
+
+    // DAO wallets: use env vars for production, deployer address as fallback for testnet
+    const daoWallets = [
+        process.env.DAO_WALLET_1 || deployer.address,
+        process.env.DAO_WALLET_2 || deployer.address,
+        process.env.DAO_WALLET_3 || deployer.address,
+        process.env.DAO_WALLET_4 || deployer.address,
+        process.env.DAO_WALLET_5 || deployer.address,
+    ];
+    console.log("DAO Wallets:", daoWallets);
     console.log("");
 
     // ============================================================
@@ -83,7 +93,7 @@ async function main() {
 
     // ============================================================
     // Step 6: Deploy StakingManager
-    // Constructor: (address _kairoToken, address _liquidityPool, address _usdt, address _systemWallet, address _admin)
+    // Constructor: (address _kairoToken, address _liquidityPool, address _usdt, address _developmentFundWallet, address[5] _daoWallets, address _admin)
     // ============================================================
     console.log("Step 6: Deploying StakingManager...");
     const StakingManager = await ethers.getContractFactory("StakingManager");
@@ -92,6 +102,7 @@ async function main() {
         liquidityPoolAddress,
         usdtAddress,
         systemWallet,
+        daoWallets,
         deployer.address
     );
     await stakingManager.waitForDeployment();

@@ -1,150 +1,149 @@
 'use client';
 
-import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { useAccount } from 'wagmi';
-import { CONTRACTS, AtomicP2pABI } from '@/lib/contracts';
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
+import { contracts } from '@/config/contracts';
+import { AtomicP2pABI } from '@/config/abis/AtomicP2p';
+import { useToast } from '@/components/ui/Toast';
+import { useEffect } from 'react';
 
 export function useP2P() {
   const { address } = useAccount();
-  const { writeContract, data: txHash, isPending: isWritePending } = useWriteContract();
-  const { isLoading: isConfirming } = useWaitForTransactionReceipt({ hash: txHash });
+  const { toast } = useToast();
 
-  // Read order book stats
-  const { data: orderBookStats, refetch: refetchStats } = useReadContract({
-    address: CONTRACTS.ATOMIC_P2P,
+  const { data: activeBuyOrders, isLoading: buyLoading, refetch: refetchBuys } = useReadContract({
+    address: contracts.atomicP2p,
     abi: AtomicP2pABI,
-    functionName: 'getOrderBookStats',
+    functionName: 'getActiveBuyOrders',
     query: {
-      enabled: !!CONTRACTS.ATOMIC_P2P,
-      refetchInterval: 10_000,
+      enabled: contracts.atomicP2p !== '0x',
+      refetchInterval: 10000,
     },
   });
 
-  // Read current price
+  const { data: activeSellOrders, isLoading: sellLoading, refetch: refetchSells } = useReadContract({
+    address: contracts.atomicP2p,
+    abi: AtomicP2pABI,
+    functionName: 'getActiveSellOrders',
+    query: {
+      enabled: contracts.atomicP2p !== '0x',
+      refetchInterval: 10000,
+    },
+  });
+
   const { data: currentPrice } = useReadContract({
-    address: CONTRACTS.ATOMIC_P2P,
+    address: contracts.atomicP2p,
     abi: AtomicP2pABI,
     functionName: 'getCurrentPrice',
     query: {
-      enabled: !!CONTRACTS.ATOMIC_P2P,
-      refetchInterval: 15_000,
+      enabled: contracts.atomicP2p !== '0x',
+      refetchInterval: 5000,
     },
   });
 
-  // Read active buy orders
-  const { data: activeBuyOrders, refetch: refetchBuyOrders } = useReadContract({
-    address: CONTRACTS.ATOMIC_P2P,
-    abi: AtomicP2pABI,
-    functionName: 'getActiveBuyOrders',
-    args: [BigInt(0), BigInt(20)],
-    query: {
-      enabled: !!CONTRACTS.ATOMIC_P2P,
-      refetchInterval: 10_000,
-    },
-  });
+  const { writeContract: writeCreateBuy, isPending: createBuyPending, data: createBuyHash } = useWriteContract();
+  const { writeContract: writeCreateSell, isPending: createSellPending, data: createSellHash } = useWriteContract();
+  const { writeContract: writeSellTo, isPending: sellToPending, data: sellToHash } = useWriteContract();
+  const { writeContract: writeBuyFrom, isPending: buyFromPending, data: buyFromHash } = useWriteContract();
+  const { writeContract: writeCancelBuy, isPending: cancelBuyPending, data: cancelBuyHash } = useWriteContract();
+  const { writeContract: writeCancelSell, isPending: cancelSellPending, data: cancelSellHash } = useWriteContract();
 
-  // Read active buy order IDs (parallel to orders, same offset/limit)
-  const { data: activeBuyOrderIds, refetch: refetchBuyOrderIds } = useReadContract({
-    address: CONTRACTS.ATOMIC_P2P,
-    abi: AtomicP2pABI,
-    functionName: 'getActiveBuyOrderIds',
-    args: [BigInt(0), BigInt(20)],
-    query: {
-      enabled: !!CONTRACTS.ATOMIC_P2P,
-      refetchInterval: 10_000,
-    },
-  });
+  const { isSuccess: createBuyOk, isError: createBuyFail } = useWaitForTransactionReceipt({ hash: createBuyHash });
+  const { isSuccess: createSellOk, isError: createSellFail } = useWaitForTransactionReceipt({ hash: createSellHash });
+  const { isSuccess: sellToOk, isError: sellToFail } = useWaitForTransactionReceipt({ hash: sellToHash });
+  const { isSuccess: buyFromOk, isError: buyFromFail } = useWaitForTransactionReceipt({ hash: buyFromHash });
+  const { isSuccess: cancelBuyOk, isError: cancelBuyFail } = useWaitForTransactionReceipt({ hash: cancelBuyHash });
+  const { isSuccess: cancelSellOk, isError: cancelSellFail } = useWaitForTransactionReceipt({ hash: cancelSellHash });
 
-  // Read active sell orders
-  const { data: activeSellOrders, refetch: refetchSellOrders } = useReadContract({
-    address: CONTRACTS.ATOMIC_P2P,
-    abi: AtomicP2pABI,
-    functionName: 'getActiveSellOrders',
-    args: [BigInt(0), BigInt(20)],
-    query: {
-      enabled: !!CONTRACTS.ATOMIC_P2P,
-      refetchInterval: 10_000,
-    },
-  });
+  useEffect(() => { if (createBuyOk) { toast({ type: 'success', title: 'Buy order created!' }); refetch(); } }, [createBuyOk]);
+  useEffect(() => { if (createBuyFail) toast({ type: 'error', title: 'Buy order failed' }); }, [createBuyFail]);
+  useEffect(() => { if (createSellOk) { toast({ type: 'success', title: 'Sell order created!' }); refetch(); } }, [createSellOk]);
+  useEffect(() => { if (createSellFail) toast({ type: 'error', title: 'Sell order failed' }); }, [createSellFail]);
+  useEffect(() => { if (sellToOk) { toast({ type: 'success', title: 'Order filled!' }); refetch(); } }, [sellToOk]);
+  useEffect(() => { if (sellToFail) toast({ type: 'error', title: 'Fill order failed' }); }, [sellToFail]);
+  useEffect(() => { if (buyFromOk) { toast({ type: 'success', title: 'Order filled!' }); refetch(); } }, [buyFromOk]);
+  useEffect(() => { if (buyFromFail) toast({ type: 'error', title: 'Fill order failed' }); }, [buyFromFail]);
+  useEffect(() => { if (cancelBuyOk) { toast({ type: 'success', title: 'Buy order cancelled!' }); refetch(); } }, [cancelBuyOk]);
+  useEffect(() => { if (cancelBuyFail) toast({ type: 'error', title: 'Cancel failed' }); }, [cancelBuyFail]);
+  useEffect(() => { if (cancelSellOk) { toast({ type: 'success', title: 'Sell order cancelled!' }); refetch(); } }, [cancelSellOk]);
+  useEffect(() => { if (cancelSellFail) toast({ type: 'error', title: 'Cancel failed' }); }, [cancelSellFail]);
 
-  // Read active sell order IDs (parallel to orders, same offset/limit)
-  const { data: activeSellOrderIds, refetch: refetchSellOrderIds } = useReadContract({
-    address: CONTRACTS.ATOMIC_P2P,
-    abi: AtomicP2pABI,
-    functionName: 'getActiveSellOrderIds',
-    args: [BigInt(0), BigInt(20)],
-    query: {
-      enabled: !!CONTRACTS.ATOMIC_P2P,
-      refetchInterval: 10_000,
-    },
-  });
-
-  // Write operations
   const createBuyOrder = (usdtAmount: bigint) => {
-    writeContract({
-      address: CONTRACTS.ATOMIC_P2P,
+    writeCreateBuy({
+      address: contracts.atomicP2p,
       abi: AtomicP2pABI,
       functionName: 'createBuyOrder',
       args: [usdtAmount],
     });
+    toast({ type: 'pending', title: 'Creating buy order...' });
   };
 
   const createSellOrder = (kairoAmount: bigint) => {
-    writeContract({
-      address: CONTRACTS.ATOMIC_P2P,
+    writeCreateSell({
+      address: contracts.atomicP2p,
       abi: AtomicP2pABI,
       functionName: 'createSellOrder',
       args: [kairoAmount],
     });
+    toast({ type: 'pending', title: 'Creating sell order...' });
+  };
+
+  const sellToOrder = (orderId: bigint, kairoAmount: bigint) => {
+    writeSellTo({
+      address: contracts.atomicP2p,
+      abi: AtomicP2pABI,
+      functionName: 'sellToOrder',
+      args: [orderId, kairoAmount],
+    });
+    toast({ type: 'pending', title: 'Filling buy order...' });
+  };
+
+  const buyFromOrder = (orderId: bigint, kairoAmount: bigint) => {
+    writeBuyFrom({
+      address: contracts.atomicP2p,
+      abi: AtomicP2pABI,
+      functionName: 'buyFromOrder',
+      args: [orderId, kairoAmount],
+    });
+    toast({ type: 'pending', title: 'Filling sell order...' });
   };
 
   const cancelBuyOrder = (orderId: bigint) => {
-    writeContract({
-      address: CONTRACTS.ATOMIC_P2P,
+    writeCancelBuy({
+      address: contracts.atomicP2p,
       abi: AtomicP2pABI,
       functionName: 'cancelBuyOrder',
       args: [orderId],
     });
+    toast({ type: 'pending', title: 'Cancelling buy order...' });
   };
 
   const cancelSellOrder = (orderId: bigint) => {
-    writeContract({
-      address: CONTRACTS.ATOMIC_P2P,
+    writeCancelSell({
+      address: contracts.atomicP2p,
       abi: AtomicP2pABI,
       functionName: 'cancelSellOrder',
       args: [orderId],
     });
+    toast({ type: 'pending', title: 'Cancelling sell order...' });
   };
 
-  const executeTrade = (buyOrderId: bigint, sellOrderId: bigint, kairoFillAmount: bigint) => {
-    writeContract({
-      address: CONTRACTS.ATOMIC_P2P,
-      abi: AtomicP2pABI,
-      functionName: 'executeTrade',
-      args: [buyOrderId, sellOrderId, kairoFillAmount],
-    });
+  const refetch = () => {
+    refetchBuys();
+    refetchSells();
   };
-
-  const refetchAllBuyOrders = () => { refetchBuyOrders(); refetchBuyOrderIds(); };
-  const refetchAllSellOrders = () => { refetchSellOrders(); refetchSellOrderIds(); };
 
   return {
-    orderBookStats,
-    currentPrice,
-    activeBuyOrders,
-    activeBuyOrderIds,
-    activeSellOrders,
-    activeSellOrderIds,
+    activeBuyOrders: (activeBuyOrders as any[]) || [],
+    activeSellOrders: (activeSellOrders as any[]) || [],
+    currentPrice: currentPrice as bigint | undefined,
     createBuyOrder,
     createSellOrder,
+    sellToOrder,
+    buyFromOrder,
     cancelBuyOrder,
     cancelSellOrder,
-    executeTrade,
-    refetchStats,
-    refetchBuyOrders: refetchAllBuyOrders,
-    refetchSellOrders: refetchAllSellOrders,
-    isWritePending,
-    isConfirming,
-    txHash,
+    refetch,
+    isLoading: buyLoading || sellLoading,
+    isPending: createBuyPending || createSellPending || sellToPending || buyFromPending || cancelBuyPending || cancelSellPending,
   };
 }

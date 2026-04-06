@@ -19,6 +19,15 @@ async function main() {
 
     const systemWallet = process.env.SYSTEM_WALLET || deployer.address;
 
+    // DAO wallets: use env vars for production, deployer address as fallback for testnet
+    const daoWallets = [
+        process.env.DAO_WALLET_1 || deployer.address,
+        process.env.DAO_WALLET_2 || deployer.address,
+        process.env.DAO_WALLET_3 || deployer.address,
+        process.env.DAO_WALLET_4 || deployer.address,
+        process.env.DAO_WALLET_5 || deployer.address,
+    ];
+
     // ============================================================
     // PHASE 1: Deploy all contracts
     // ============================================================
@@ -68,11 +77,11 @@ async function main() {
     const affiliateAddress = await affiliateDistributor.getAddress();
     console.log("  AffiliateDistributor:", affiliateAddress);
 
-    // 6. StakingManager - constructor(address _kairoToken, address _liquidityPool, address _usdt, address _systemWallet, address _admin)
+    // 6. StakingManager - constructor(address _kairoToken, address _liquidityPool, address _usdt, address _developmentFundWallet, address[5] _daoWallets, address _admin)
     console.log("[6/8] Deploying StakingManager...");
     const StakingManager = await ethers.getContractFactory("StakingManager");
     const stakingManager = await StakingManager.deploy(
-        kairoAddress, liquidityPoolAddress, usdtAddress, systemWallet, deployer.address
+        kairoAddress, liquidityPoolAddress, usdtAddress, systemWallet, daoWallets, deployer.address
     );
     await stakingManager.waitForDeployment();
     const stakingAddress = await stakingManager.getAddress();
@@ -95,6 +104,11 @@ async function main() {
     await cms.waitForDeployment();
     const cmsAddress = await cms.getAddress();
     console.log("  CoreMembershipSubscription:", cmsAddress);
+
+    // Link StakingManager -> CMS (for addEarnings authorization)
+    tx = await stakingManager.setCMS(cmsAddress);
+    await tx.wait();
+    console.log("  StakingManager -> CMS linked");
 
     // 8. AtomicP2p - constructor(address _kairoToken, address _usdtToken, address _liquidityPool)
     console.log("[8/8] Deploying AtomicP2p...");
@@ -136,10 +150,10 @@ async function main() {
     console.log("  KAIROToken BURNER_ROLE -> AtomicP2p");
 
     // AffiliateDistributor roles
-    const RANK_UPDATER_ROLE = await affiliateDistributor.RANK_UPDATER_ROLE();
-    tx = await affiliateDistributor.grantRole(RANK_UPDATER_ROLE, deployer.address);
+    const STAKING_ROLE = await affiliateDistributor.STAKING_ROLE();
+    tx = await affiliateDistributor.grantRole(STAKING_ROLE, cmsAddress);
     await tx.wait();
-    console.log("  AffiliateDistributor RANK_UPDATER_ROLE -> deployer");
+    console.log("  AffiliateDistributor STAKING_ROLE -> CMS");
 
     // StakingManager roles
     const COMPOUNDER_ROLE = await stakingManager.COMPOUNDER_ROLE();
@@ -166,6 +180,13 @@ async function main() {
     // ============================================================
     console.log("--- PHASE 3: Seed Testnet Environment ---");
     console.log("");
+
+    // Register genesis account (deployer as genesis - root of referral tree)
+    tx = await affiliateDistributor.grantRole(STAKING_ROLE, deployer.address);
+    await tx.wait();
+    tx = await affiliateDistributor.setReferrer(deployer.address, ethers.ZeroAddress);
+    await tx.wait();
+    console.log("  Genesis account registered:", deployer.address);
 
     // Mint extra USDT to deployer for testing
     tx = await mockUSDT.mint(deployer.address, ethers.parseEther("100000"));
@@ -202,11 +223,11 @@ async function main() {
         console.log("");
 
         try {
-            // Test: User approves and stakes 100 USDT
+            // Test: User approves and stakes 100 USDT (with deployer/genesis as referrer)
             const stakeAmount = ethers.parseEther("100");
             tx = await mockUSDT.connect(testUser).approve(stakingAddress, stakeAmount);
             await tx.wait();
-            tx = await stakingManager.connect(testUser).stake(stakeAmount, ethers.ZeroAddress);
+            tx = await stakingManager.connect(testUser).stake(stakeAmount, deployer.address);
             await tx.wait();
             console.log("  [TEST] Test user staked 100 USDT (Tier 0)");
 

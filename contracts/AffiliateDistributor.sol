@@ -21,22 +21,33 @@ interface ILiquidityPool {
 }
 
 /**
- * @title AffiliateDistributor - Multi-level income distribution for KAIRO DeFi ecosystem
- * @dev Manages referral tracking, multi-level team dividends, rank salaries,
- *      and qualifier bonuses. All income is denominated in USD (18 decimals)
- *      and harvested as minted KAIRO tokens at live price.
+ * @title IStakingManager - Interface for reporting earnings to FIFO 3X cap
+ */
+interface IStakingManager {
+    function addEarnings(address _user, uint256 _usdAmount) external;
+}
+
+/**
+ * @title AffiliateDistributor - Fully Decentralized Multi-level Income Distribution
+ * @dev All operations are user-triggered. No backend wallet or admin role needed
+ *      for ongoing operations. Admin roles are intended to be burned after setup.
  *
  * Income Types:
  *   0 = Direct Dividends (5% of referred stakes)
- *   1 = Team Dividends (multi-level vesting profits)
- *   2 = Rank Dividends (weekly salary based on team volume)
- *   3 = Qualifier Weekly (3% global weekly profits share)
- *   4 = Qualifier Monthly (2% global monthly profits share)
+ *   1 = Team Dividends (multi-level compound profits)
+ *   2 = Rank Dividends (periodic salary based on team volume)
+ *   3 = Qualifier Weekly (3% global weekly profits, qualify with $50k fresh business/week)
+ *   4 = Qualifier Monthly (2% global monthly profits, qualify with $500k fresh business/month)
+ *
+ * Trigger Model:
+ *   All closings (weekly/monthly epochs) are triggered by user actions:
+ *   stake, unstake, compound, harvest, claim — whichever happens first.
+ *   Rank salary is self-service: users call claimRankSalary() themselves.
+ *   Qualifier bonuses use epoch-based pull model: users claim their share.
  */
 contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
     // ============ Roles ============
     bytes32 public constant STAKING_ROLE = keccak256("STAKING_ROLE");
-    bytes32 public constant RANK_UPDATER_ROLE = keccak256("RANK_UPDATER_ROLE");
 
     // ============ External References ============
     IKAIROToken public kairoToken;
@@ -57,8 +68,55 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
     mapping(address => uint256) public teamVolume;
     mapping(address => uint256) public directCount;
 
+    // ============ Genesis Account ============
+    /// @notice The first registered address (root of the referral tree). Cannot stake.
+    address public genesisAccount;
+
+    // ============ On-Chain Rank Tracking ============
+    mapping(address => uint256) public userRankLevel;       // 0-10
+    mapping(address => uint256) public lastRankClaimTime;
+
+    // ============ Fresh Business Qualifier Tracking ============
+    // Per-user fresh referral staking volume tracked per epoch
+    mapping(address => uint256) public userWeeklyBusiness;         // fresh business in current weekly epoch
+    mapping(address => uint256) public userWeeklyBusinessEpoch;    // which epoch this tracking is for
+    mapping(address => uint256) public lastWeeklyQualifiedEpoch;   // last epoch user qualified in
+    uint256 public currentWeeklyQualifierCount;                    // live count for current epoch
+
+    mapping(address => uint256) public userMonthlyBusiness;        // fresh business in current monthly epoch
+    mapping(address => uint256) public userMonthlyBusinessEpoch;   // which epoch this tracking is for
+    mapping(address => uint256) public lastMonthlyQualifiedEpoch;  // last epoch user qualified in
+    uint256 public currentMonthlyQualifierCount;                   // live count for current epoch
+
+    // ============ Profit Accumulators (fed by StakingManager on compound) ============
+    uint256 public weeklyProfitAccumulator;
+    uint256 public monthlyProfitAccumulator;
+
+    // ============ Weekly Qualifier Epoch ============
+    uint256 public weeklyEpoch;
+    uint256 public weeklyEpochStartTime;
+    uint256 public weeklyEpochPool;                         // 3% of profits snapshot
+    uint256 public weeklyEpochQualifiers;                   // qualifying user count snapshot
+
+    // ============ Monthly Qualifier Epoch ============
+    uint256 public monthlyEpoch;
+    uint256 public monthlyEpochStartTime;
+    uint256 public monthlyEpochPool;                        // 2% of profits snapshot
+    uint256 public monthlyEpochQualifiers;                  // qualifying user count snapshot
+
+    // ============ Qualifier Claim Tracking ============
+    mapping(address => uint256) public lastWeeklyEpochClaimed;
+    mapping(address => uint256) public lastMonthlyEpochClaimed;
+
+    // ============ Closing Intervals ============
+    uint256 public constant RANK_INTERVAL = 3 hours;        // TESTING (prod: 1 hour)
+    uint256 public constant WEEKLY_INTERVAL = 3 hours;      // TESTING (prod: 7 days)
+    uint256 public constant MONTHLY_INTERVAL = 5 hours;     // TESTING (prod: 30 days)
+
     // ============ Constants ============
     uint256 public constant MIN_HARVEST = 10e18; // $10 minimum harvest
+    uint256 public constant WEEKLY_QUALIFIER_THRESHOLD = 50_000e18;   // $50,000 fresh business
+    uint256 public constant MONTHLY_QUALIFIER_THRESHOLD = 500_000e18; // $500,000 fresh business
 
     // Team dividend percentages (basis points: 1000 = 10%)
     // L1: 10%, L2-L10: 5% each, L11-L15: 2% each
@@ -99,8 +157,16 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
     event ReferrerSet(address indexed user, address indexed referrer);
     event DirectEarned(address indexed referrer, uint256 amount);
     event TeamEarned(address indexed upline, address indexed staker, uint256 level, uint256 amount);
-    event RankUpdated(address indexed user, uint256 amount);
+    event RankSalaryClaimed(address indexed user, uint256 rankLevel, uint256 salary);
+    event WeeklyEpochClosed(uint256 indexed epoch, uint256 pool, uint256 qualifiers);
+    event MonthlyEpochClosed(uint256 indexed epoch, uint256 pool, uint256 qualifiers);
+    event WeeklyQualifierClaimed(address indexed user, uint256 indexed epoch, uint256 amount);
+    event MonthlyQualifierClaimed(address indexed user, uint256 indexed epoch, uint256 amount);
     event Harvested(address indexed user, uint8 incomeType, uint256 usdAmount, uint256 kairoAmount);
+    event TeamVolumeAdded(address indexed staker, uint256 amount);
+    event TeamVolumeRemoved(address indexed staker, uint256 amount);
+    event ProfitAccumulated(uint256 amount);
+    event FreshBusinessAdded(address indexed referrer, uint256 amount);
 
     // ============ Constructor ============
     constructor(
@@ -109,36 +175,57 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
         address _admin,
         address _systemWallet
     ) {
-        require(_kairoToken != address(0), "AffiliateDistributor: Invalid KAIRO token");
-        require(_liquidityPool != address(0), "AffiliateDistributor: Invalid LiquidityPool");
-        require(_admin != address(0), "AffiliateDistributor: Invalid admin");
-        require(_systemWallet != address(0), "AffiliateDistributor: Invalid system wallet");
+        require(_kairoToken != address(0), "AD: Invalid KAIRO token");
+        require(_liquidityPool != address(0), "AD: Invalid LiquidityPool");
+        require(_admin != address(0), "AD: Invalid admin");
+        require(_systemWallet != address(0), "AD: Invalid system wallet");
 
         kairoToken = IKAIROToken(_kairoToken);
         liquidityPool = ILiquidityPool(_liquidityPool);
         systemWallet = _systemWallet;
 
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
+
+        // Initialize epoch start times and counters (start at 1 to avoid default-0 collision)
+        weeklyEpoch = 1;
+        monthlyEpoch = 1;
+        weeklyEpochStartTime = block.timestamp;
+        monthlyEpochStartTime = block.timestamp;
     }
 
-    // ============ Referral Functions ============
+    // ============ Referral Functions (STAKING_ROLE - contract-to-contract) ============
 
     /**
-     * @dev Set referrer for a user. Called when user first stakes or subscribes.
-     * @param _user Address of the new user
-     * @param _referrer Address of the referrer
+     * @dev Set referrer for a user. Called by StakingManager when user first stakes.
      */
     function setReferrer(address _user, address _referrer) external onlyRole(STAKING_ROLE) {
-        require(referrerOf[_user] == address(0), "AffiliateDistributor: Referrer already set");
-        require(_referrer != address(0), "AffiliateDistributor: Invalid referrer");
-        require(_referrer != _user, "AffiliateDistributor: No self-referral");
+        require(referrerOf[_user] == address(0), "AD: Referrer already set");
+        require(_referrer != _user, "AD: No self-referral");
 
-        // Prevent circular referral: walk up chain from _referrer (cap at 15 for gas safety)
+        // Genesis registration: the very first user registers without a referrer
+        if (genesisAccount == address(0)) {
+            // First registration ever — no referrer required
+            require(_user != address(0), "AD: Invalid user");
+            genesisAccount = _user;
+            // Mark as registered by setting referrerOf to a sentinel (self-reference)
+            referrerOf[_user] = _user;
+            emit ReferrerSet(_user, address(0));
+            return;
+        }
+
+        // All subsequent registrations require a valid referrer
+        require(_referrer != address(0), "AD: Invalid referrer");
+        // Referrer must be registered (have a non-zero referrerOf)
+        require(referrerOf[_referrer] != address(0), "AD: Referrer not registered");
+
+        // Prevent circular referral
         address current = _referrer;
         for (uint256 i = 0; i < 15; i++) {
-            if (current == address(0)) break;
-            require(current != _user, "AffiliateDistributor: Circular referral detected");
+            if (current == address(0) || current == _referrer && i > 0) break;
+            require(current != _user, "AD: Circular referral");
             current = referrerOf[current];
+            // Stop at genesis (self-referencing sentinel)
+            if (current == genesisAccount) break;
         }
 
         referrerOf[_user] = _referrer;
@@ -148,87 +235,227 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
         emit ReferrerSet(_user, _referrer);
     }
 
-    // ============ Distribution Functions (STAKING_ROLE only) ============
+    // ============ Distribution Functions (STAKING_ROLE - contract-to-contract) ============
 
     /**
-     * @dev Distribute 5% direct dividend to referrer
-     * @param _referrer Address of the referrer
-     * @param _stakeAmount Stake amount in USD (18 decimals)
+     * @dev Distribute 5% direct dividend to referrer and track fresh business
+     *      for weekly/monthly qualifier (called by StakingManager on stake)
      */
     function distributeDirect(address _referrer, uint256 _stakeAmount) external onlyRole(STAKING_ROLE) {
-        require(_referrer != address(0), "AffiliateDistributor: Invalid referrer");
-
+        require(_referrer != address(0), "AD: Invalid referrer");
         uint256 dividend = (_stakeAmount * 5) / 100;
         directDividends[_referrer] += dividend;
+
+        // Report direct dividend to FIFO 3X cap
+        IStakingManager(stakingManager).addEarnings(_referrer, dividend);
+
+        // Track fresh referral business for qualifier pools
+        _addFreshBusiness(_referrer, _stakeAmount);
 
         emit DirectEarned(_referrer, dividend);
     }
 
     /**
-     * @dev Distribute team dividends through up to 15 levels of referrer chain
-     * @param _staker Address of the staker generating the profit
-     * @param _profit Profit amount in USD (18 decimals)
+     * @dev Distribute team dividends through 15 levels (called by StakingManager on compound)
      */
     function distributeTeamDividend(address _staker, uint256 _profit) external onlyRole(STAKING_ROLE) {
         address current = _staker;
-
         for (uint256 i = 0; i < 15; i++) {
             address upline = referrerOf[current];
-            if (upline == address(0)) break;
+            if (upline == address(0) || upline == current) break; // stop at genesis sentinel
 
-            uint256 dividend = (_profit * TEAM_PERCENTAGES[i]) / 10000;
-            teamDividends[upline] += dividend;
-
-            emit TeamEarned(upline, _staker, i + 1, dividend);
-
+            // Check if this upline has unlocked level (i+1)
+            uint256 unlockedLevels = _getUnlockedLevels(upline);
+            if (i < unlockedLevels) {
+                uint256 dividend = (_profit * TEAM_PERCENTAGES[i]) / 10000;
+                teamDividends[upline] += dividend;
+                IStakingManager(stakingManager).addEarnings(upline, dividend);
+                emit TeamEarned(upline, _staker, i + 1, dividend);
+            }
             current = upline;
         }
     }
 
-    // ============ Rank & Qualifier Functions (RANK_UPDATER_ROLE only) ============
-
     /**
-     * @dev Update rank dividend for a user (called by backend after weekly calculation)
-     * @param _user User address
-     * @param _amount Amount in USD (18 decimals)
+     * @dev Calculate how many team dividend levels a user has unlocked.
+     *      Phase 1 (1-5 directs): 1 direct = 1 level
+     *      Phase 2 (6-10 directs): each additional direct = 2 levels
+     *      Max: 15 levels at 10 direct sponsors
      */
-    function updateRankDividend(address _user, uint256 _amount) external onlyRole(RANK_UPDATER_ROLE) {
-        require(_user != address(0), "AffiliateDistributor: Invalid user");
-        rankDividends[_user] += _amount;
-
-        emit RankUpdated(_user, _amount);
+    function _getUnlockedLevels(address _user) internal view returns (uint256) {
+        uint256 directs = directCount[_user];
+        if (directs == 0) return 0;
+        if (directs <= 5) return directs;            // 1-5 directs → 1-5 levels
+        uint256 extra = directs - 5;                 // 6th direct → 1 extra, etc.
+        uint256 levels = 5 + (extra * 2);            // each extra unlocks 2 levels
+        return levels > 15 ? 15 : levels;            // cap at 15
     }
 
     /**
-     * @dev Batch update weekly qualifier bonuses
-     * @param _users Array of user addresses
-     * @param _amounts Array of bonus amounts in USD (18 decimals)
+     * @dev View function: get unlocked team dividend levels for a user
      */
-    function updateQualifierWeekly(
-        address[] calldata _users,
-        uint256[] calldata _amounts
-    ) external onlyRole(RANK_UPDATER_ROLE) {
-        require(_users.length == _amounts.length, "AffiliateDistributor: Length mismatch");
+    function getUnlockedLevels(address _user) external view returns (uint256) {
+        return _getUnlockedLevels(_user);
+    }
 
-        for (uint256 i = 0; i < _users.length; i++) {
-            qualifierWeekly[_users[i]] += _amounts[i];
+    // ============ Team Volume (STAKING_ROLE - called by StakingManager) ============
+
+    /**
+     * @dev Add stake volume to all ancestors' team volume (called on stake)
+     * Propagates to ALL ancestors (unlimited levels) for accurate rank calculation
+     */
+    function addTeamVolume(address _staker, uint256 _amount) external onlyRole(STAKING_ROLE) {
+        address current = _staker;
+        while (true) {
+            address upline = referrerOf[current];
+            if (upline == address(0) || upline == current) break; // stop at genesis sentinel
+            teamVolume[upline] += _amount;
+            current = upline;
         }
+        emit TeamVolumeAdded(_staker, _amount);
     }
 
     /**
-     * @dev Batch update monthly qualifier bonuses
-     * @param _users Array of user addresses
-     * @param _amounts Array of bonus amounts in USD (18 decimals)
+     * @dev Remove stake volume from all ancestors' team volume (called on unstake/auto-close)
+     * Propagates to ALL ancestors (unlimited levels) to match addTeamVolume
      */
-    function updateQualifierMonthly(
-        address[] calldata _users,
-        uint256[] calldata _amounts
-    ) external onlyRole(RANK_UPDATER_ROLE) {
-        require(_users.length == _amounts.length, "AffiliateDistributor: Length mismatch");
-
-        for (uint256 i = 0; i < _users.length; i++) {
-            qualifierMonthly[_users[i]] += _amounts[i];
+    function removeTeamVolume(address _staker, uint256 _amount) external onlyRole(STAKING_ROLE) {
+        address current = _staker;
+        while (true) {
+            address upline = referrerOf[current];
+            if (upline == address(0) || upline == current) break; // stop at genesis sentinel
+            if (teamVolume[upline] >= _amount) {
+                teamVolume[upline] -= _amount;
+            } else {
+                teamVolume[upline] = 0;
+            }
+            current = upline;
         }
+        emit TeamVolumeRemoved(_staker, _amount);
+    }
+
+    // ============ Profit Tracking (STAKING_ROLE - called by StakingManager on compound) ============
+
+    /**
+     * @dev Accumulate compound profits for qualifier pool calculation
+     */
+    function addProfit(uint256 _profit) external onlyRole(STAKING_ROLE) {
+        weeklyProfitAccumulator += _profit;
+        monthlyProfitAccumulator += _profit;
+        emit ProfitAccumulated(_profit);
+    }
+
+    // ============ Epoch Closing (permissionless - triggered by any user action) ============
+
+    /**
+     * @dev Public trigger: anyone can call to close due epochs.
+     *      Also called internally by user-facing functions.
+     */
+    function tryCloseEpochs() public {
+        _tryCloseEpochs();
+    }
+
+    function _tryCloseEpochs() internal {
+        if (block.timestamp >= weeklyEpochStartTime + WEEKLY_INTERVAL) {
+            _closeWeeklyEpoch();
+        }
+        if (block.timestamp >= monthlyEpochStartTime + MONTHLY_INTERVAL) {
+            _closeMonthlyEpoch();
+        }
+    }
+
+    function _closeWeeklyEpoch() internal {
+        weeklyEpochPool = (weeklyProfitAccumulator * 3) / 100;
+        weeklyEpochQualifiers = currentWeeklyQualifierCount;
+        weeklyEpoch++;
+        weeklyEpochStartTime = block.timestamp;
+        weeklyProfitAccumulator = 0;
+        currentWeeklyQualifierCount = 0;
+        emit WeeklyEpochClosed(weeklyEpoch, weeklyEpochPool, weeklyEpochQualifiers);
+    }
+
+    function _closeMonthlyEpoch() internal {
+        monthlyEpochPool = (monthlyProfitAccumulator * 2) / 100;
+        monthlyEpochQualifiers = currentMonthlyQualifierCount;
+        monthlyEpoch++;
+        monthlyEpochStartTime = block.timestamp;
+        monthlyProfitAccumulator = 0;
+        currentMonthlyQualifierCount = 0;
+        emit MonthlyEpochClosed(monthlyEpoch, monthlyEpochPool, monthlyEpochQualifiers);
+    }
+
+    // ============ Self-Service Rank Salary (user-triggered, time-gated) ============
+
+    /**
+     * @dev Claim rank salary based on on-chain team volume.
+     *      Time-gated: can only claim once per RANK_INTERVAL.
+     *      Calculates rank using 50% max-leg rule and thresholds.
+     */
+    function claimRankSalary() external whenNotPaused {
+        require(
+            block.timestamp >= lastRankClaimTime[msg.sender] + RANK_INTERVAL,
+            "AD: Rank claim too soon"
+        );
+
+        // Try close epochs on every user action
+        _tryCloseEpochs();
+
+        // Calculate current rank
+        (uint256 newRank, uint256 salary) = _determineRankLevel(msg.sender);
+        userRankLevel[msg.sender] = newRank;
+
+        // Add salary to rank dividends (user harvests later with harvest(2))
+        if (salary > 0) {
+            rankDividends[msg.sender] += salary;
+            IStakingManager(stakingManager).addEarnings(msg.sender, salary);
+        }
+
+        lastRankClaimTime[msg.sender] = block.timestamp;
+        emit RankSalaryClaimed(msg.sender, newRank, salary);
+    }
+
+    // ============ Self-Service Qualifier Claims (epoch-based pull model) ============
+
+    /**
+     * @dev Claim weekly qualifier bonus from the last completed epoch.
+     *      Requires $50,000 fresh referral staking business during the epoch.
+     *      Equal share of 3% profit pool among all qualified members.
+     */
+    function claimWeeklyQualifier() external whenNotPaused {
+        _tryCloseEpochs();
+
+        require(weeklyEpoch > 1, "AD: No epoch completed");
+        require(lastWeeklyEpochClaimed[msg.sender] < weeklyEpoch, "AD: Already claimed this epoch");
+        require(lastWeeklyQualifiedEpoch[msg.sender] == weeklyEpoch - 1, "AD: Not qualified (need $50k fresh business)");
+        require(weeklyEpochPool > 0 && weeklyEpochQualifiers > 0, "AD: No pool or qualifiers");
+
+        uint256 share = weeklyEpochPool / weeklyEpochQualifiers;
+        qualifierWeekly[msg.sender] += share;
+        IStakingManager(stakingManager).addEarnings(msg.sender, share);
+        lastWeeklyEpochClaimed[msg.sender] = weeklyEpoch;
+
+        emit WeeklyQualifierClaimed(msg.sender, weeklyEpoch, share);
+    }
+
+    /**
+     * @dev Claim monthly qualifier bonus from the last completed epoch.
+     *      Requires $500,000 fresh referral staking business during the epoch.
+     *      Equal share of 2% profit pool among all qualified members.
+     */
+    function claimMonthlyQualifier() external whenNotPaused {
+        _tryCloseEpochs();
+
+        require(monthlyEpoch > 1, "AD: No epoch completed");
+        require(lastMonthlyEpochClaimed[msg.sender] < monthlyEpoch, "AD: Already claimed this epoch");
+        require(lastMonthlyQualifiedEpoch[msg.sender] == monthlyEpoch - 1, "AD: Not qualified (need $500k fresh business)");
+        require(monthlyEpochPool > 0 && monthlyEpochQualifiers > 0, "AD: No pool or qualifiers");
+
+        uint256 share = monthlyEpochPool / monthlyEpochQualifiers;
+        qualifierMonthly[msg.sender] += share;
+        IStakingManager(stakingManager).addEarnings(msg.sender, share);
+        lastMonthlyEpochClaimed[msg.sender] = monthlyEpoch;
+
+        emit MonthlyQualifierClaimed(msg.sender, monthlyEpoch, share);
     }
 
     // ============ Harvest Function ============
@@ -238,6 +465,9 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
      * @param _incomeType 0=Direct, 1=Team, 2=Rank, 3=QualifierWeekly, 4=QualifierMonthly
      */
     function harvest(uint8 _incomeType) external nonReentrant whenNotPaused {
+        // Try close epochs on every user action
+        _tryCloseEpochs();
+
         uint256 balance;
 
         if (_incomeType == 0) {
@@ -256,71 +486,139 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
             balance = qualifierMonthly[msg.sender];
             qualifierMonthly[msg.sender] = 0;
         } else {
-            revert("AffiliateDistributor: Invalid income type");
+            revert("AD: Invalid income type");
         }
 
-        require(balance >= MIN_HARVEST, "AffiliateDistributor: Below minimum harvest ($10)");
+        require(balance >= MIN_HARVEST, "AD: Below minimum harvest ($10)");
 
         uint256 livePrice = liquidityPool.getLivePrice();
-        require(livePrice > 0, "AffiliateDistributor: Invalid price");
+        require(livePrice > 0, "AD: Invalid price");
 
         uint256 kairoAmount = (balance * 1e18) / livePrice;
-        require(kairoAmount > 0, "AffiliateDistributor: Mint amount too small");
+        require(kairoAmount > 0, "AD: Mint amount too small");
 
         kairoToken.mint(msg.sender, kairoAmount);
 
         emit Harvested(msg.sender, _incomeType, balance, kairoAmount);
     }
 
-    // ============ View Functions ============
+    // ============ Internal: Rank Calculation ============
 
     /**
-     * @dev Calculate rank salary based on team volume with 50% max per leg rule
-     * @param _user User address
-     * @return salary Weekly rank salary in USD (18 decimals)
+     * @dev Calculate rank level and salary based on team volume with 50% max-leg rule
      */
-    function calculateRankSalary(address _user) external view returns (uint256 salary) {
-        uint256 totalVolume = teamVolume[_user];
-        if (totalVolume == 0) return 0;
+    function _determineRankLevel(address _user) internal view returns (uint256 level, uint256 salary) {
+        uint256 totalVol = teamVolume[_user];
+        if (totalVol == 0) return (0, 0);
 
-        // Find the largest leg volume
+        // Find largest leg volume
         address[] storage referrals = directReferrals[_user];
         uint256 largestLeg = 0;
-
         for (uint256 i = 0; i < referrals.length; i++) {
-            uint256 legVolume = teamVolume[referrals[i]];
-            if (legVolume > largestLeg) {
-                largestLeg = legVolume;
-            }
+            uint256 legVol = teamVolume[referrals[i]];
+            if (legVol > largestLeg) largestLeg = legVol;
         }
 
         // Apply 50% max per leg rule
-        uint256 maxLeg = totalVolume / 2;
-        uint256 adjustedVolume;
+        uint256 maxLeg = totalVol / 2;
+        uint256 adjustedVol;
         if (largestLeg > maxLeg) {
-            adjustedVolume = totalVolume - largestLeg + maxLeg;
+            adjustedVol = totalVol - largestLeg + maxLeg;
         } else {
-            adjustedVolume = totalVolume;
+            adjustedVol = totalVol;
         }
 
-        // Determine rank salary from thresholds (highest qualifying)
-        for (uint256 i = RANK_THRESHOLDS.length; i > 0; i--) {
-            if (adjustedVolume >= RANK_THRESHOLDS[i - 1]) {
-                return RANK_SALARIES[i - 1];
+        // Determine rank (highest qualifying)
+        for (uint256 i = 10; i > 0; i--) {
+            if (adjustedVol >= RANK_THRESHOLDS[i - 1]) {
+                return (i, RANK_SALARIES[i - 1]);
             }
         }
 
-        return 0;
+        return (0, 0);
+    }
+
+    /**
+     * @dev Track fresh referral staking business for qualifier pools.
+     *      Called when a direct referral stakes. Auto-resets on new epoch.
+     *      Increments qualifier counters when thresholds are crossed.
+     */
+    function _addFreshBusiness(address _referrer, uint256 _amount) internal {
+        // Weekly fresh business tracking
+        uint256 wEpoch = weeklyEpoch;
+        if (userWeeklyBusinessEpoch[_referrer] != wEpoch) {
+            userWeeklyBusiness[_referrer] = 0;
+            userWeeklyBusinessEpoch[_referrer] = wEpoch;
+        }
+        userWeeklyBusiness[_referrer] += _amount;
+        if (lastWeeklyQualifiedEpoch[_referrer] != wEpoch &&
+            userWeeklyBusiness[_referrer] >= WEEKLY_QUALIFIER_THRESHOLD) {
+            lastWeeklyQualifiedEpoch[_referrer] = wEpoch;
+            currentWeeklyQualifierCount++;
+        }
+
+        // Monthly fresh business tracking
+        uint256 mEpoch = monthlyEpoch;
+        if (userMonthlyBusinessEpoch[_referrer] != mEpoch) {
+            userMonthlyBusiness[_referrer] = 0;
+            userMonthlyBusinessEpoch[_referrer] = mEpoch;
+        }
+        userMonthlyBusiness[_referrer] += _amount;
+        if (lastMonthlyQualifiedEpoch[_referrer] != mEpoch &&
+            userMonthlyBusiness[_referrer] >= MONTHLY_QUALIFIER_THRESHOLD) {
+            lastMonthlyQualifiedEpoch[_referrer] = mEpoch;
+            currentMonthlyQualifierCount++;
+        }
+
+        emit FreshBusinessAdded(_referrer, _amount);
+    }
+
+    // ============ View Functions ============
+
+    /**
+     * @dev Calculate rank salary for a user (view only, doesn't update state)
+     */
+    function calculateRankSalary(address _user) external view returns (uint256 salary) {
+        (, salary) = _determineRankLevel(_user);
+    }
+
+    /**
+     * @dev Get full rank info for a user
+     */
+    function getUserRankInfo(address _user) external view returns (
+        uint256 rankLevel,
+        uint256 salary,
+        uint256 lastClaimed,
+        uint256 nextClaimTime
+    ) {
+        rankLevel = userRankLevel[_user];
+        (, salary) = _determineRankLevel(_user);
+        lastClaimed = lastRankClaimTime[_user];
+        nextClaimTime = lastClaimed + RANK_INTERVAL;
+    }
+
+    /**
+     * @dev Get epoch info for weekly and monthly qualifiers
+     */
+    function getEpochInfo() external view returns (
+        uint256 wEpoch, uint256 wStartTime, uint256 wPool, uint256 wQualifiers,
+        uint256 mEpoch, uint256 mStartTime, uint256 mPool, uint256 mQualifiers,
+        uint256 wAccumulator, uint256 mAccumulator
+    ) {
+        wEpoch = weeklyEpoch;
+        wStartTime = weeklyEpochStartTime;
+        wPool = weeklyEpochPool;
+        wQualifiers = weeklyEpochQualifiers;
+        mEpoch = monthlyEpoch;
+        mStartTime = monthlyEpochStartTime;
+        mPool = monthlyEpochPool;
+        mQualifiers = monthlyEpochQualifiers;
+        wAccumulator = weeklyProfitAccumulator;
+        mAccumulator = monthlyProfitAccumulator;
     }
 
     /**
      * @dev Get all income balances for a user
-     * @param _user User address
-     * @return direct Direct dividends balance
-     * @return team Team dividends balance
-     * @return rank Rank dividends balance
-     * @return qWeekly Qualifier weekly balance
-     * @return qMonthly Qualifier monthly balance
      */
     function getAllIncome(address _user) external view returns (
         uint256 direct,
@@ -338,8 +636,6 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
 
     /**
      * @dev Get total harvestable amount across all income types
-     * @param _user User address
-     * @return total Sum of all income types in USD (18 decimals)
      */
     function getTotalHarvestable(address _user) external view returns (uint256 total) {
         total = directDividends[_user]
@@ -349,38 +645,20 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
             + qualifierMonthly[_user];
     }
 
-    /**
-     * @dev Get referrer of a user
-     * @param _user User address
-     * @return Referrer address
-     */
     function getReferrer(address _user) external view returns (address) {
         return referrerOf[_user];
     }
 
-    /**
-     * @dev Get direct referrals of a user
-     * @param _user User address
-     * @return Array of direct referral addresses
-     */
     function getDirectReferrals(address _user) external view returns (address[] memory) {
         return directReferrals[_user];
     }
 
-    /**
-     * @dev Get upline chain for a user up to _levels deep
-     * @param _user User address
-     * @param _levels Number of levels to traverse
-     * @return upline Array of upline addresses
-     */
     function getUpline(address _user, uint256 _levels) external view returns (address[] memory upline) {
         upline = new address[](_levels);
         address current = _user;
-
         for (uint256 i = 0; i < _levels; i++) {
             address ref = referrerOf[current];
-            if (ref == address(0)) {
-                // Resize array to actual length
+            if (ref == address(0) || ref == current) {
                 address[] memory trimmed = new address[](i);
                 for (uint256 j = 0; j < i; j++) {
                     trimmed[j] = upline[j];
@@ -392,61 +670,45 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
         }
     }
 
-    /**
-     * @dev Get team volume of a user
-     * @param _user User address
-     * @return Team volume in USD (18 decimals)
-     */
     function getTeamVolume(address _user) external view returns (uint256) {
         return teamVolume[_user];
     }
 
-    // ============ Admin Functions ============
-
     /**
-     * @dev Set staking manager address and grant STAKING_ROLE
-     * @param _staking Staking manager address
+     * @dev Get fresh business info for a user in current epoch
      */
-    function setStakingManager(address _staking) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(_staking != address(0), "AffiliateDistributor: Invalid staking address");
+    function getUserFreshBusiness(address _user) external view returns (
+        uint256 weeklyBusiness,
+        uint256 monthlyBusiness,
+        bool weeklyQualified,
+        bool monthlyQualified
+    ) {
+        weeklyBusiness = userWeeklyBusinessEpoch[_user] == weeklyEpoch ? userWeeklyBusiness[_user] : 0;
+        monthlyBusiness = userMonthlyBusinessEpoch[_user] == monthlyEpoch ? userMonthlyBusiness[_user] : 0;
+        weeklyQualified = lastWeeklyQualifiedEpoch[_user] == weeklyEpoch;
+        monthlyQualified = lastMonthlyQualifiedEpoch[_user] == monthlyEpoch;
+    }
 
-        // Revoke old role if previously set
+    // ============ Admin Functions (call BEFORE burning admin role) ============
+
+    function setStakingManager(address _staking) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_staking != address(0), "AD: Invalid staking address");
         if (stakingManager != address(0)) {
             _revokeRole(STAKING_ROLE, stakingManager);
         }
-
         stakingManager = _staking;
         _grantRole(STAKING_ROLE, _staking);
     }
 
-    /**
-     * @dev Set system wallet address
-     * @param _wallet System wallet address
-     */
     function setSystemWallet(address _wallet) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(_wallet != address(0), "AffiliateDistributor: Invalid wallet address");
+        require(_wallet != address(0), "AD: Invalid wallet address");
         systemWallet = _wallet;
     }
 
-    /**
-     * @dev Update team volume for a user (called when stakes change)
-     * @param _user User address
-     * @param _volume New team volume in USD (18 decimals)
-     */
-    function updateTeamVolume(address _user, uint256 _volume) external onlyRole(STAKING_ROLE) {
-        teamVolume[_user] = _volume;
-    }
-
-    /**
-     * @dev Pause the contract (emergency)
-     */
     function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _pause();
     }
 
-    /**
-     * @dev Unpause the contract
-     */
     function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _unpause();
     }
