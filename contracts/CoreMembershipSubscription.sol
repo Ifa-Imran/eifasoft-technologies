@@ -27,6 +27,7 @@ interface ILiquidityPool {
 interface IStakingManager {
     function getTotalActiveStakeValue(address _user) external view returns (uint256);
     function addEarnings(address _user, uint256 _usdAmount) external;
+    function getRemainingCap(address _user) external view returns (uint256);
 }
 
 /**
@@ -35,6 +36,7 @@ interface IStakingManager {
 interface IAffiliateDistributor {
     function setReferrer(address _user, address _referrer) external;
     function referrerOf(address _user) external view returns (address);
+    function directCount(address _user) external view returns (uint256);
 }
 
 /**
@@ -46,7 +48,8 @@ interface IAffiliateDistributor {
  * Features:
  * - 10 USDT per subscription, max 10,000 total subscriptions
  * - 5 KAIRO loyalty reward per subscription
- * - 5-level referral rewards in KAIRO
+ * - 5-level referral rewards in KAIRO (level-gated by direct referral count)
+ * - Leadership rewards require active CMS subscription
  * - One-time claim with stake-based cap (excess is permanently deleted)
  * - 90/10 split on claim (user/system)
  * - Deadline enforcement (configurable by admin)
@@ -138,40 +141,71 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
         uint256 loyaltyReward = _amount * REWARD_PER_SUB;
         loyaltyRewards[msg.sender] += loyaltyReward;
 
-        // Report USDT value of loyalty reward to FIFO 3X cap
+        // Report USDT value of loyalty reward to FIFO 3X cap (only if user has active stake + cap space)
         uint256 livePrice = liquidityPool.getLivePrice();
-        if (livePrice > 0) {
+        if (livePrice > 0 && stakingManager.getTotalActiveStakeValue(msg.sender) > 0) {
             uint256 loyaltyUsdValue = (loyaltyReward * livePrice) / 1e18;
-            stakingManager.addEarnings(msg.sender, loyaltyUsdValue);
+            uint256 remainingCap = stakingManager.getRemainingCap(msg.sender);
+            if (loyaltyUsdValue > remainingCap) loyaltyUsdValue = remainingCap;
+            if (loyaltyUsdValue > 0) {
+                stakingManager.addEarnings(msg.sender, loyaltyUsdValue);
+            }
         }
 
-        // Handle referrer
+        // Handle referrer (CMS-internal referrer tracking for leadership rewards)
         if (_referrer != address(0) && referrerOf[msg.sender] == address(0)) {
             require(_referrer != msg.sender, "CMS: No self-referral");
             referrerOf[msg.sender] = _referrer;
-
-            // Also set referrer in AffiliateDistributor if not already set
-            try affiliateDistributor.referrerOf(msg.sender) returns (address existingRef) {
-                if (existingRef == address(0)) {
-                    try affiliateDistributor.setReferrer(msg.sender, _referrer) {} catch {}
-                }
-            } catch {}
         }
 
         // Distribute referral rewards up 5 levels
+        // Eligibility conditions at each level:
+        //   1. Referrer must have an active CMS subscription (subscriptionCount > 0)
+        //   2. Referrer must have enough direct referrals to unlock the level
+        //   3. Referrer must have an active stake in StakingManager
+        //   4. Reward capped by remaining FIFO 3X cap space (excess forfeited)
         address currentReferrer = referrerOf[msg.sender];
         for (uint256 i = 0; i < 5; i++) {
             if (currentReferrer == address(0)) break;
-            uint256 leadershipReward = REF_REWARDS[i] * _amount;
-            leadershipRewards[currentReferrer] += leadershipReward;
 
-            // Report USDT value of leadership reward to FIFO 3X cap
-            if (livePrice > 0) {
-                uint256 leadershipUsdValue = (leadershipReward * livePrice) / 1e18;
-                stakingManager.addEarnings(currentReferrer, leadershipUsdValue);
+            // Check eligibility: CMS subscription + enough directs + active stake + cap space
+            bool eligible = false;
+            if (subscriptionCount[currentReferrer] > 0) {
+                uint256 directs = affiliateDistributor.directCount(currentReferrer);
+                uint256 unlockedLevels = directs > 5 ? 5 : directs; // cap at 5
+                if (i < unlockedLevels) {
+                    // Must have active stake
+                    if (stakingManager.getTotalActiveStakeValue(currentReferrer) > 0) {
+                        eligible = true;
+                    }
+                }
             }
 
-            // Walk up: try local referrer first, then affiliateDistributor
+            if (eligible) {
+                uint256 leadershipReward = REF_REWARDS[i] * _amount;
+
+                // Cap to remaining FIFO space; forfeit excess
+                if (livePrice > 0) {
+                    uint256 leadershipUsdValue = (leadershipReward * livePrice) / 1e18;
+                    uint256 remainingCap = stakingManager.getRemainingCap(currentReferrer);
+                    if (remainingCap == 0) {
+                        leadershipReward = 0; // Fully forfeited
+                    } else if (leadershipUsdValue > remainingCap) {
+                        // Scale down KAIRO reward proportionally
+                        leadershipReward = (remainingCap * 1e18) / livePrice;
+                    }
+                }
+
+                if (leadershipReward > 0) {
+                    leadershipRewards[currentReferrer] += leadershipReward;
+                    if (livePrice > 0) {
+                        uint256 cappedUsdValue = (leadershipReward * livePrice) / 1e18;
+                        stakingManager.addEarnings(currentReferrer, cappedUsdValue);
+                    }
+                }
+            }
+
+            // Walk up regardless of eligibility (reward skips ineligible, doesn't stop)
             address nextRef = referrerOf[currentReferrer];
             if (nextRef == address(0)) {
                 try affiliateDistributor.referrerOf(currentReferrer) returns (address affRef) {

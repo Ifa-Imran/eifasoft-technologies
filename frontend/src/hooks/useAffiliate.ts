@@ -1,10 +1,11 @@
 'use client';
 
-import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
-import { contracts } from '@/config/contracts';
+import { useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
+import { contracts, USDT_DECIMALS } from '@/config/contracts';
 import { AffiliateDistributorABI } from '@/config/abis/AffiliateDistributor';
 import { useToast } from '@/components/ui/Toast';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
+import { formatUnits } from 'viem';
 
 export function useAffiliate() {
   const { address } = useAccount();
@@ -63,6 +64,28 @@ export function useAffiliate() {
     },
   });
 
+  const { data: teamVolume } = useReadContract({
+    address: contracts.affiliateDistributor,
+    abi: AffiliateDistributorABI,
+    functionName: 'getTeamVolume',
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address && contracts.affiliateDistributor !== '0x',
+      refetchInterval: 30000,
+    },
+  });
+
+  const { data: unlockedLevels } = useReadContract({
+    address: contracts.affiliateDistributor,
+    abi: AffiliateDistributorABI,
+    functionName: 'getUnlockedLevels',
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address && contracts.affiliateDistributor !== '0x',
+      refetchInterval: 30000,
+    },
+  });
+
   // Write operations
   const { writeContract: writeClaimRank, isPending: claimRankPending, data: claimRankHash } = useWriteContract();
   const { writeContract: writeClaimWeekly, isPending: claimWeeklyPending, data: claimWeeklyHash } = useWriteContract();
@@ -74,12 +97,12 @@ export function useAffiliate() {
   const { isSuccess: monthlySuccess, isError: monthlyError } = useWaitForTransactionReceipt({ hash: claimMonthlyHash });
   const { isSuccess: harvestSuccess, isError: harvestError } = useWaitForTransactionReceipt({ hash: harvestHash });
 
-  useEffect(() => { if (rankSuccess) toast({ type: 'success', title: 'Rank salary claimed!' }); }, [rankSuccess]);
-  useEffect(() => { if (rankError) toast({ type: 'error', title: 'Rank salary claim failed' }); }, [rankError]);
-  useEffect(() => { if (weeklySuccess) toast({ type: 'success', title: 'Weekly qualifier claimed!' }); }, [weeklySuccess]);
-  useEffect(() => { if (weeklyError) toast({ type: 'error', title: 'Weekly qualifier claim failed' }); }, [weeklyError]);
-  useEffect(() => { if (monthlySuccess) toast({ type: 'success', title: 'Monthly qualifier claimed!' }); }, [monthlySuccess]);
-  useEffect(() => { if (monthlyError) toast({ type: 'error', title: 'Monthly qualifier claim failed' }); }, [monthlyError]);
+  useEffect(() => { if (rankSuccess) toast({ type: 'success', title: 'Rank salary harvested!' }); }, [rankSuccess]);
+  useEffect(() => { if (rankError) toast({ type: 'error', title: 'Rank salary harvest failed' }); }, [rankError]);
+  useEffect(() => { if (weeklySuccess) toast({ type: 'success', title: 'Weekly qualifier harvested!' }); }, [weeklySuccess]);
+  useEffect(() => { if (weeklyError) toast({ type: 'error', title: 'Weekly qualifier harvest failed' }); }, [weeklyError]);
+  useEffect(() => { if (monthlySuccess) toast({ type: 'success', title: 'Monthly qualifier harvested!' }); }, [monthlySuccess]);
+  useEffect(() => { if (monthlyError) toast({ type: 'error', title: 'Monthly qualifier harvest failed' }); }, [monthlyError]);
   useEffect(() => { if (harvestSuccess) toast({ type: 'success', title: 'Income harvested!' }); }, [harvestSuccess]);
   useEffect(() => { if (harvestError) toast({ type: 'error', title: 'Harvest failed' }); }, [harvestError]);
 
@@ -89,7 +112,7 @@ export function useAffiliate() {
       abi: AffiliateDistributorABI,
       functionName: 'claimRankSalary',
     });
-    toast({ type: 'pending', title: 'Claiming rank salary...' });
+    toast({ type: 'pending', title: 'Harvesting rank salary...' });
   };
 
   const claimWeeklyQualifier = () => {
@@ -98,7 +121,7 @@ export function useAffiliate() {
       abi: AffiliateDistributorABI,
       functionName: 'claimWeeklyQualifier',
     });
-    toast({ type: 'pending', title: 'Claiming weekly qualifier...' });
+    toast({ type: 'pending', title: 'Harvesting weekly qualifier...' });
   };
 
   const claimMonthlyQualifier = () => {
@@ -107,7 +130,7 @@ export function useAffiliate() {
       abi: AffiliateDistributorABI,
       functionName: 'claimMonthlyQualifier',
     });
-    toast({ type: 'pending', title: 'Claiming monthly qualifier...' });
+    toast({ type: 'pending', title: 'Harvesting monthly qualifier...' });
   };
 
   const harvestIncome = (incomeType: number) => {
@@ -120,12 +143,54 @@ export function useAffiliate() {
     toast({ type: 'pending', title: 'Harvesting income...' });
   };
 
+  // Fetch per-referral team volumes for leg breakdown & 50% rule
+  const referralsList = (directReferrals as `0x${string}`[]) || [];
+  const legVolumeContracts = useMemo(() =>
+    referralsList.map((ref) => ({
+      address: contracts.affiliateDistributor as `0x${string}`,
+      abi: AffiliateDistributorABI,
+      functionName: 'teamVolume' as const,
+      args: [ref] as const,
+    })),
+    [referralsList.length]
+  );
+
+  const { data: legVolumesRaw } = useReadContracts({
+    contracts: legVolumeContracts,
+    query: {
+      enabled: referralsList.length > 0 && contracts.affiliateDistributor !== '0x',
+      refetchInterval: 30000,
+    },
+  });
+
+  const legVolumes = useMemo(() => {
+    if (!legVolumesRaw || !referralsList.length) return [];
+    return referralsList.map((ref, i) => {
+      const raw = legVolumesRaw[i];
+      const vol = raw?.status === 'success' ? BigInt(raw.result as any) : 0n;
+      return {
+        address: ref,
+        volume: vol,
+        volumeUsd: Number(formatUnits(vol, USDT_DECIMALS)),
+      };
+    });
+  }, [legVolumesRaw, referralsList.length]);
+
+  const largestLegVolume = useMemo(() => {
+    if (!legVolumes.length) return 0n;
+    return legVolumes.reduce((max, l) => l.volume > max ? l.volume : max, 0n);
+  }, [legVolumes]);
+
   return {
     allIncome: allIncome as any,
     rankInfo: rankInfo as any,
     directReferrals: directReferrals as any,
     freshBusiness: freshBusiness as any,
     upline: upline as string | undefined,
+    teamVolume: teamVolume as bigint | undefined,
+    unlockedLevels: unlockedLevels != null ? Number(unlockedLevels) : 0,
+    legVolumes,
+    largestLegVolume,
     claimRankSalary,
     claimWeeklyQualifier,
     claimMonthlyQualifier,

@@ -52,7 +52,7 @@ export default function Home() {
       <section className="py-16 flex justify-center">
         <GlassCard className="max-w-md w-full mx-4 text-center" variant="gradient">
           <h2 className="text-2xl font-orbitron font-bold gradient-text mb-3">Get Started</h2>
-          <p className="text-surface-500 text-sm mb-6">Connect your wallet to access the KAIRO Aurora Financial Ecosystem.</p>
+          <p className="text-surface-500 text-sm mb-6">Connect your wallet to access the KAIRO DAO Aurora Financial Ecosystem.</p>
           <div className="flex justify-center">
             <ConnectButton />
           </div>
@@ -61,7 +61,7 @@ export default function Home() {
 
       <footer className="py-8 text-center border-t border-surface-200">
         <p className="text-surface-400 text-sm">
-          &copy; {new Date().getFullYear()} KAIRO DeFi &middot; Aurora Financial Ecosystem
+          &copy; {new Date().getFullYear()} KAIRO DAO &middot; Aurora Financial Ecosystem
         </p>
       </footer>
     </main>

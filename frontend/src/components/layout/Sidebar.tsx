@@ -14,13 +14,15 @@ import {
   ArrowPathIcon,
   ChartBarIcon,
   ChevronLeftIcon,
+  UsersIcon,
 } from '@heroicons/react/24/outline';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: HomeIcon },
   { href: '/stake', label: 'Stake', icon: CurrencyDollarIcon },
-  { href: '/exchange', label: 'Exchange', icon: ArrowsRightLeftIcon },
-  { href: '/referrals', label: 'Referrals', icon: UserGroupIcon },
+  { href: '/exchange', label: 'Atomic P2P', icon: ArrowsRightLeftIcon },
+  { href: '/referrals', label: 'Rank Dividend', icon: UserGroupIcon },
+  { href: '/team-dividend', label: 'Team Dividend', icon: UsersIcon },
   { href: '/qualifiers', label: 'Qualifiers', icon: TrophyIcon },
   { href: '/cms', label: 'CMS', icon: CreditCardIcon },
   { href: '/swap', label: 'Swap', icon: ArrowPathIcon },
@@ -46,7 +48,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
             <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
               <span className="text-white font-bold text-sm">K</span>
             </div>
-            <span className="font-orbitron text-lg font-bold gradient-text">KAIRO</span>
+            <span className="font-orbitron text-lg font-bold gradient-text">KAIRO DAO</span>
           </Link>
         )}
         <button

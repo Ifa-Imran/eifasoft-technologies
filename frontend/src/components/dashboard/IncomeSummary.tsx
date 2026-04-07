@@ -52,7 +52,7 @@ export function IncomeSummary() {
                 disabled={incomes[i] <= 0 || isPending}
                 className="text-xs"
               >
-                Claim
+                Harvest
               </Button>
             </div>
           </div>

@@ -25,7 +25,7 @@ export const opBNBTestnet = defineChain({
 });
 
 export const config = getDefaultConfig({
-  appName: 'KAIRO DeFi',
+  appName: 'KAIRO DAO',
   projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'd9fddb48789291a159e8270ef32105c2',
   chains: [opBNBTestnet],
   transports: {

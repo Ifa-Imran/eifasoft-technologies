@@ -17,6 +17,7 @@ import { contracts, USDT_DECIMALS } from '@/config/contracts';
 import { MockUSDTABI } from '@/config/abis/MockUSDT';
 import { parseUnits } from 'viem';
 import { useToast } from '@/components/ui/Toast';
+import Link from 'next/link';
 
 export default function DashboardPage() {
   const { isConnected, address } = useAccount();
@@ -51,21 +52,28 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-orbitron font-bold gradient-text">Dashboard</h1>
-        <Button
-          onClick={handleMintUsdt}
-          loading={mintPending}
-          variant="secondary"
-          size="sm"
-        >
-          Mint 100K Test USDT
-        </Button>
+        <div className="flex items-center gap-3">
+          <Link href="/cms">
+            <Button variant="primary" size="sm">
+              Buy CMS
+            </Button>
+          </Link>
+          <Button
+            onClick={handleMintUsdt}
+            loading={mintPending}
+            variant="secondary"
+            size="sm"
+          >
+            Mint 100K Test USDT
+          </Button>
+        </div>
       </div>
 
+      <ReferralWidget />
       <PortfolioOverview />
       <ActiveStakesTable />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <IncomeSummary />
-        <ReferralWidget />
       </div>
     </div>
   );

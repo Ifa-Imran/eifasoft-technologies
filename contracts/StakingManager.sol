@@ -103,6 +103,7 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
 
     // ============ Constants ============
     uint256 public constant MIN_STAKE = 10 * 10 ** 18;       // 10 USDT minimum
+    uint256 public constant MAX_STAKE = 2000 * 10 ** 18;     // 2000 USDT maximum per stake
     uint256 public constant MIN_HARVEST = 10 * 10 ** 18;     // $10 minimum harvest
     uint256 public constant PROFIT_NUMERATOR = 1;             // 0.1% = 1/1000
     uint256 public constant PROFIT_DENOMINATOR = 1000;
@@ -148,12 +149,12 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
 
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
 
-        // Tier 0: 10-499 USDT, 8 hours (28800s), 3 closings/day
-        tiers[0] = Tier(10 * 10 ** 18, 499 * 10 ** 18, 28800, 3);
-        // Tier 1: 500-1999 USDT, 6 hours (21600s), 4 closings/day
-        tiers[1] = Tier(500 * 10 ** 18, 1999 * 10 ** 18, 21600, 4);
-        // Tier 2: 2000+ USDT, 4 hours (14400s), 6 closings/day
-        tiers[2] = Tier(2000 * 10 ** 18, type(uint256).max, 14400, 6);
+        // Tier 0: 10-499 USDT, 15 minutes (900s) TESTING
+        tiers[0] = Tier(10 * 10 ** 18, 499 * 10 ** 18, 900, 3);
+        // Tier 1: 500-1999 USDT, 10 minutes (600s) TESTING
+        tiers[1] = Tier(500 * 10 ** 18, 1999 * 10 ** 18, 600, 4);
+        // Tier 2: 2000+ USDT, 5 minutes (300s) TESTING
+        tiers[2] = Tier(2000 * 10 ** 18, type(uint256).max, 300, 6);
     }
 
     // ============ Core Functions ============
@@ -165,6 +166,7 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
      */
     function stake(uint256 _usdtAmount, address _referrer) external nonReentrant whenNotPaused {
         require(_usdtAmount >= MIN_STAKE, "StakingManager: Below minimum stake");
+        require(_usdtAmount <= MAX_STAKE, "StakingManager: Above maximum stake (2000 USDT)");
         require(_referrer != address(0), "StakingManager: Referrer required");
         require(_referrer != msg.sender, "StakingManager: No self-referral");
 
@@ -479,6 +481,15 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
             totalCap += CAP_MULTIPLIER * userStakes[_user][i].originalAmount;
         }
         remaining = totalCap > totalEarned ? totalCap - totalEarned : 0;
+    }
+
+    /**
+     * @dev Get remaining FIFO cap across all active stakes
+     * @param _user User address
+     * @return Remaining earnable amount before all stakes cap out
+     */
+    function getRemainingCap(address _user) external view returns (uint256) {
+        return _getTotalRemainingCap(_user);
     }
 
     /**

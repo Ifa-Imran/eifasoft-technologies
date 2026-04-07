@@ -25,6 +25,8 @@ interface ILiquidityPool {
  */
 interface IStakingManager {
     function addEarnings(address _user, uint256 _usdAmount) external;
+    function getTotalActiveStakeValue(address _user) external view returns (uint256);
+    function getRemainingCap(address _user) external view returns (uint256);
 }
 
 /**
@@ -193,10 +195,49 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
         monthlyEpochStartTime = block.timestamp;
     }
 
+    // ============ Public Registration ============
+
+    /**
+     * @dev Public registration - users register themselves on-chain with a referrer.
+     *      Genesis mode: first user registers without needing a referrer.
+     */
+    function register(address _referrer) external whenNotPaused {
+        require(referrerOf[msg.sender] == address(0), "AD: Already registered");
+        require(_referrer != msg.sender, "AD: No self-referral");
+
+        // Genesis registration: the very first user registers without a referrer
+        if (genesisAccount == address(0)) {
+            require(msg.sender != address(0), "AD: Invalid user");
+            genesisAccount = msg.sender;
+            referrerOf[msg.sender] = msg.sender;
+            emit ReferrerSet(msg.sender, address(0));
+            return;
+        }
+
+        // All subsequent registrations require a valid referrer
+        require(_referrer != address(0), "AD: Invalid referrer");
+        require(referrerOf[_referrer] != address(0), "AD: Referrer not registered");
+
+        // Prevent circular referral
+        address current = _referrer;
+        for (uint256 i = 0; i < 15; i++) {
+            if (current == address(0) || current == _referrer && i > 0) break;
+            require(current != msg.sender, "AD: Circular referral");
+            current = referrerOf[current];
+            if (current == genesisAccount) break;
+        }
+
+        referrerOf[msg.sender] = _referrer;
+        directReferrals[_referrer].push(msg.sender);
+        directCount[_referrer]++;
+
+        emit ReferrerSet(msg.sender, _referrer);
+    }
+
     // ============ Referral Functions (STAKING_ROLE - contract-to-contract) ============
 
     /**
-     * @dev Set referrer for a user. Called by StakingManager when user first stakes.
+     * @dev Set referrer for a user. Called internally by contracts with STAKING_ROLE.
      */
     function setReferrer(address _user, address _referrer) external onlyRole(STAKING_ROLE) {
         require(referrerOf[_user] == address(0), "AD: Referrer already set");
@@ -243,14 +284,22 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
      */
     function distributeDirect(address _referrer, uint256 _stakeAmount) external onlyRole(STAKING_ROLE) {
         require(_referrer != address(0), "AD: Invalid referrer");
-        uint256 dividend = (_stakeAmount * 5) / 100;
-        directDividends[_referrer] += dividend;
 
-        // Report direct dividend to FIFO 3X cap
-        IStakingManager(stakingManager).addEarnings(_referrer, dividend);
-
-        // Track fresh referral business for qualifier pools
+        // Always track fresh referral business for qualifier pools
         _addFreshBusiness(_referrer, _stakeAmount);
+
+        // Referrer must have active stake to earn direct income
+        if (IStakingManager(stakingManager).getTotalActiveStakeValue(_referrer) == 0) return;
+
+        uint256 dividend = (_stakeAmount * 5) / 100;
+
+        // Cap to remaining FIFO space; forfeit if no space
+        uint256 remainingCap = IStakingManager(stakingManager).getRemainingCap(_referrer);
+        if (remainingCap == 0) return;
+        if (dividend > remainingCap) dividend = remainingCap;
+
+        directDividends[_referrer] += dividend;
+        IStakingManager(stakingManager).addEarnings(_referrer, dividend);
 
         emit DirectEarned(_referrer, dividend);
     }
@@ -267,10 +316,18 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
             // Check if this upline has unlocked level (i+1)
             uint256 unlockedLevels = _getUnlockedLevels(upline);
             if (i < unlockedLevels) {
-                uint256 dividend = (_profit * TEAM_PERCENTAGES[i]) / 10000;
-                teamDividends[upline] += dividend;
-                IStakingManager(stakingManager).addEarnings(upline, dividend);
-                emit TeamEarned(upline, _staker, i + 1, dividend);
+                // Must have active stake to earn team income
+                if (IStakingManager(stakingManager).getTotalActiveStakeValue(upline) > 0) {
+                    uint256 dividend = (_profit * TEAM_PERCENTAGES[i]) / 10000;
+                    // Cap to remaining FIFO space
+                    uint256 remainingCap = IStakingManager(stakingManager).getRemainingCap(upline);
+                    if (remainingCap > 0) {
+                        if (dividend > remainingCap) dividend = remainingCap;
+                        teamDividends[upline] += dividend;
+                        IStakingManager(stakingManager).addEarnings(upline, dividend);
+                        emit TeamEarned(upline, _staker, i + 1, dividend);
+                    }
+                }
             }
             current = upline;
         }
@@ -396,6 +453,10 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
             block.timestamp >= lastRankClaimTime[msg.sender] + RANK_INTERVAL,
             "AD: Rank claim too soon"
         );
+        require(
+            IStakingManager(stakingManager).getTotalActiveStakeValue(msg.sender) > 0,
+            "AD: No active stake"
+        );
 
         // Try close epochs on every user action
         _tryCloseEpochs();
@@ -404,10 +465,14 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
         (uint256 newRank, uint256 salary) = _determineRankLevel(msg.sender);
         userRankLevel[msg.sender] = newRank;
 
-        // Add salary to rank dividends (user harvests later with harvest(2))
+        // Add salary to rank dividends, capped by FIFO space
         if (salary > 0) {
-            rankDividends[msg.sender] += salary;
-            IStakingManager(stakingManager).addEarnings(msg.sender, salary);
+            uint256 remainingCap = IStakingManager(stakingManager).getRemainingCap(msg.sender);
+            if (salary > remainingCap) salary = remainingCap;
+            if (salary > 0) {
+                rankDividends[msg.sender] += salary;
+                IStakingManager(stakingManager).addEarnings(msg.sender, salary);
+            }
         }
 
         lastRankClaimTime[msg.sender] = block.timestamp;
@@ -428,12 +493,23 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
         require(lastWeeklyEpochClaimed[msg.sender] < weeklyEpoch, "AD: Already claimed this epoch");
         require(lastWeeklyQualifiedEpoch[msg.sender] == weeklyEpoch - 1, "AD: Not qualified (need $50k fresh business)");
         require(weeklyEpochPool > 0 && weeklyEpochQualifiers > 0, "AD: No pool or qualifiers");
+        require(
+            IStakingManager(stakingManager).getTotalActiveStakeValue(msg.sender) > 0,
+            "AD: No active stake"
+        );
 
         uint256 share = weeklyEpochPool / weeklyEpochQualifiers;
-        qualifierWeekly[msg.sender] += share;
-        IStakingManager(stakingManager).addEarnings(msg.sender, share);
-        lastWeeklyEpochClaimed[msg.sender] = weeklyEpoch;
 
+        // Cap to remaining FIFO space; forfeit excess
+        uint256 remainingCap = IStakingManager(stakingManager).getRemainingCap(msg.sender);
+        if (share > remainingCap) share = remainingCap;
+
+        if (share > 0) {
+            qualifierWeekly[msg.sender] += share;
+            IStakingManager(stakingManager).addEarnings(msg.sender, share);
+        }
+
+        lastWeeklyEpochClaimed[msg.sender] = weeklyEpoch;
         emit WeeklyQualifierClaimed(msg.sender, weeklyEpoch, share);
     }
 
@@ -449,12 +525,23 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
         require(lastMonthlyEpochClaimed[msg.sender] < monthlyEpoch, "AD: Already claimed this epoch");
         require(lastMonthlyQualifiedEpoch[msg.sender] == monthlyEpoch - 1, "AD: Not qualified (need $500k fresh business)");
         require(monthlyEpochPool > 0 && monthlyEpochQualifiers > 0, "AD: No pool or qualifiers");
+        require(
+            IStakingManager(stakingManager).getTotalActiveStakeValue(msg.sender) > 0,
+            "AD: No active stake"
+        );
 
         uint256 share = monthlyEpochPool / monthlyEpochQualifiers;
-        qualifierMonthly[msg.sender] += share;
-        IStakingManager(stakingManager).addEarnings(msg.sender, share);
-        lastMonthlyEpochClaimed[msg.sender] = monthlyEpoch;
 
+        // Cap to remaining FIFO space; forfeit excess
+        uint256 remainingCap = IStakingManager(stakingManager).getRemainingCap(msg.sender);
+        if (share > remainingCap) share = remainingCap;
+
+        if (share > 0) {
+            qualifierMonthly[msg.sender] += share;
+            IStakingManager(stakingManager).addEarnings(msg.sender, share);
+        }
+
+        lastMonthlyEpochClaimed[msg.sender] = monthlyEpoch;
         emit MonthlyQualifierClaimed(msg.sender, monthlyEpoch, share);
     }
 

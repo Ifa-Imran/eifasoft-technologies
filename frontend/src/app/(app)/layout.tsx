@@ -2,21 +2,26 @@
 
 import { useRegistration } from '@/hooks/useRegistration';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { useAccount } from 'wagmi';
 import { AppLayout } from '@/components/layout/AppLayout';
 
 export default function AppGroupLayout({ children }: { children: React.ReactNode }) {
   const { isRegistered, isLoading, isConnected } = useRegistration();
+  const { address } = useAccount();
   const router = useRouter();
+  const [redirecting, setRedirecting] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && isConnected && !isRegistered) {
+    // Only redirect when we have a definitive answer: loaded, connected, have address, not registered
+    if (!isLoading && isConnected && address && !isRegistered && !redirecting) {
+      setRedirecting(true);
       router.replace('/register');
     }
-  }, [isRegistered, isLoading, isConnected, router]);
+  }, [isRegistered, isLoading, isConnected, address, router, redirecting]);
 
   // Show loading while checking registration
-  if (isLoading && isConnected) {
+  if ((isLoading || !address) && isConnected) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center min-h-[60vh]">

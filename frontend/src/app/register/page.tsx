@@ -15,7 +15,7 @@ function RegisterPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isConnected, address } = useAccount();
-  const { isRegistered, isLoading: regLoading, isGenesisMode, register } = useRegistration();
+  const { isRegistered, isLoading: regLoading, isGenesisMode, register, isPending, isSuccess } = useRegistration();
 
   const refParam = searchParams.get('ref') || '';
   const [referrer, setReferrer] = useState(refParam);
@@ -32,12 +32,19 @@ function RegisterPageInner() {
     query: { enabled: !!referrerAddr && contracts.affiliateDistributor !== '0x' },
   });
 
-  // Redirect to dashboard if already registered
+  // Redirect to dashboard if already registered or after successful on-chain registration
   useEffect(() => {
-    if (isRegistered && !regLoading) {
+    if (isRegistered && !regLoading && !refParam) {
       router.replace('/dashboard');
     }
-  }, [isRegistered, regLoading, router]);
+  }, [isRegistered, regLoading, refParam, router]);
+
+  // Redirect after successful registration tx
+  useEffect(() => {
+    if (isSuccess && isRegistered) {
+      router.replace('/dashboard');
+    }
+  }, [isSuccess, isRegistered, router]);
 
   // Validate referrer on change
   useEffect(() => {
@@ -81,8 +88,8 @@ function RegisterPageInner() {
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl font-orbitron font-bold text-white">K</span>
           </div>
-          <h1 className="text-3xl font-orbitron font-bold gradient-text mb-3">Join KAIRO</h1>
-          <p className="text-surface-500 mb-8">Connect your wallet to get started with the KAIRO DeFi Ecosystem.</p>
+          <h1 className="text-3xl font-orbitron font-bold gradient-text mb-3">Join KAIRO DAO</h1>
+          <p className="text-surface-500 mb-8">Connect your wallet to get started with the KAIRO DAO Ecosystem.</p>
           <div className="flex justify-center">
             <ConnectButton />
           </div>
@@ -112,10 +119,9 @@ function RegisterPageInner() {
   );
 
   const handleRegister = () => {
-    if (!canSubmit) return;
+    if (!canSubmit || isPending) return;
     const ref = effectiveReferrer && isAddress(effectiveReferrer) ? effectiveReferrer : SYSTEM_WALLET;
     register(ref);
-    router.replace('/dashboard');
   };
 
   return (
@@ -130,9 +136,9 @@ function RegisterPageInner() {
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center mx-auto mb-3">
             <span className="text-xl font-orbitron font-bold text-white">K</span>
           </div>
-          <h1 className="text-2xl font-orbitron font-bold gradient-text mb-2">Join KAIRO</h1>
+          <h1 className="text-2xl font-orbitron font-bold gradient-text mb-2">Join KAIRO DAO</h1>
           <p className="text-surface-500 text-sm">
-            Register for free and join the KAIRO DeFi Ecosystem.
+            Register on-chain to join the KAIRO DAO Ecosystem.
           </p>
         </div>
 
@@ -170,7 +176,7 @@ function RegisterPageInner() {
             <ul className="space-y-2 text-xs text-surface-500">
               <li className="flex items-start gap-3">
                 <span className="w-5 h-5 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center flex-shrink-0 text-[10px] font-bold">1</span>
-                <span>Register for free (this step)</span>
+                <span>Register on-chain (this step — requires a small gas fee)</span>
               </li>
               <li className="flex items-start gap-3">
                 <span className="w-5 h-5 rounded-full bg-secondary-100 text-secondary-600 flex items-center justify-center flex-shrink-0 text-[10px] font-bold">2</span>
@@ -185,10 +191,11 @@ function RegisterPageInner() {
 
           <Button
             onClick={handleRegister}
-            disabled={!canSubmit}
+            disabled={!canSubmit || isPending}
+            loading={isPending}
             className="w-full"
           >
-            Register for Free
+            {isPending ? 'Registering...' : 'Register on Blockchain'}
           </Button>
         </div>
       </GlassCard>

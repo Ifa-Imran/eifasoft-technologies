@@ -6,6 +6,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { GlassCard, Button, Input } from '@/components/ui';
 import { useSwap } from '@/hooks/useSwap';
 import { useKairoPrice } from '@/hooks/useKairoPrice';
+import { useGlobalStats } from '@/hooks/useGlobalStats';
 import { useApproval } from '@/hooks/useApproval';
 import { useTokenBalances } from '@/hooks/useTokenBalances';
 import { contracts, KAIRO_DECIMALS, USDT_DECIMALS, SWAP_FEE_BPS } from '@/config/contracts';
@@ -24,12 +25,13 @@ export default function SwapPage() {
   const [slippage, setSlippage] = useState('0.5');
   const { price } = useKairoPrice();
   const { swap, isPending, poolBalances } = useSwap();
+  const { tvlFormatted } = useGlobalStats();
   const { kairoFormatted } = useTokenBalances();
   const approval = useApproval(contracts.kairoToken, contracts.liquidityPool);
 
-  // Pool USDT balance (liquidity)
+  // Pool balances - use actual USDT balance from useGlobalStats for display accuracy
   const poolKairo = poolBalances ? Number(formatUnits(BigInt(poolBalances[0] || 0), KAIRO_DECIMALS)) : 0;
-  const poolUsdt = poolBalances ? Number(formatUnits(BigInt(poolBalances[1] || 0), USDT_DECIMALS)) : 0;
+  const poolUsdt = Number(tvlFormatted);
 
   if (!isConnected) {
     return (

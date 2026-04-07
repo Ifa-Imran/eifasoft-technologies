@@ -113,7 +113,7 @@ export default function QualifiersPage() {
               {weeklyQualified ? (
                 <div className="flex items-center justify-center gap-2">
                   <CheckCircleIcon className="w-5 h-5 text-success-600" />
-                  <span className="text-success-600 font-semibold">Qualified! Claim your reward</span>
+                  <span className="text-success-600 font-semibold">Qualified! Harvest your reward</span>
                 </div>
               ) : (
                 <div className="flex items-center justify-center gap-2">
@@ -132,7 +132,7 @@ export default function QualifiersPage() {
               className="w-full"
               icon={<BoltIcon className="w-4 h-4" />}
             >
-              Claim Weekly Reward
+              Harvest Weekly Reward
             </Button>
           </div>
         </GlassCard>
@@ -174,7 +174,7 @@ export default function QualifiersPage() {
               {monthlyQualified ? (
                 <div className="flex items-center justify-center gap-2">
                   <CheckCircleIcon className="w-5 h-5 text-success-600" />
-                  <span className="text-success-600 font-semibold">Qualified! Claim your reward</span>
+                  <span className="text-success-600 font-semibold">Qualified! Harvest your reward</span>
                 </div>
               ) : (
                 <div className="flex items-center justify-center gap-2">
@@ -194,7 +194,7 @@ export default function QualifiersPage() {
               className="w-full"
               icon={<BoltIcon className="w-4 h-4" />}
             >
-              Claim Monthly Reward
+              Harvest Monthly Reward
             </Button>
           </div>
         </GlassCard>
@@ -214,7 +214,7 @@ export default function QualifiersPage() {
           </div>
           <div className="flex items-start gap-2">
             <span className="w-5 h-5 rounded-full bg-accent-100 text-accent-600 flex items-center justify-center flex-shrink-0 text-[10px] font-bold">3</span>
-            <span>Claim your share of the pool distributed equally among all qualifiers.</span>
+            <span>Harvest your share of the pool distributed equally among all qualifiers.</span>
           </div>
         </div>
       </GlassCard>

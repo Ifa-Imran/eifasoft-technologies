@@ -120,6 +120,13 @@ export function useCMS() {
     remainingSubscriptions: Number(remaining || 0),
     claimableRewards: claimable as any,
     maxClaimable: maxClaimable as bigint | undefined,
+    // Total available rewards from subscriptions (loyalty + leadership)
+    availableFormatted: claimable ? formatUnits((claimable as readonly bigint[])[2] ?? BigInt(0), KAIRO_DECIMALS) : '0',
+    loyaltyFormatted: claimable ? formatUnits((claimable as readonly bigint[])[0] ?? BigInt(0), KAIRO_DECIMALS) : '0',
+    leadershipFormatted: claimable ? formatUnits((claimable as readonly bigint[])[1] ?? BigInt(0), KAIRO_DECIMALS) : '0',
+    // Max claimable KAIRO capped by active stake value
+    maxClaimableFormatted: maxClaimable ? formatUnits(maxClaimable as bigint, KAIRO_DECIMALS) : '0',
+    // Legacy alias
     claimableFormatted: claimable ? formatUnits((claimable as readonly bigint[])[2] ?? BigInt(0), KAIRO_DECIMALS) : '0',
     subscribe,
     claimRewards,

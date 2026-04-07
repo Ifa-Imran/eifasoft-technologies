@@ -8,6 +8,7 @@ import {
   CurrencyDollarIcon,
   ArrowsRightLeftIcon,
   UserGroupIcon,
+  UsersIcon,
   ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 
@@ -15,8 +16,8 @@ const items = [
   { href: '/dashboard', label: 'Home', icon: HomeIcon },
   { href: '/stake', label: 'Stake', icon: CurrencyDollarIcon },
   { href: '/exchange', label: 'P2P', icon: ArrowsRightLeftIcon },
-  { href: '/referrals', label: 'Refer', icon: UserGroupIcon },
-  { href: '/swap', label: 'Swap', icon: ArrowPathIcon },
+  { href: '/referrals', label: 'Rank', icon: UserGroupIcon },
+  { href: '/team-dividend', label: 'Team', icon: UsersIcon },
 ];
 
 export function BottomNav() {

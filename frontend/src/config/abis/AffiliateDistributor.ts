@@ -1470,6 +1470,19 @@ export const AffiliateDistributorABI = [
     "inputs": [
       {
         "internalType": "address",
+        "name": "_referrer",
+        "type": "address"
+      }
+    ],
+    "name": "register",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
         "name": "_staker",
         "type": "address"
       },

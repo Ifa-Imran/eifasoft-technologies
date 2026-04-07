@@ -188,13 +188,10 @@ async function main() {
     await tx.wait();
     console.log("  KAIROToken: BURNER_ROLE -> AtomicP2p");
 
-    // --- AffiliateDistributor Roles ---
-    const RANK_UPDATER_ROLE = await affiliateDistributor.RANK_UPDATER_ROLE();
-
-    // Grant RANK_UPDATER_ROLE to deployer (backend will use this)
-    tx = await affiliateDistributor.grantRole(RANK_UPDATER_ROLE, deployer.address);
+    // --- StakingManager: Set CMS contract ---
+    tx = await stakingManager.setCMS(cmsAddress);
     await tx.wait();
-    console.log("  AffiliateDistributor: RANK_UPDATER_ROLE -> deployer");
+    console.log("  StakingManager: CMS contract set ->", cmsAddress);
 
     // --- StakingManager Roles ---
     const COMPOUNDER_ROLE = await stakingManager.COMPOUNDER_ROLE();
@@ -264,7 +261,6 @@ async function main() {
     console.log("  KAIROToken MINTER_ROLE:       StakingManager, AffiliateDistributor, CMS");
     console.log("  KAIROToken BURNER_ROLE:       LiquidityPool, AtomicP2p");
     console.log("  AffiliateDistributor STAKING_ROLE: StakingManager");
-    console.log("  AffiliateDistributor RANK_UPDATER_ROLE: deployer");
     console.log("  StakingManager COMPOUNDER_ROLE: deployer");
     console.log("  LiquidityPool CORE_ROLE:      StakingManager, CMS");
     console.log("  LiquidityPool P2P_ROLE:       AtomicP2p");

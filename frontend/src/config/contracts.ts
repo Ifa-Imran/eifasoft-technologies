@@ -24,21 +24,32 @@ export function getExplorerAddressUrl(address: string) {
 
 // Constants from contracts
 export const STAKING_TIERS = [
-  { name: 'Bronze', minAmount: 10, compoundInterval: 8 * 3600, color: '#CD7F32' },
-  { name: 'Silver', minAmount: 1000, compoundInterval: 6 * 3600, color: '#C0C0C0' },
-  { name: 'Gold', minAmount: 5000, compoundInterval: 4 * 3600, color: '#FFD700' },
+  { name: 'Bronze', minAmount: 10, maxAmount: 499, compoundInterval: 15 * 60, color: '#CD7F32' },
+  { name: 'Silver', minAmount: 500, maxAmount: 1999, compoundInterval: 10 * 60, color: '#C0C0C0' },
+  { name: 'Gold', minAmount: 2000, maxAmount: 2000, compoundInterval: 5 * 60, color: '#FFD700' },
 ] as const;
 
 export const RANK_NAMES = [
-  'None', 'Star', 'Bronze Star', 'Silver Star', 'Gold Star',
-  'Platinum Star', 'Diamond', 'Blue Diamond', 'Black Diamond',
-  'Royal Diamond', 'Crown Diamond',
+  'None', 'Associate', 'Executive', 'Director', 'Vice President',
+  'Senior VP', 'Managing Director', 'Partner', 'Senior Partner',
+  'Global Leader', 'Chairman',
+] as const;
+
+// Rank thresholds in USD (team volume required)
+export const RANK_THRESHOLDS = [
+  10_000, 30_000, 100_000, 300_000, 1_000_000,
+  3_000_000, 10_000_000, 30_000_000, 100_000_000, 250_000_000,
+] as const;
+
+// Rank salary per period in USD
+export const RANK_SALARIES_USD = [
+  10, 30, 70, 200, 600, 1_200, 4_000, 12_000, 40_000, 100_000,
 ] as const;
 
 export const USDT_DECIMALS = 18; // MockUSDT uses 18 decimals
 export const KAIRO_DECIMALS = 18;
 export const BASIS_POINTS = 10000;
-export const SWAP_FEE_BPS = 300; // 3%
+export const SWAP_FEE_BPS = 500; // 5%
 export const P2P_FEE_BPS = 300; // 3%
 export const CMS_PRICE_USDT = 10; // 10 USDT per subscription
 export const CMS_MAX_SUBSCRIPTIONS = 10000;

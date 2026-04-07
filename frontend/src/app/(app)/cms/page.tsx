@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAccount } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { GlassCard, Button, Input, ProgressBar } from '@/components/ui';
@@ -8,22 +8,26 @@ import { useCMS } from '@/hooks/useCMS';
 import { useApproval } from '@/hooks/useApproval';
 import { useTokenBalances } from '@/hooks/useTokenBalances';
 import { useRegistration } from '@/hooks/useRegistration';
+import { useUserStakes } from '@/hooks/useUserStakes';
 import { contracts, CMS_PRICE_USDT, CMS_MAX_SUBSCRIPTIONS, USDT_DECIMALS } from '@/config/contracts';
-import { parseUnits, zeroAddress, isAddress } from 'viem';
+import { parseUnits, zeroAddress, isAddress, formatUnits } from 'viem';
 import {
   TicketIcon,
   GiftIcon,
   SparklesIcon,
   FireIcon,
   ShieldCheckIcon,
+  LockClosedIcon,
+  CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 
 export default function CMSPage() {
   const { isConnected } = useAccount();
   const [amount, setAmount] = useState('1');
-  const { totalSubscriptions, userSubscriptionCount, remainingSubscriptions, claimableFormatted, maxClaimable, subscribe, claimRewards, isPending } = useCMS();
+  const { totalSubscriptions, userSubscriptionCount, remainingSubscriptions, availableFormatted, loyaltyFormatted, leadershipFormatted, maxClaimableFormatted, claimableFormatted, maxClaimable, subscribe, claimRewards, isPending } = useCMS();
   const { usdtFormatted } = useTokenBalances();
   const { storedReferrer, hasOnChainReferrer } = useRegistration();
+  const { totalStaked } = useUserStakes();
   const totalCost = Number(amount) * CMS_PRICE_USDT;
   const costBigInt = parseUnits(totalCost.toString(), USDT_DECIMALS);
   const approval = useApproval(contracts.usdt, contracts.cms);
@@ -44,12 +48,26 @@ export default function CMSPage() {
     );
   }
 
+  const pendingSubscribeRef = useRef(false);
+
+  // Auto-subscribe after approval succeeds
+  useEffect(() => {
+    if (pendingSubscribeRef.current && approval.hasAllowance(costBigInt) && !isPending) {
+      pendingSubscribeRef.current = false;
+      // Always pass the actual referrer so CMS can set its internal referrerOf mapping
+      const ref = storedReferrer && isAddress(storedReferrer) ? storedReferrer : zeroAddress;
+      subscribe(BigInt(Number(amount)), ref);
+    }
+  }, [approval.allowance]);
+
   const handleSubscribe = () => {
     if (!approval.hasAllowance(costBigInt)) {
+      pendingSubscribeRef.current = true;
       approval.approve(costBigInt);
       return;
     }
-    const ref = hasOnChainReferrer ? zeroAddress : (storedReferrer && isAddress(storedReferrer) ? storedReferrer : zeroAddress);
+    // Always pass the actual referrer so CMS can set its internal referrerOf mapping
+    const ref = storedReferrer && isAddress(storedReferrer) ? storedReferrer : zeroAddress;
     subscribe(BigInt(Number(amount)), ref);
   };
 
@@ -170,7 +188,7 @@ export default function CMSPage() {
               disabled={Number(amount) < 1}
               className="w-full"
             >
-              {!approval.hasAllowance(costBigInt) ? 'Approve USDT' : `Subscribe (${amount}x for $${totalCost})`}
+              {!approval.hasAllowance(costBigInt) ? `Approve & Subscribe (${amount}x for $${totalCost})` : `Subscribe (${amount}x for $${totalCost})`}
             </Button>
           </div>
         </GlassCard>
@@ -185,23 +203,77 @@ export default function CMSPage() {
           </div>
 
           <div className="space-y-4">
+            {/* Available Rewards - total from subscriptions */}
             <div className="text-center p-8 rounded-2xl bg-gradient-to-br from-primary-100/60 via-white to-secondary-100/60 border-2 border-primary-200/50">
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center mx-auto mb-3 shadow-lg shadow-primary-400/30">
                 <GiftIcon className="w-7 h-7 text-white" />
               </div>
-              <p className="text-sm text-surface-500 mb-2">Claimable Rewards</p>
-              <p className="text-4xl font-mono font-bold gradient-text">{Number(claimableFormatted).toFixed(2)}</p>
-              <p className="text-sm text-surface-400 mt-1">KAIRO tokens</p>
+              <p className="text-sm text-surface-500 mb-2">Available Rewards</p>
+              <p className="text-4xl font-mono font-bold gradient-text">{Number(availableFormatted).toFixed(2)}</p>
+              <p className="text-sm text-surface-400 mt-1">KAIRO tokens from subscriptions</p>
+            </div>
+
+            {/* Breakdown: Loyalty vs Leadership */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-xl bg-gradient-to-br from-accent-50 to-accent-100/60 border border-accent-200/50 text-center">
+                <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Loyalty</p>
+                <p className="text-lg font-mono font-bold text-accent-700">{Number(loyaltyFormatted).toFixed(2)}</p>
+                <p className="text-[10px] text-surface-400">KAIRO</p>
+              </div>
+              <div className="p-3 rounded-xl bg-gradient-to-br from-secondary-50 to-secondary-100/60 border border-secondary-200/50 text-center">
+                <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Leadership</p>
+                <p className="text-lg font-mono font-bold text-secondary-700">{Number(leadershipFormatted).toFixed(2)}</p>
+                <p className="text-[10px] text-surface-400">KAIRO</p>
+              </div>
+            </div>
+
+            {/* Claimable Status - stake-gated */}
+            <div className={`p-4 rounded-xl border-2 ${
+              totalStaked > 0n
+                ? 'bg-gradient-to-r from-success-50 to-success-100/60 border-success-300/50'
+                : 'bg-gradient-to-r from-surface-50 to-warn-50/30 border-warn-200/50'
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                {totalStaked > 0n ? (
+                  <CheckCircleIcon className="w-5 h-5 text-success-600" />
+                ) : (
+                  <LockClosedIcon className="w-5 h-5 text-warn-600" />
+                )}
+                <span className={`text-sm font-semibold ${
+                  totalStaked > 0n ? 'text-success-700' : 'text-warn-700'
+                }`}>
+                  {totalStaked > 0n ? 'Claimable Amount' : 'Staking Required to Unlock'}
+                </span>
+              </div>
+              {totalStaked > 0n ? (
+                <div>
+                  <p className="text-2xl font-mono font-bold text-success-700">
+                    {Number(maxClaimableFormatted) >= Number(availableFormatted)
+                      ? Number(availableFormatted).toFixed(2)
+                      : Number(maxClaimableFormatted).toFixed(2)} KAIRO
+                  </p>
+                  <p className="text-xs text-surface-500 mt-1">
+                    Claimable amount = min(available rewards, stake-equivalent KAIRO)
+                  </p>
+                  <p className="text-xs text-surface-400 mt-0.5">
+                    Your stake supports up to {Number(maxClaimableFormatted).toFixed(2)} KAIRO
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-surface-500">
+                  Your available rewards of <span className="font-semibold text-surface-700">{Number(availableFormatted).toFixed(2)} KAIRO</span> will become claimable once you create an active stake. The claimable amount is capped by your active stake value.
+                </p>
+              )}
             </div>
 
             <div className="p-4 rounded-xl bg-gradient-to-r from-primary-100/50 to-secondary-100/50 border-2 border-primary-200/40 space-y-2 text-xs text-surface-600">
               <div className="flex items-start gap-2">
                 <span className="text-primary-500 mt-0.5">&#8226;</span>
-                <span>90% sent to your wallet, 10% auto-staked</span>
+                <span>90% sent to your wallet, 10% to system wallet</span>
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-primary-500 mt-0.5">&#8226;</span>
-                <span>Claim amount capped by total active stake value</span>
+                <span>Claimable amount capped by your active stake value</span>
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-primary-500 mt-0.5">&#8226;</span>
@@ -214,8 +286,9 @@ export default function CMSPage() {
               loading={isPending}
               variant="secondary"
               className="w-full"
+              disabled={Number(availableFormatted) <= 0 || totalStaked <= 0n}
             >
-              Claim CMS Rewards
+              {totalStaked <= 0n ? 'Requires Active Stake to Claim' : 'Claim CMS Rewards'}
             </Button>
           </div>
         </GlassCard>

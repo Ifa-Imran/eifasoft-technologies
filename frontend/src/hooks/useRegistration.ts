@@ -1,102 +1,79 @@
 'use client';
 
-import { useReadContract, useAccount } from 'wagmi';
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
+import { useQueryClient } from '@tanstack/react-query';
 import { zeroAddress } from 'viem';
 import { contracts, SYSTEM_WALLET } from '@/config/contracts';
 import { AffiliateDistributorABI } from '@/config/abis/AffiliateDistributor';
-import { useState, useEffect, useCallback } from 'react';
-
-const STORAGE_KEY = 'kairo_registration';
-
-interface RegistrationData {
-  address: string;
-  referrer: string;
-  timestamp: number;
-}
-
-/** Read saved registration from localStorage */
-function getSavedRegistration(address: string | undefined): RegistrationData | null {
-  if (!address || typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const data: RegistrationData = JSON.parse(raw);
-    if (data.address?.toLowerCase() === address.toLowerCase()) return data;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-/** Save registration to localStorage */
-function saveRegistration(address: string, referrer: string) {
-  if (typeof window === 'undefined') return;
-  const data: RegistrationData = { address: address.toLowerCase(), referrer, timestamp: Date.now() };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
+import { useEffect } from 'react';
+import { useToast } from '@/components/ui/Toast';
 
 export function useRegistration() {
   const { address, isConnected } = useAccount();
-  const [localRegistered, setLocalRegistered] = useState(false);
-  const [storedReferrer, setStoredReferrer] = useState<string>('');
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  // Check localStorage on mount and address change
-  useEffect(() => {
-    const saved = getSavedRegistration(address);
-    if (saved) {
-      setLocalRegistered(true);
-      setStoredReferrer(saved.referrer);
-    } else {
-      setLocalRegistered(false);
-      setStoredReferrer('');
-    }
-  }, [address]);
-
-  // Check if user has a referrer set on-chain (meaning they already interacted)
-  const { data: onChainReferrer, isLoading: referrerLoading } = useReadContract({
+  // Check if user has a referrer set on-chain (source of truth)
+  const { data: onChainReferrer, isLoading: referrerLoading, queryKey: referrerQueryKey } = useReadContract({
     address: contracts.affiliateDistributor,
     abi: AffiliateDistributorABI,
     functionName: 'referrerOf',
     args: address ? [address] : undefined,
     query: {
       enabled: !!address && contracts.affiliateDistributor !== '0x',
-      refetchInterval: 15000,
+      refetchInterval: 10000,
     },
   });
 
-  // Genesis mode detection: check if system wallet has any direct referrals
-  const { data: systemDirectCount } = useReadContract({
+  // Genesis mode detection: check if genesis account is set
+  const { data: genesisAccount } = useReadContract({
     address: contracts.affiliateDistributor,
     abi: AffiliateDistributorABI,
-    functionName: 'directCount',
-    args: SYSTEM_WALLET !== '0x' ? [SYSTEM_WALLET] : undefined,
+    functionName: 'genesisAccount',
     query: {
-      enabled: SYSTEM_WALLET !== '0x' && contracts.affiliateDistributor !== '0x',
+      enabled: contracts.affiliateDistributor !== '0x',
       refetchInterval: 30000,
     },
   });
 
   const hasOnChainReferrer = onChainReferrer !== undefined && onChainReferrer !== zeroAddress;
-  const isRegistered = localRegistered || hasOnChainReferrer;
-  const isGenesisMode = systemDirectCount !== undefined && (systemDirectCount as bigint) === 0n;
-  const isLoading = referrerLoading;
+  const isRegistered = hasOnChainReferrer;
+  const isGenesisMode = genesisAccount !== undefined && (genesisAccount as string) === zeroAddress;
+  const isLoading = referrerLoading || (isConnected && !address);
 
-  // Register: save referrer to localStorage
-  const register = useCallback((referrer: string) => {
-    if (!address) return;
-    saveRegistration(address, referrer);
-    setLocalRegistered(true);
-    setStoredReferrer(referrer);
-  }, [address]);
+  // On-chain register transaction
+  const { writeContract, isPending: registerPending, data: registerHash } = useWriteContract();
+  const { isSuccess: registerSuccess, isError: registerError } = useWaitForTransactionReceipt({ hash: registerHash });
 
-  // If on-chain referrer is set but no local data, sync it
+  // Handle registration success
   useEffect(() => {
-    if (hasOnChainReferrer && !localRegistered && address && onChainReferrer) {
-      saveRegistration(address, onChainReferrer as string);
-      setLocalRegistered(true);
-      setStoredReferrer(onChainReferrer as string);
+    if (registerSuccess) {
+      toast({ type: 'success', title: 'Registration successful!' });
+      queryClient.invalidateQueries({ queryKey: referrerQueryKey });
     }
-  }, [hasOnChainReferrer, localRegistered, address, onChainReferrer]);
+  }, [registerSuccess]);
+
+  // Handle registration error
+  useEffect(() => {
+    if (registerError) {
+      toast({ type: 'error', title: 'Registration failed. Please try again.' });
+    }
+  }, [registerError]);
+
+  // Register on-chain by calling AffiliateDistributor.register(_referrer)
+  const register = (referrer: string) => {
+    if (!address) return;
+    writeContract({
+      address: contracts.affiliateDistributor,
+      abi: AffiliateDistributorABI,
+      functionName: 'register',
+      args: [referrer as `0x${string}`],
+    });
+    toast({ type: 'pending', title: 'Registering on blockchain...' });
+  };
+
+  // Stored referrer from on-chain data (for CMS/staking referrer param)
+  const storedReferrer = hasOnChainReferrer ? (onChainReferrer as string) : '';
 
   return {
     isRegistered,
@@ -106,5 +83,7 @@ export function useRegistration() {
     hasOnChainReferrer,
     storedReferrer,
     register,
+    isPending: registerPending,
+    isSuccess: registerSuccess,
   };
 }

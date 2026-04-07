@@ -257,6 +257,59 @@ async function main() {
     }
 
     // ============================================================
+    // PHASE 5: Burn ALL deployer roles (irreversible)
+    // ============================================================
+    console.log("--- PHASE 5: Burn ALL Deployer Roles ---");
+    console.log("  WARNING: This is irreversible. Deployer will lose all admin control.");
+    console.log("");
+
+    const DEFAULT_ADMIN_ROLE = await kairoToken.DEFAULT_ADMIN_ROLE();
+
+    // 1. KAIROToken — renounce DEFAULT_ADMIN_ROLE
+    tx = await kairoToken.renounceRole(DEFAULT_ADMIN_ROLE, deployer.address);
+    await tx.wait();
+    console.log("  [BURNED] KAIROToken DEFAULT_ADMIN_ROLE");
+
+    // 2. StakingManager — renounce COMPOUNDER_ROLE + DEFAULT_ADMIN_ROLE
+    tx = await stakingManager.renounceRole(COMPOUNDER_ROLE, deployer.address);
+    await tx.wait();
+    console.log("  [BURNED] StakingManager COMPOUNDER_ROLE");
+    tx = await stakingManager.renounceRole(DEFAULT_ADMIN_ROLE, deployer.address);
+    await tx.wait();
+    console.log("  [BURNED] StakingManager DEFAULT_ADMIN_ROLE");
+
+    // 3. AffiliateDistributor — renounce STAKING_ROLE (genesis setup) + DEFAULT_ADMIN_ROLE
+    tx = await affiliateDistributor.renounceRole(STAKING_ROLE, deployer.address);
+    await tx.wait();
+    console.log("  [BURNED] AffiliateDistributor STAKING_ROLE");
+    tx = await affiliateDistributor.renounceRole(DEFAULT_ADMIN_ROLE, deployer.address);
+    await tx.wait();
+    console.log("  [BURNED] AffiliateDistributor DEFAULT_ADMIN_ROLE");
+
+    // 4. CoreMembershipSubscription — renounce DEFAULT_ADMIN_ROLE
+    tx = await cms.renounceRole(DEFAULT_ADMIN_ROLE, deployer.address);
+    await tx.wait();
+    console.log("  [BURNED] CMS DEFAULT_ADMIN_ROLE");
+
+    // 5. LiquidityPool — renounce DEFAULT_ADMIN_ROLE
+    tx = await liquidityPool.renounceRole(DEFAULT_ADMIN_ROLE, deployer.address);
+    await tx.wait();
+    console.log("  [BURNED] LiquidityPool DEFAULT_ADMIN_ROLE");
+
+    // 6. AtomicP2p — renounce ADMIN_ROLE + DEFAULT_ADMIN_ROLE
+    const P2P_ADMIN_ROLE = await atomicP2p.ADMIN_ROLE();
+    tx = await atomicP2p.renounceRole(P2P_ADMIN_ROLE, deployer.address);
+    await tx.wait();
+    console.log("  [BURNED] AtomicP2p ADMIN_ROLE");
+    tx = await atomicP2p.renounceRole(DEFAULT_ADMIN_ROLE, deployer.address);
+    await tx.wait();
+    console.log("  [BURNED] AtomicP2p DEFAULT_ADMIN_ROLE");
+
+    console.log("");
+    console.log("  ALL DEPLOYER ROLES BURNED. Private key is now safe to reveal.");
+    console.log("");
+
+    // ============================================================
     // Final Summary
     // ============================================================
     console.log("=============================================");

@@ -5,13 +5,11 @@ import { useTokenBalances } from '@/hooks/useTokenBalances';
 import { useUserStakes } from '@/hooks/useUserStakes';
 import { useKairoPrice } from '@/hooks/useKairoPrice';
 import { useGlobalStats } from '@/hooks/useGlobalStats';
-import { useSwap } from '@/hooks/useSwap';
-import { formatUnits } from 'viem';
 import { USDT_DECIMALS } from '@/config/contracts';
+import { formatUnits } from 'viem';
 import { formatPrice, formatCompact } from '@/lib/utils';
 import {
   CurrencyDollarIcon,
-  BanknotesIcon,
   ArrowTrendingUpIcon,
   GiftIcon,
   CircleStackIcon,
@@ -20,19 +18,18 @@ import {
 } from '@heroicons/react/24/outline';
 
 export function PortfolioOverview() {
-  const { kairoFormatted, usdtFormatted } = useTokenBalances();
+  const { kairoFormatted } = useTokenBalances();
   const { totalStaked, totalHarvestable, activeStakes } = useUserStakes();
   const { price } = useKairoPrice();
   const { tvlFormatted, totalSupplyFormatted } = useGlobalStats();
-  const { poolBalances } = useSwap();
 
   const kairoUsd = Number(kairoFormatted) * price;
-  const stakedUsd = Number(totalStaked) / 1e6;
-  const harvestableUsd = Number(totalHarvestable) / 1e6;
-  const totalPortfolioUsd = kairoUsd + Number(usdtFormatted) + stakedUsd;
+  const stakedUsd = totalStaked ? Number(formatUnits(totalStaked, USDT_DECIMALS)) : 0;
+  const harvestableUsd = totalHarvestable ? Number(formatUnits(totalHarvestable, USDT_DECIMALS)) : 0;
+  const totalPortfolioUsd = kairoUsd + stakedUsd;
 
-  // Pool liquidity (USDT only)
-  const poolUsdt = poolBalances ? Number(formatUnits(BigInt(poolBalances[1] || 0), USDT_DECIMALS)) : 0;
+  // Pool liquidity = actual USDT balance in pool (from useGlobalStats)
+  const poolUsdt = Number(tvlFormatted);
 
   // Total circulation
   const totalCirculation = Number(totalSupplyFormatted);
@@ -58,20 +55,13 @@ export function PortfolioOverview() {
       </div>
 
       {/* Stat cards - personal */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
           label="KAIRO Balance"
           value={Number(kairoFormatted).toLocaleString('en-US', { maximumFractionDigits: 2 })}
           suffix=" KAIRO"
           icon={<CurrencyDollarIcon className="w-5 h-5" />}
           gradient="cyan"
-        />
-        <StatCard
-          label="USDT Balance"
-          value={Number(usdtFormatted).toLocaleString('en-US', { maximumFractionDigits: 2 })}
-          prefix="$"
-          icon={<BanknotesIcon className="w-5 h-5" />}
-          gradient="success"
         />
         <StatCard
           label="Total Staked"

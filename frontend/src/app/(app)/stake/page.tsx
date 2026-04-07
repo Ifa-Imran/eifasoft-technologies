@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useRef } from 'react';
 import { useAccount } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { GlassCard, Button, Input, Badge, ProgressBar } from '@/components/ui';
@@ -14,11 +14,12 @@ import { contracts, STAKING_TIERS, USDT_DECIMALS } from '@/config/contracts';
 import { parseUnits, isAddress, zeroAddress } from 'viem';
 import { formatCountdown } from '@/lib/utils';
 import { useEffect } from 'react';
-import { BoltIcon, ArrowDownTrayIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { useAffiliate } from '@/hooks/useAffiliate';
+import { BoltIcon, ArrowDownTrayIcon, ClockIcon, LockClosedIcon, LockOpenIcon } from '@heroicons/react/24/outline';
 
 function getTier(amount: number) {
-  if (amount >= 5000) return STAKING_TIERS[2];
-  if (amount >= 1000) return STAKING_TIERS[1];
+  if (amount >= 2000) return STAKING_TIERS[2];
+  if (amount >= 500) return STAKING_TIERS[1];
   return STAKING_TIERS[0];
 }
 
@@ -30,6 +31,7 @@ function StakePageInner() {
   const { usdtFormatted } = useTokenBalances();
   const { storedReferrer, hasOnChainReferrer } = useRegistration();
   const { remainingSubscriptions } = useCMS();
+  const { unlockedLevels, directReferrals: directRefs } = useAffiliate();
   const approval = useApproval(contracts.usdt, contracts.stakingManager);
   const [now, setNow] = useState(Math.floor(Date.now() / 1000));
 
@@ -53,18 +55,27 @@ function StakePageInner() {
   const tier = getTier(numAmount);
   const stakeAmountBigInt = numAmount > 0 ? parseUnits(amount, USDT_DECIMALS) : BigInt(0);
   const needsApproval = numAmount > 0 && !approval.hasAllowance(stakeAmountBigInt);
+  const pendingStakeRef = useRef(false);
+
+  // Auto-stake after approval succeeds (one-click flow)
+  useEffect(() => {
+    if (pendingStakeRef.current && approval.hasAllowance(stakeAmountBigInt) && !isPending) {
+      pendingStakeRef.current = false;
+      // Always pass the actual referrer — StakingManager requires non-zero referrer
+      const ref = storedReferrer && isAddress(storedReferrer) ? (storedReferrer as `0x${string}`) : zeroAddress;
+      stake(stakeAmountBigInt, ref);
+    }
+  }, [approval.allowance]);
 
   const handleStake = () => {
     if (cmsActive) return;
     if (needsApproval) {
+      pendingStakeRef.current = true;
       approval.approve(stakeAmountBigInt);
       return;
     }
-    const ref = hasOnChainReferrer
-      ? zeroAddress
-      : storedReferrer && isAddress(storedReferrer)
-        ? (storedReferrer as `0x${string}`)
-        : zeroAddress;
+    // Always pass the actual referrer — StakingManager requires non-zero referrer
+    const ref = storedReferrer && isAddress(storedReferrer) ? (storedReferrer as `0x${string}`) : zeroAddress;
     stake(stakeAmountBigInt, ref);
   };
 
@@ -102,7 +113,7 @@ function StakePageInner() {
             >
               <div className="text-center">
                 <Badge tier={tierBadge} size="md">{t.name}</Badge>
-                <p className="text-sm text-surface-400 mt-3">Min ${t.minAmount.toLocaleString()}</p>
+                <p className="text-sm text-surface-400 mt-3">${t.minAmount.toLocaleString()} – ${t.maxAmount.toLocaleString()}</p>
                 <p className="text-2xl font-mono font-bold text-surface-900 mt-1">{t.compoundInterval / 3600}h</p>
                 <p className="text-sm text-surface-500">compound interval</p>
               </div>
@@ -123,7 +134,7 @@ function StakePageInner() {
               placeholder="Enter amount..."
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              helperText={`Balance: ${Number(usdtFormatted).toFixed(2)} USDT | Min: 10 USDT`}
+              helperText={`Balance: ${Number(usdtFormatted).toFixed(2)} USDT | Min: 10 | Max: 2,000 USDT`}
             />
 
             {numAmount >= 10 && (
@@ -163,7 +174,7 @@ function StakePageInner() {
               disabled={numAmount < 10 || cmsActive}
               className="w-full"
             >
-              {cmsActive ? 'Staking Not Yet Available' : needsApproval ? 'Approve USDT' : `Stake $${numAmount}`}
+              {cmsActive ? 'Staking Not Yet Available' : needsApproval ? `Approve & Stake $${numAmount}` : `Stake $${numAmount}`}
             </Button>
           </div>
         </GlassCard>
@@ -211,7 +222,7 @@ function StakePageInner() {
                       </div>
                       <div className="p-2 rounded-xl bg-gradient-to-br from-accent-100 to-accent-50 border-2 border-accent-200/60 text-center">
                         <p className="font-mono font-bold text-accent-700">${s.harvestableFormatted}</p>
-                        <p className="text-xs text-surface-400">claimable</p>
+                        <p className="text-xs text-surface-400">harvestable</p>
                       </div>
                     </div>
 
@@ -229,7 +240,7 @@ function StakePageInner() {
                         Compound
                       </Button>
                       <Button size="sm" variant="secondary" onClick={() => harvest(BigInt(s.index), s.harvestable)} className="flex-1" icon={<ArrowDownTrayIcon className="w-3.5 h-3.5" />}>
-                        Claim
+                        Harvest
                       </Button>
                     </div>
                   </GlassCard>
@@ -239,6 +250,44 @@ function StakePageInner() {
           )}
         </div>
       </div>
+
+      {/* Level Unlock Requirements */}
+      <GlassCard>
+        <h3 className="text-lg font-semibold text-surface-900 mb-3">Team Dividend Level Unlock</h3>
+        <p className="text-xs text-surface-500 mb-4">Unlock more team dividend levels by adding direct referrals. You currently have <span className="font-semibold text-primary-600">{((directRefs as any[]) || []).length}</span> direct referrals and <span className="font-semibold text-primary-600">{unlockedLevels} / 15</span> levels unlocked.</p>
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+          {Array.from({ length: 15 }, (_, i) => {
+            const level = i + 1;
+            const isUnlocked = level <= unlockedLevels;
+            let directsNeeded: number;
+            if (level <= 5) {
+              directsNeeded = level;
+            } else {
+              directsNeeded = 5 + Math.ceil((level - 5) / 2);
+            }
+            return (
+              <div
+                key={i}
+                className={`p-2 rounded-xl text-center border-2 transition-all ${
+                  isUnlocked
+                    ? 'bg-gradient-to-br from-success-50 to-success-100/60 border-success-300/60'
+                    : 'bg-surface-50 border-surface-200 opacity-60'
+                }`}
+              >
+                <div className="flex justify-center mb-1">
+                  {isUnlocked ? (
+                    <LockOpenIcon className="w-4 h-4 text-success-600" />
+                  ) : (
+                    <LockClosedIcon className="w-4 h-4 text-surface-400" />
+                  )}
+                </div>
+                <p className={`text-sm font-bold ${isUnlocked ? 'text-success-700' : 'text-surface-500'}`}>L{level}</p>
+                <p className="text-[10px] text-surface-400">{directsNeeded} directs</p>
+              </div>
+            );
+          })}
+        </div>
+      </GlassCard>
     </div>
   );
 }

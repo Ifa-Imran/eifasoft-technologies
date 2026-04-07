@@ -28,7 +28,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'KAIRO DeFi | Aurora Financial Ecosystem',
+  title: 'KAIRO DAO | Aurora Financial Ecosystem',
   description:
     'Stake, trade, earn rewards, and grow your network with KAIRO — the next-gen DeFi protocol on opBNB.',
   icons: {

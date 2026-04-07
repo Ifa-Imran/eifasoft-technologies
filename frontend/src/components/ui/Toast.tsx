@@ -46,9 +46,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const addToast = useCallback((t: Omit<Toast, 'id'>) => {
     const id = Math.random().toString(36).slice(2);
     setToasts((prev) => [...prev, { ...t, id }]);
-    if (t.type !== 'pending') {
-      setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 5000);
-    }
+    const duration = t.type === 'pending' ? 8000 : 5000;
+    setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), duration);
   }, []);
 
   const dismiss = useCallback((id: string) => {

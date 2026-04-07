@@ -85,7 +85,7 @@ export function ActiveStakesTable() {
                   <p className="font-mono font-semibold text-success-700">${stake.earnedFormatted}</p>
                 </div>
                 <div className="p-2 rounded-lg bg-accent-50 text-center">
-                  <p className="text-surface-400">Claimable</p>
+                  <p className="text-surface-400">Harvestable</p>
                   <p className="font-mono font-semibold text-accent-700">${stake.harvestableFormatted}</p>
                 </div>
               </div>
@@ -123,7 +123,7 @@ export function ActiveStakesTable() {
                   className="flex-1"
                   icon={<ArrowDownTrayIcon className="w-3.5 h-3.5" />}
                 >
-                  Claim
+                  Harvest
                 </Button>
               </div>
             </div>
