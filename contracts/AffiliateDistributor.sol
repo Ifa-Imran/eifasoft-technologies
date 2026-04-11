@@ -160,6 +160,7 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
     event DirectEarned(address indexed referrer, uint256 amount);
     event TeamEarned(address indexed upline, address indexed staker, uint256 level, uint256 amount);
     event RankSalaryClaimed(address indexed user, uint256 rankLevel, uint256 salary);
+    event RankChanged(address indexed user, uint256 oldRank, uint256 newRank);
     event WeeklyEpochClosed(uint256 indexed epoch, uint256 pool, uint256 qualifiers);
     event MonthlyEpochClosed(uint256 indexed epoch, uint256 pool, uint256 qualifiers);
     event WeeklyQualifierClaimed(address indexed user, uint256 indexed epoch, uint256 amount);
@@ -447,12 +448,10 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
      * @dev Claim rank salary based on on-chain team volume.
      *      Time-gated: can only claim once per RANK_INTERVAL.
      *      Calculates rank using 50% max-leg rule and thresholds.
+     *      If rank has changed (promotion or demotion), resets the timer
+     *      and does NOT pay — fresh countdown starts from the change moment.
      */
     function claimRankSalary() external whenNotPaused {
-        require(
-            block.timestamp >= lastRankClaimTime[msg.sender] + RANK_INTERVAL,
-            "AD: Rank claim too soon"
-        );
         require(
             IStakingManager(stakingManager).getTotalActiveStakeValue(msg.sender) > 0,
             "AD: No active stake"
@@ -463,7 +462,21 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
 
         // Calculate current rank
         (uint256 newRank, uint256 salary) = _determineRankLevel(msg.sender);
-        userRankLevel[msg.sender] = newRank;
+        uint256 storedRank = userRankLevel[msg.sender];
+
+        // Rank changed (promotion or demotion) — reset timer, do NOT pay
+        if (newRank != storedRank) {
+            userRankLevel[msg.sender] = newRank;
+            lastRankClaimTime[msg.sender] = block.timestamp;
+            emit RankChanged(msg.sender, storedRank, newRank);
+            return;
+        }
+
+        // Same rank — enforce time gate
+        require(
+            block.timestamp >= lastRankClaimTime[msg.sender] + RANK_INTERVAL,
+            "AD: Rank claim too soon"
+        );
 
         // Add salary to rank dividends, capped by FIFO space
         if (salary > 0) {
@@ -477,6 +490,21 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
 
         lastRankClaimTime[msg.sender] = block.timestamp;
         emit RankSalaryClaimed(msg.sender, newRank, salary);
+    }
+
+    /**
+     * @dev Public function to check and update a user's rank.
+     *      If rank has changed, resets the salary payout timer.
+     *      Can be called by anyone (user themselves, another user, or a backend).
+     */
+    function checkRankChange(address _user) external {
+        (uint256 newRank, ) = _determineRankLevel(_user);
+        uint256 storedRank = userRankLevel[_user];
+        if (newRank != storedRank) {
+            userRankLevel[_user] = newRank;
+            lastRankClaimTime[_user] = block.timestamp;
+            emit RankChanged(_user, storedRank, newRank);
+        }
     }
 
     // ============ Self-Service Qualifier Claims (epoch-based pull model) ============
@@ -673,13 +701,14 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
      * @dev Get full rank info for a user
      */
     function getUserRankInfo(address _user) external view returns (
-        uint256 rankLevel,
+        uint256 storedRank,
+        uint256 liveRank,
         uint256 salary,
         uint256 lastClaimed,
         uint256 nextClaimTime
     ) {
-        rankLevel = userRankLevel[_user];
-        (, salary) = _determineRankLevel(_user);
+        storedRank = userRankLevel[_user];
+        (liveRank, salary) = _determineRankLevel(_user);
         lastClaimed = lastRankClaimTime[_user];
         nextClaimTime = lastClaimed + RANK_INTERVAL;
     }

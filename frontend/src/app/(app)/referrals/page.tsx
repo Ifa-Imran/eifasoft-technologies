@@ -15,11 +15,14 @@ import {
   CheckCircleIcon,
   LockClosedIcon,
   ScaleIcon,
+  ExclamationTriangleIcon,
+  ClockIcon,
 } from '@heroicons/react/24/outline';
+import { useState, useEffect } from 'react';
 
 export default function RankDividendPage() {
   const { isConnected, address } = useAccount();
-  const { allIncome, rankInfo, directReferrals, freshBusiness, teamVolume, unlockedLevels, legVolumes, largestLegVolume, claimRankSalary, harvestIncome, isLoading, isPending } = useAffiliate();
+  const { allIncome, rankInfo, directReferrals, freshBusiness, teamVolume, unlockedLevels, legVolumes, largestLegVolume, claimRankSalary, harvestIncome, checkRankChange, storedRank, liveRank, rankSalary, nextRankClaim, isRankChangePending, isLoading, isPending } = useAffiliate();
 
   if (!isConnected) {
     return (
@@ -30,8 +33,20 @@ export default function RankDividendPage() {
     );
   }
 
-  const currentRank = rankInfo ? Number(rankInfo[0] || 0) : 0;
+  const currentRank = liveRank;
   const rankName = RANK_NAMES[currentRank] || 'None';
+
+  // Countdown timer to next salary payout
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+  useEffect(() => {
+    const t = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const timeLeft = nextRankClaim > now ? nextRankClaim - now : 0;
+  const hrs = Math.floor(timeLeft / 3600);
+  const mins = Math.floor((timeLeft % 3600) / 60);
+  const secs = timeLeft % 60;
+  const countdownStr = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   const referralsList = (directReferrals as any[]) || [];
   const weeklyBiz = freshBusiness ? Number(formatUnits(BigInt(freshBusiness[0] || 0), USDT_DECIMALS)) : 0;
   const monthlyBiz = freshBusiness ? Number(formatUnits(BigInt(freshBusiness[1] || 0), USDT_DECIMALS)) : 0;
@@ -58,6 +73,24 @@ export default function RankDividendPage() {
         <p className="text-base text-surface-500 mt-1">Achieve ranks through team volume and earn periodic salary rewards</p>
       </div>
 
+      {/* Rank Change Alert */}
+      {isRankChangePending && (
+        <div className="flex items-center gap-3 p-4 rounded-2xl bg-gradient-to-r from-warn-50 to-warn-100 border border-warn-300 shadow-sm">
+          <ExclamationTriangleIcon className="w-6 h-6 text-warn-600 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-warn-800">
+              Rank Change Detected: {RANK_NAMES[storedRank]} → {RANK_NAMES[liveRank]}
+            </p>
+            <p className="text-xs text-warn-600 mt-0.5">
+              Your salary timer will reset when you confirm. Click below to update your rank.
+            </p>
+          </div>
+          <Button size="sm" onClick={checkRankChange} loading={isPending}>
+            Update Rank
+          </Button>
+        </div>
+      )}
+
       {/* Top Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Current Rank */}
@@ -78,8 +111,24 @@ export default function RankDividendPage() {
             />
           </div>
 
-          <Button onClick={claimRankSalary} loading={isPending} className="w-full mt-4">
-            Harvest Rank Salary
+          {/* Countdown to next salary */}
+          {currentRank > 0 && (
+            <div className="mt-4 p-3 rounded-xl bg-gradient-to-r from-surface-50 to-primary-50/40 border border-primary-100/40">
+              <div className="flex items-center gap-2 mb-1">
+                <ClockIcon className="w-4 h-4 text-primary-500" />
+                <span className="text-xs text-surface-500">Next Salary In</span>
+              </div>
+              <p className="text-2xl font-mono font-bold text-center gradient-text">
+                {timeLeft > 0 ? countdownStr : 'Ready!'}
+              </p>
+              <p className="text-[10px] text-surface-400 text-center mt-1">
+                ${rankSalary ? Number(formatUnits(rankSalary, USDT_DECIMALS)).toFixed(2) : '0.00'} / period
+              </p>
+            </div>
+          )}
+
+          <Button onClick={claimRankSalary} loading={isPending} className="w-full mt-4" disabled={timeLeft > 0 && !isRankChangePending}>
+            {isRankChangePending ? 'Update Rank & Reset Timer' : timeLeft > 0 ? `Claim in ${countdownStr}` : 'Harvest Rank Salary'}
           </Button>
         </GlassCard>
 

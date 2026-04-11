@@ -3,13 +3,12 @@
 import { GlassCard, Badge, ProgressBar, Button } from '@/components/ui';
 import { useUserStakes } from '@/hooks/useUserStakes';
 import { useStaking } from '@/hooks/useStaking';
-import { formatCountdown } from '@/lib/utils';
 import { useEffect, useState } from 'react';
-import { BoltIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 
 export function ActiveStakesTable() {
-  const { activeStakes, isLoading } = useUserStakes();
-  const { compound, harvest } = useStaking();
+  const { tierGroups, isLoading } = useUserStakes();
+  const { harvestTier, isPending } = useStaking();
   const [now, setNow] = useState(Math.floor(Date.now() / 1000));
 
   useEffect(() => {
@@ -29,14 +28,11 @@ export function ActiveStakesTable() {
     );
   }
 
-  if (activeStakes.length === 0) {
+  if (tierGroups.length === 0) {
     return (
       <GlassCard>
         <h3 className="text-lg font-semibold text-surface-900 mb-4">Active Stakes</h3>
         <div className="text-center py-8">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-100 to-secondary-50 flex items-center justify-center mx-auto mb-4">
-            <BoltIcon className="w-8 h-8 text-primary-500" />
-          </div>
           <p className="text-surface-500 text-sm">No active stakes. Start staking to earn rewards!</p>
         </div>
       </GlassCard>
@@ -47,85 +43,60 @@ export function ActiveStakesTable() {
     <GlassCard padding="p-0">
       <div className="p-6 pb-4 flex items-center justify-between">
         <h3 className="text-lg font-semibold text-surface-900">Active Stakes</h3>
-        <span className="text-xs font-mono text-surface-400">{activeStakes.length} active</span>
+        <span className="text-xs font-mono text-surface-400">{tierGroups.length} tier(s)</span>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-6 pt-0">
-        {activeStakes.map((stake) => {
-          const timeToCompound = stake.nextCompoundTime - now;
-          const tierBadge = stake.tierName.toLowerCase() as 'bronze' | 'silver' | 'gold';
-
-          // Dynamic progress color based on 3X cap progress
-          const progressVariant = stake.progress > 80 ? 'gold' : stake.progress > 50 ? 'purple' : 'cyan';
+      <div className="space-y-4 p-6 pt-0">
+        {tierGroups.map((tg) => {
+          const progressVariant = tg.capProgress > 80 ? 'gold' : tg.capProgress > 50 ? 'purple' : 'cyan';
 
           return (
-            <div key={stake.index} className="card p-4 space-y-3 hover:shadow-card-hover transition-all duration-300">
+            <div key={tg.tier} className="card p-4 space-y-3 hover:shadow-card-hover transition-all duration-300">
               <div className="flex items-center justify-between">
-                <Badge tier={tierBadge}>{stake.tierName}</Badge>
-                <span className="text-xs font-mono text-surface-400">#{stake.index}</span>
+                <div className="flex items-center gap-2">
+                  <Badge tier={tg.tierName.toLowerCase() as 'bronze' | 'silver' | 'gold'}>{tg.tierName}</Badge>
+                  <span className="text-xs text-surface-400">{tg.stakeCount} stake{tg.stakeCount > 1 ? 's' : ''}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-[10px] text-success-600 font-medium">
+                  <div className="w-1.5 h-1.5 rounded-full bg-success-500 animate-pulse" />
+                  Auto
+                </div>
               </div>
 
               <div className="text-center py-1">
                 <p className="text-2xl font-mono font-bold text-surface-900">
-                  ${stake.amountFormatted}
+                  ${tg.originalAmountFormatted}
                 </p>
                 <p className="text-xs text-surface-400 mt-0.5">Staked Amount</p>
               </div>
 
-              {/* 3X Cap Progress */}
-              <ProgressBar
-                value={stake.progress}
-                label="3X Cap Progress"
-                variant={progressVariant}
-              />
+              <ProgressBar value={tg.capProgress} label="3X Cap Progress" variant={progressVariant} />
 
-              {/* Earnings breakdown */}
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="p-2 rounded-lg bg-success-50 text-center">
-                  <p className="text-surface-400">Earned</p>
-                  <p className="font-mono font-semibold text-success-700">${stake.earnedFormatted}</p>
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className="p-2 rounded-lg bg-primary-50 text-center">
+                  <p className="text-surface-400">Total Earned</p>
+                  <p className="font-mono font-semibold text-primary-700">${tg.totalEarnedFormatted}</p>
                 </div>
                 <div className="p-2 rounded-lg bg-accent-50 text-center">
                   <p className="text-surface-400">Harvestable</p>
-                  <p className="font-mono font-semibold text-accent-700">${stake.harvestableFormatted}</p>
+                  <p className="font-mono font-semibold text-accent-700">${tg.harvestableFormatted}</p>
+                </div>
+                <div className="p-2 rounded-lg bg-surface-50 text-center">
+                  <p className="text-surface-400">Harvested</p>
+                  <p className="font-mono font-semibold text-surface-600">${tg.totalHarvestedFormatted}</p>
                 </div>
               </div>
 
-              {/* Compound countdown */}
-              <div className="text-center py-1">
-                {stake.canCompound ? (
-                  <span className="text-sm font-semibold text-success-600 animate-pulse-soft">Ready to compound!</span>
-                ) : (
-                  <div>
-                    <p className="text-xs text-surface-400 mb-0.5">Next compound in</p>
-                    <p className="text-sm font-mono font-semibold text-surface-700">
-                      {formatCountdown(timeToCompound > 0 ? timeToCompound : 0)}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="primary"
-                  disabled={!stake.canCompound}
-                  onClick={() => compound(BigInt(stake.index))}
-                  className="flex-1"
-                  icon={<BoltIcon className="w-3.5 h-3.5" />}
-                >
-                  Compound
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={stake.harvestable === BigInt(0)}
-                  onClick={() => harvest(BigInt(stake.index), stake.harvestable)}
-                  className="flex-1"
-                  icon={<ArrowDownTrayIcon className="w-3.5 h-3.5" />}
-                >
-                  Harvest
-                </Button>
-              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={tg.harvestable === 0n && !tg.stakes.some(s => s.canCompound)}
+                onClick={() => harvestTier(tg.stakes)}
+                loading={isPending}
+                className="w-full"
+                icon={<ArrowDownTrayIcon className="w-3.5 h-3.5" />}
+              >
+                {tg.harvestable > 0n ? `Harvest $${tg.harvestableFormatted}` : 'Nothing to Harvest'}
+              </Button>
             </div>
           );
         })}

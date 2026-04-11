@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { GlassCard, Button, Input, Tabs, TabContent } from '@/components/ui';
-import { useP2P } from '@/hooks/useP2P';
+import { useP2P, P2PBuyOrder, P2PSellOrder } from '@/hooks/useP2P';
 import { useApproval } from '@/hooks/useApproval';
 import { useTokenBalances } from '@/hooks/useTokenBalances';
 import { useKairoPrice } from '@/hooks/useKairoPrice';
@@ -29,6 +29,31 @@ export default function ExchangePage() {
   const { price: livePrice } = useKairoPrice();
   const usdtApproval = useApproval(contracts.usdt, contracts.atomicP2p);
   const kairoApproval = useApproval(contracts.kairoToken, contracts.atomicP2p);
+  const pendingOrderRef = useRef<'buy' | 'sell' | null>(null);
+  const pendingAmountRef = useRef('');
+
+  // Auto-create order after approval succeeds (one-click flow)
+  useEffect(() => {
+    if (pendingOrderRef.current === 'buy') {
+      const usdtAmount = parseUnits(pendingAmountRef.current, USDT_DECIMALS);
+      if (usdtApproval.hasAllowance(usdtAmount) && !isPending) {
+        pendingOrderRef.current = null;
+        createBuyOrder(usdtAmount);
+        setAmount('');
+      }
+    }
+  }, [usdtApproval.allowance]);
+
+  useEffect(() => {
+    if (pendingOrderRef.current === 'sell') {
+      const kairoAmount = parseUnits(pendingAmountRef.current, KAIRO_DECIMALS);
+      if (kairoApproval.hasAllowance(kairoAmount) && !isPending) {
+        pendingOrderRef.current = null;
+        createSellOrder(kairoAmount);
+        setAmount('');
+      }
+    }
+  }, [kairoApproval.allowance]);
 
   if (!isConnected) {
     return (
@@ -47,31 +72,20 @@ export default function ExchangePage() {
   const priceVal = currentPrice ? Number(formatUnits(currentPrice, USDT_DECIMALS)) : 0;
 
   // Market stats
-  const totalBuyVolume = activeBuyOrders.reduce((sum: number, o: any) => sum + Number(formatUnits(BigInt(o.usdtAmount || 0), USDT_DECIMALS)), 0);
-  const totalSellVolume = activeSellOrders.reduce((sum: number, o: any) => sum + Number(formatUnits(BigInt(o.kairoAmount || 0), KAIRO_DECIMALS)), 0);
-  const bestBuyPrice = activeBuyOrders.length > 0 ? Math.max(...activeBuyOrders.map((o: any) => {
-    const usdt = Number(formatUnits(BigInt(o.usdtAmount || 0), USDT_DECIMALS));
-    const kairo = Number(formatUnits(BigInt(o.kairoAmount || 0), KAIRO_DECIMALS));
-    return kairo > 0 ? usdt / kairo : 0;
-  })) : 0;
-  const bestSellPrice = activeSellOrders.length > 0 ? Math.min(...activeSellOrders.filter((o: any) => {
-    const kairo = Number(formatUnits(BigInt(o.kairoAmount || 0), KAIRO_DECIMALS));
-    return kairo > 0;
-  }).map((o: any) => {
-    const usdt = Number(formatUnits(BigInt(o.usdtAmount || 0), USDT_DECIMALS));
-    const kairo = Number(formatUnits(BigInt(o.kairoAmount || 0), KAIRO_DECIMALS));
-    return usdt / kairo;
-  })) : 0;
-  const spread = bestSellPrice > 0 && bestBuyPrice > 0 ? ((bestSellPrice - bestBuyPrice) / bestBuyPrice * 100) : 0;
+  const totalBuyVolume = activeBuyOrders.reduce((sum: number, o) => sum + Number(formatUnits(o.usdtRemaining, USDT_DECIMALS)), 0);
+  const totalSellVolume = activeSellOrders.reduce((sum: number, o) => sum + Number(formatUnits(o.kairoRemaining, KAIRO_DECIMALS)), 0);
+  const spread = 0; // Spread not meaningful without limit prices
 
   // My orders
-  const myBuyOrders = activeBuyOrders.filter((o: any) => o.buyer?.toLowerCase() === address?.toLowerCase());
-  const mySellOrders = activeSellOrders.filter((o: any) => o.seller?.toLowerCase() === address?.toLowerCase());
+  const myBuyOrders = activeBuyOrders.filter((o) => o.creator?.toLowerCase() === address?.toLowerCase());
+  const mySellOrders = activeSellOrders.filter((o) => o.creator?.toLowerCase() === address?.toLowerCase());
 
   const handleCreateOrder = () => {
     if (orderType === 'buy') {
       const usdtAmount = parseUnits(amount, USDT_DECIMALS);
       if (!usdtApproval.hasAllowance(usdtAmount)) {
+        pendingOrderRef.current = 'buy';
+        pendingAmountRef.current = amount;
         usdtApproval.approve(usdtAmount);
         return;
       }
@@ -79,6 +93,8 @@ export default function ExchangePage() {
     } else {
       const kairoAmount = parseUnits(amount, KAIRO_DECIMALS);
       if (!kairoApproval.hasAllowance(kairoAmount)) {
+        pendingOrderRef.current = 'sell';
+        pendingAmountRef.current = amount;
         kairoApproval.approve(kairoAmount);
         return;
       }
@@ -119,8 +135,8 @@ export default function ExchangePage() {
           <p className="text-xs text-surface-500">{totalSellVolume.toLocaleString('en-US', { maximumFractionDigits: 0 })} KAIRO</p>
         </GlassCard>
         <GlassCard padding="p-4">
-          <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Best Bid</p>
-          <p className="text-xl font-mono font-bold text-success-600">${bestBuyPrice > 0 ? bestBuyPrice.toFixed(4) : '--'}</p>
+          <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">DEX Price</p>
+          <p className="text-xl font-mono font-bold text-success-600">${priceVal > 0 ? priceVal.toFixed(4) : '--'}</p>
         </GlassCard>
         <GlassCard padding="p-4">
           <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Spread</p>
@@ -155,21 +171,25 @@ export default function ExchangePage() {
                     <p className="text-surface-400 text-sm">No active buy orders</p>
                   </div>
                 ) : (
-                  activeBuyOrders.slice(0, 15).map((order: any, i: number) => {
-                    const usdtVal = Number(formatUnits(BigInt(order.usdtAmount || 0), USDT_DECIMALS));
-                    const kairoVal = Number(formatUnits(BigInt(order.kairoAmount || 0), KAIRO_DECIMALS));
-                    const impliedPrice = kairoVal > 0 ? (usdtVal / kairoVal) : 0;
+                  activeBuyOrders.slice(0, 15).map((order, i: number) => {
+                    const usdtVal = Number(formatUnits(order.usdtRemaining, USDT_DECIMALS));
+                    // Estimate KAIRO equivalent at DEX price
+                    const estKairo = priceVal > 0 ? usdtVal / priceVal : 0;
                     return (
                       <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-success-100/60 to-success-50/40 border-2 border-success-200/50 hover:border-success-400 transition-colors">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-mono font-semibold text-surface-900">${usdtVal.toFixed(2)}</p>
-                            {impliedPrice > 0 && <span className="text-[10px] text-surface-400">@ ${impliedPrice.toFixed(4)}</span>}
+                            {estKairo > 0 && <span className="text-[10px] text-surface-400">~{estKairo.toFixed(2)} KAIRO</span>}
                           </div>
-                          <p className="text-xs text-surface-400 truncate">{order.buyer || ''}</p>
+                          <p className="text-xs text-surface-400 truncate">{order.creator}</p>
                         </div>
-                        {order.buyer?.toLowerCase() !== address?.toLowerCase() && (
-                          <Button size="sm" variant="success" onClick={() => sellToOrder(BigInt(order.id || i), BigInt(order.kairoAmount || 0))}>
+                        {order.creator?.toLowerCase() !== address?.toLowerCase() && priceVal > 0 && (
+                          <Button size="sm" variant="success" onClick={() => {
+                            // Calculate KAIRO amount from USDT remaining at current price
+                            const kairoWei = order.usdtRemaining * BigInt(10 ** KAIRO_DECIMALS) / (currentPrice ?? 1n);
+                            sellToOrder(order.id, kairoWei);
+                          }}>
                             Fill
                           </Button>
                         )}
@@ -196,21 +216,20 @@ export default function ExchangePage() {
                     <p className="text-surface-400 text-sm">No active sell orders</p>
                   </div>
                 ) : (
-                  activeSellOrders.slice(0, 15).map((order: any, i: number) => {
-                    const kairoVal = Number(formatUnits(BigInt(order.kairoAmount || 0), KAIRO_DECIMALS));
-                    const usdtVal = Number(formatUnits(BigInt(order.usdtAmount || 0), USDT_DECIMALS));
-                    const impliedPrice = kairoVal > 0 ? (usdtVal / kairoVal) : 0;
+                  activeSellOrders.slice(0, 15).map((order, i: number) => {
+                    const kairoVal = Number(formatUnits(order.kairoRemaining, KAIRO_DECIMALS));
+                    const estUsdt = kairoVal * priceVal;
                     return (
                       <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-danger-100/60 to-danger-50/40 border-2 border-danger-200/50 hover:border-danger-400 transition-colors">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-mono font-semibold text-surface-900">{kairoVal.toFixed(2)} KAIRO</p>
-                            {impliedPrice > 0 && <span className="text-[10px] text-surface-400">@ ${impliedPrice.toFixed(4)}</span>}
+                            {estUsdt > 0 && <span className="text-[10px] text-surface-400">~${estUsdt.toFixed(2)}</span>}
                           </div>
-                          <p className="text-xs text-surface-400 truncate">{order.seller || ''}</p>
+                          <p className="text-xs text-surface-400 truncate">{order.creator}</p>
                         </div>
-                        {order.seller?.toLowerCase() !== address?.toLowerCase() && (
-                          <Button size="sm" onClick={() => buyFromOrder(BigInt(order.id || i), BigInt(order.kairoAmount || 0))}>
+                        {order.creator?.toLowerCase() !== address?.toLowerCase() && (
+                          <Button size="sm" onClick={() => buyFromOrder(order.id, order.kairoRemaining)}>
                             Fill
                           </Button>
                         )}
@@ -265,7 +284,7 @@ export default function ExchangePage() {
                 </div>
                 <div className="flex justify-between text-surface-500">
                   <span>Trading Fee</span>
-                  <span className="font-mono">3%</span>
+                  <span className="font-mono">5%</span>
                 </div>
                 <div className="flex justify-between font-semibold text-surface-900 border-t border-surface-200 pt-2">
                   <span>Estimated {orderType === 'buy' ? 'KAIRO' : 'USDT'}</span>
@@ -281,10 +300,10 @@ export default function ExchangePage() {
             <Button onClick={handleCreateOrder} loading={isPending} disabled={numAmount <= 0} className="w-full mt-4">
               {orderType === 'buy'
                 ? !usdtApproval.hasAllowance(numAmount > 0 ? parseUnits(amount, USDT_DECIMALS) : BigInt(0))
-                  ? 'Approve USDT'
+                  ? 'Approve & Create Buy Order'
                   : 'Create Buy Order'
                 : !kairoApproval.hasAllowance(numAmount > 0 ? parseUnits(amount, KAIRO_DECIMALS) : BigInt(0))
-                  ? 'Approve KAIRO'
+                  ? 'Approve & Create Sell Order'
                   : 'Create Sell Order'}
             </Button>
           </GlassCard>
@@ -309,19 +328,23 @@ export default function ExchangePage() {
                     <ShoppingCartIcon className="w-4 h-4" /> My Buy Orders
                   </h3>
                   <div className="space-y-2">
-                    {myBuyOrders.map((order: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-success-50/40 border border-success-100">
-                        <div>
-                          <p className="text-sm font-mono font-semibold text-surface-900">
-                            ${Number(formatUnits(BigInt(order.usdtAmount || 0), USDT_DECIMALS)).toFixed(2)} USDT
-                          </p>
-                          <p className="text-xs text-surface-400">for {Number(formatUnits(BigInt(order.kairoAmount || 0), KAIRO_DECIMALS)).toFixed(2)} KAIRO</p>
+                    {myBuyOrders.map((order, i: number) => {
+                      const usdtVal = Number(formatUnits(order.usdtRemaining, USDT_DECIMALS));
+                      const totalUsdt = Number(formatUnits(order.usdtAmount, USDT_DECIMALS));
+                      return (
+                        <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-success-50/40 border border-success-100">
+                          <div>
+                            <p className="text-sm font-mono font-semibold text-surface-900">
+                              ${usdtVal.toFixed(2)} remaining
+                            </p>
+                            <p className="text-xs text-surface-400">of ${totalUsdt.toFixed(2)} USDT total</p>
+                          </div>
+                          <Button size="sm" variant="ghost" onClick={() => cancelBuyOrder(order.id)} icon={<XMarkIcon className="w-4 h-4" />}>
+                            Cancel
+                          </Button>
                         </div>
-                        <Button size="sm" variant="ghost" onClick={() => cancelBuyOrder(BigInt(order.id || i))} icon={<XMarkIcon className="w-4 h-4" />}>
-                          Cancel
-                        </Button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </GlassCard>
               )}
@@ -331,19 +354,23 @@ export default function ExchangePage() {
                     <TagIcon className="w-4 h-4" /> My Sell Orders
                   </h3>
                   <div className="space-y-2">
-                    {mySellOrders.map((order: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-danger-50/40 border border-danger-100">
-                        <div>
-                          <p className="text-sm font-mono font-semibold text-surface-900">
-                            {Number(formatUnits(BigInt(order.kairoAmount || 0), KAIRO_DECIMALS)).toFixed(2)} KAIRO
-                          </p>
-                          <p className="text-xs text-surface-400">for ${Number(formatUnits(BigInt(order.usdtAmount || 0), USDT_DECIMALS)).toFixed(2)} USDT</p>
+                    {mySellOrders.map((order, i: number) => {
+                      const kairoVal = Number(formatUnits(order.kairoRemaining, KAIRO_DECIMALS));
+                      const totalKairo = Number(formatUnits(order.kairoAmount, KAIRO_DECIMALS));
+                      return (
+                        <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-danger-50/40 border border-danger-100">
+                          <div>
+                            <p className="text-sm font-mono font-semibold text-surface-900">
+                              {kairoVal.toFixed(2)} KAIRO remaining
+                            </p>
+                            <p className="text-xs text-surface-400">of {totalKairo.toFixed(2)} KAIRO total</p>
+                          </div>
+                          <Button size="sm" variant="ghost" onClick={() => cancelSellOrder(order.id)} icon={<XMarkIcon className="w-4 h-4" />}>
+                            Cancel
+                          </Button>
                         </div>
-                        <Button size="sm" variant="ghost" onClick={() => cancelSellOrder(BigInt(order.id || i))} icon={<XMarkIcon className="w-4 h-4" />}>
-                          Cancel
-                        </Button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </GlassCard>
               )}

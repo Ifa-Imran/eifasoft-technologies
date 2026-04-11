@@ -68,6 +68,27 @@ export function useCMS() {
     },
   });
 
+  // True when subscription period has ended (deadline passed OR 10k cap reached)
+  const { data: subscriptionEnded } = useReadContract({
+    address: contracts.cms,
+    abi: CoreMembershipSubscriptionABI,
+    functionName: 'isSubscriptionEnded',
+    query: {
+      enabled: contracts.cms !== '0x',
+      refetchInterval: 15000,
+    },
+  });
+
+  // Subscribe deadline timestamp (unix seconds)
+  const { data: subscribeDeadline } = useReadContract({
+    address: contracts.cms,
+    abi: CoreMembershipSubscriptionABI,
+    functionName: 'SUBSCRIBE_DEADLINE',
+    query: {
+      enabled: contracts.cms !== '0x',
+    },
+  });
+
   const { writeContract: writeSubscribe, isPending: subscribePending, data: subscribeHash } = useWriteContract();
   const { writeContract: writeClaim, isPending: claimPending, data: claimHash } = useWriteContract();
 
@@ -118,6 +139,8 @@ export function useCMS() {
     totalSubscriptions: Number(totalSubs || 0),
     userSubscriptionCount: Number(userSubCount || 0),
     remainingSubscriptions: Number(remaining || 0),
+    isSubscriptionEnded: subscriptionEnded === true,
+    subscribeDeadline: subscribeDeadline ? Number(subscribeDeadline) : 0,
     claimableRewards: claimable as any,
     maxClaimable: maxClaimable as bigint | undefined,
     // Total available rewards from subscriptions (loyalty + leadership)

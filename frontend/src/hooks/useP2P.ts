@@ -4,31 +4,102 @@ import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAcc
 import { contracts } from '@/config/contracts';
 import { AtomicP2pABI } from '@/config/abis/AtomicP2p';
 import { useToast } from '@/components/ui/Toast';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
+
+export interface P2PBuyOrder {
+  id: bigint;
+  creator: string;
+  usdtAmount: bigint;
+  usdtRemaining: bigint;
+  active: boolean;
+  createdAt: bigint;
+}
+
+export interface P2PSellOrder {
+  id: bigint;
+  creator: string;
+  kairoAmount: bigint;
+  kairoRemaining: bigint;
+  active: boolean;
+  createdAt: bigint;
+}
 
 export function useP2P() {
   const { address } = useAccount();
   const { toast } = useToast();
 
-  const { data: activeBuyOrders, isLoading: buyLoading, refetch: refetchBuys } = useReadContract({
+  // Fetch order structs
+  const { data: rawBuyOrders, isLoading: buyLoading, refetch: refetchBuys } = useReadContract({
     address: contracts.atomicP2p,
     abi: AtomicP2pABI,
     functionName: 'getActiveBuyOrders',
+    args: [BigInt(0), BigInt(200)],
     query: {
       enabled: contracts.atomicP2p !== '0x',
       refetchInterval: 10000,
     },
   });
 
-  const { data: activeSellOrders, isLoading: sellLoading, refetch: refetchSells } = useReadContract({
+  const { data: rawSellOrders, isLoading: sellLoading, refetch: refetchSells } = useReadContract({
     address: contracts.atomicP2p,
     abi: AtomicP2pABI,
     functionName: 'getActiveSellOrders',
+    args: [BigInt(0), BigInt(200)],
     query: {
       enabled: contracts.atomicP2p !== '0x',
       refetchInterval: 10000,
     },
   });
+
+  // Fetch corresponding order IDs (same offset/limit so arrays align 1:1)
+  const { data: buyOrderIds, refetch: refetchBuyIds } = useReadContract({
+    address: contracts.atomicP2p,
+    abi: AtomicP2pABI,
+    functionName: 'getActiveBuyOrderIds',
+    args: [BigInt(0), BigInt(200)],
+    query: {
+      enabled: contracts.atomicP2p !== '0x',
+      refetchInterval: 10000,
+    },
+  });
+
+  const { data: sellOrderIds, refetch: refetchSellIds } = useReadContract({
+    address: contracts.atomicP2p,
+    abi: AtomicP2pABI,
+    functionName: 'getActiveSellOrderIds',
+    args: [BigInt(0), BigInt(200)],
+    query: {
+      enabled: contracts.atomicP2p !== '0x',
+      refetchInterval: 10000,
+    },
+  });
+
+  // Zip order data with IDs
+  const activeBuyOrders: P2PBuyOrder[] = useMemo(() => {
+    const orders = (rawBuyOrders as any[]) || [];
+    const ids = (buyOrderIds as bigint[]) || [];
+    return orders.map((o: any, i: number) => ({
+      id: ids[i] ?? BigInt(i),
+      creator: o.creator,
+      usdtAmount: BigInt(o.usdtAmount || 0),
+      usdtRemaining: BigInt(o.usdtRemaining || 0),
+      active: o.active,
+      createdAt: BigInt(o.createdAt || 0),
+    }));
+  }, [rawBuyOrders, buyOrderIds]);
+
+  const activeSellOrders: P2PSellOrder[] = useMemo(() => {
+    const orders = (rawSellOrders as any[]) || [];
+    const ids = (sellOrderIds as bigint[]) || [];
+    return orders.map((o: any, i: number) => ({
+      id: ids[i] ?? BigInt(i),
+      creator: o.creator,
+      kairoAmount: BigInt(o.kairoAmount || 0),
+      kairoRemaining: BigInt(o.kairoRemaining || 0),
+      active: o.active,
+      createdAt: BigInt(o.createdAt || 0),
+    }));
+  }, [rawSellOrders, sellOrderIds]);
 
   const { data: currentPrice } = useReadContract({
     address: contracts.atomicP2p,
@@ -130,11 +201,13 @@ export function useP2P() {
   const refetch = () => {
     refetchBuys();
     refetchSells();
+    refetchBuyIds();
+    refetchSellIds();
   };
 
   return {
-    activeBuyOrders: (activeBuyOrders as any[]) || [],
-    activeSellOrders: (activeSellOrders as any[]) || [],
+    activeBuyOrders,
+    activeSellOrders,
     currentPrice: currentPrice as bigint | undefined,
     createBuyOrder,
     createSellOrder,

@@ -218,6 +218,31 @@ export const AffiliateDistributorABI = [
       {
         "indexed": false,
         "internalType": "uint256",
+        "name": "oldRank",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "newRank",
+        "type": "uint256"
+      }
+    ],
+    "name": "RankChanged",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
         "name": "rankLevel",
         "type": "uint256"
       },
@@ -669,6 +694,19 @@ export const AffiliateDistributorABI = [
     "type": "function"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "name": "checkRankChange",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [],
     "name": "claimMonthlyQualifier",
     "outputs": [],
@@ -1107,7 +1145,12 @@ export const AffiliateDistributorABI = [
     "outputs": [
       {
         "internalType": "uint256",
-        "name": "rankLevel",
+        "name": "storedRank",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "liveRank",
         "type": "uint256"
       },
       {

@@ -67,14 +67,9 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
     // Level 1: 0 directs, Level 2: 2, Level 3: 3, Level 4: 4, Level 5: 5
     uint256[5] public LEVEL_DIRECTS = [0, 2, 3, 4, 5];
 
-    // ============ Deadlines ============
-    // Subscription deadline: May 1, 2026 00:00:00 UTC
-    // If 10,000 subs reached earlier, subscribe() reverts via MAX_SUBS check.
-    uint256 public constant SUBSCRIBE_DEADLINE = 1777593600;
-
-    // Claim deadline: June 1, 2026 00:00:00 UTC
-    // After this, claiming is permanently disabled; unclaimed tokens are forfeit.
-    uint256 public constant CLAIM_DEADLINE = 1780272000;
+    // ============ Deadlines (Testing: 3h subscribe, 6h claim from deploy) ============
+    uint256 public immutable SUBSCRIBE_DEADLINE;
+    uint256 public immutable CLAIM_DEADLINE;
 
     // ============ State Variables ============
     uint256 public totalSubscriptions;                         // Global counter
@@ -124,6 +119,10 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
         systemWallet = _systemWallet;
 
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
+
+        // Testing deadlines: 3 hours to subscribe, 6 hours to claim
+        SUBSCRIBE_DEADLINE = block.timestamp + 3 hours;
+        CLAIM_DEADLINE = block.timestamp + 6 hours;
     }
 
     // ============ Core Functions ============

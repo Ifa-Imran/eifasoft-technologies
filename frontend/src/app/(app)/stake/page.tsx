@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense, useRef } from 'react';
+import { useState, Suspense, useRef, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { GlassCard, Button, Input, Badge, ProgressBar } from '@/components/ui';
@@ -11,11 +11,9 @@ import { useTokenBalances } from '@/hooks/useTokenBalances';
 import { useRegistration } from '@/hooks/useRegistration';
 import { useCMS } from '@/hooks/useCMS';
 import { contracts, STAKING_TIERS, USDT_DECIMALS } from '@/config/contracts';
-import { parseUnits, isAddress, zeroAddress } from 'viem';
-import { formatCountdown } from '@/lib/utils';
-import { useEffect } from 'react';
+import { parseUnits, isAddress, zeroAddress, formatUnits } from 'viem';
 import { useAffiliate } from '@/hooks/useAffiliate';
-import { BoltIcon, ArrowDownTrayIcon, ClockIcon, LockClosedIcon, LockOpenIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, ClockIcon, LockClosedIcon, LockOpenIcon, BoltIcon } from '@heroicons/react/24/outline';
 
 function getTier(amount: number) {
   if (amount >= 2000) return STAKING_TIERS[2];
@@ -26,17 +24,26 @@ function getTier(amount: number) {
 function StakePageInner() {
   const { isConnected } = useAccount();
   const [amount, setAmount] = useState('');
-  const { stake, compound, harvest, isPending } = useStaking();
-  const { activeStakes, isLoading } = useUserStakes();
+  const { stake, harvestTier, isPending } = useStaking();
+  const { tierGroups, activeStakes, isLoading } = useUserStakes();
   const { usdtFormatted } = useTokenBalances();
   const { storedReferrer, hasOnChainReferrer } = useRegistration();
-  const { remainingSubscriptions } = useCMS();
+  const { remainingSubscriptions, isSubscriptionEnded, subscribeDeadline } = useCMS();
   const { unlockedLevels, directReferrals: directRefs } = useAffiliate();
   const approval = useApproval(contracts.usdt, contracts.stakingManager);
   const [now, setNow] = useState(Math.floor(Date.now() / 1000));
 
-  const cmsActive = remainingSubscriptions > 0;
+  // CMS phase is active only if subscriptions remain AND deadline hasn't passed
+  const cmsActive = remainingSubscriptions > 0 && !isSubscriptionEnded;
 
+  // CMS countdown
+  const cmsTimeLeft = subscribeDeadline > 0 ? Math.max(0, subscribeDeadline - now) : 0;
+  const cmsDays = Math.floor(cmsTimeLeft / 86400);
+  const cmsHours = Math.floor((cmsTimeLeft % 86400) / 3600);
+  const cmsMinutes = Math.floor((cmsTimeLeft % 3600) / 60);
+  const cmsSeconds = cmsTimeLeft % 60;
+
+  // Real-time tick every second for accruing earnings display
   useEffect(() => {
     const interval = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
     return () => clearInterval(interval);
@@ -61,7 +68,6 @@ function StakePageInner() {
   useEffect(() => {
     if (pendingStakeRef.current && approval.hasAllowance(stakeAmountBigInt) && !isPending) {
       pendingStakeRef.current = false;
-      // Always pass the actual referrer — StakingManager requires non-zero referrer
       const ref = storedReferrer && isAddress(storedReferrer) ? (storedReferrer as `0x${string}`) : zeroAddress;
       stake(stakeAmountBigInt, ref);
     }
@@ -74,7 +80,6 @@ function StakePageInner() {
       approval.approve(stakeAmountBigInt);
       return;
     }
-    // Always pass the actual referrer — StakingManager requires non-zero referrer
     const ref = storedReferrer && isAddress(storedReferrer) ? (storedReferrer as `0x${string}`) : zeroAddress;
     stake(stakeAmountBigInt, ref);
   };
@@ -89,12 +94,36 @@ function StakePageInner() {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-400 to-accent-300 flex items-center justify-center shadow-md shadow-accent-300/30">
               <ClockIcon className="w-5 h-5 text-white" />
             </div>
-            <div>
+            <div className="flex-1">
               <h3 className="text-sm font-semibold text-surface-900">CMS Phase Active</h3>
               <p className="text-xs text-surface-500">
-                Staking opens after all {remainingSubscriptions.toLocaleString()} remaining CMS subscriptions are sold.
+                Staking opens after all {remainingSubscriptions.toLocaleString()} remaining CMS subscriptions are sold or the deadline passes.
               </p>
             </div>
+            {cmsTimeLeft > 0 && (
+              <div className="flex items-center gap-1.5">
+                {cmsDays > 0 && (
+                  <div className="text-center px-2 py-1.5 rounded-lg bg-white/70 border border-accent-200">
+                    <p className="text-lg font-mono font-bold text-accent-700">{cmsDays}</p>
+                    <p className="text-[9px] text-surface-400">DAYS</p>
+                  </div>
+                )}
+                <div className="text-center px-2 py-1.5 rounded-lg bg-white/70 border border-accent-200">
+                  <p className="text-lg font-mono font-bold text-accent-700">{String(cmsHours).padStart(2, '0')}</p>
+                  <p className="text-[9px] text-surface-400">HRS</p>
+                </div>
+                <span className="text-accent-400 font-bold">:</span>
+                <div className="text-center px-2 py-1.5 rounded-lg bg-white/70 border border-accent-200">
+                  <p className="text-lg font-mono font-bold text-accent-700">{String(cmsMinutes).padStart(2, '0')}</p>
+                  <p className="text-[9px] text-surface-400">MIN</p>
+                </div>
+                <span className="text-accent-400 font-bold">:</span>
+                <div className="text-center px-2 py-1.5 rounded-lg bg-white/70 border border-accent-200">
+                  <p className="text-lg font-mono font-bold text-accent-700">{String(cmsSeconds).padStart(2, '0')}</p>
+                  <p className="text-[9px] text-surface-400">SEC</p>
+                </div>
+              </div>
+            )}
           </div>
         </GlassCard>
       )}
@@ -114,8 +143,8 @@ function StakePageInner() {
               <div className="text-center">
                 <Badge tier={tierBadge} size="md">{t.name}</Badge>
                 <p className="text-sm text-surface-400 mt-3">${t.minAmount.toLocaleString()} – ${t.maxAmount.toLocaleString()}</p>
-                <p className="text-2xl font-mono font-bold text-surface-900 mt-1">{t.compoundInterval / 3600}h</p>
-                <p className="text-sm text-surface-500">compound interval</p>
+                <p className="text-2xl font-mono font-bold text-surface-900 mt-1">{t.compoundInterval / 60}m</p>
+                <p className="text-sm text-surface-500">closing interval</p>
               </div>
             </GlassCard>
           );
@@ -141,32 +170,11 @@ function StakePageInner() {
               <div className="flex items-center gap-2 p-3 rounded-xl bg-gradient-to-r from-primary-50 to-secondary-50 border border-primary-100">
                 <Badge tier={tier.name.toLowerCase() as any}>{tier.name}</Badge>
                 <span className="text-xs text-surface-500">
-                  Compound every {tier.compoundInterval / 3600}h &middot; 3X FIFO Cap
+                  Auto-compound every {tier.compoundInterval / 60}m &middot; 3X FIFO Cap
                 </span>
               </div>
             )}
 
-            {numAmount >= 10 && (
-              <div className="space-y-2 text-xs text-surface-500 p-3 rounded-xl bg-surface-50">
-                <p className="text-xs font-semibold text-surface-700 mb-2">Distribution Breakdown</p>
-                <div className="flex justify-between">
-                  <span>Staking Pool (90%)</span>
-                  <span className="font-mono text-surface-700">${(numAmount * 0.9).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Liquidity Pool (5%)</span>
-                  <span className="font-mono text-surface-700">${(numAmount * 0.05).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Affiliates (5%)</span>
-                  <span className="font-mono text-surface-700">${(numAmount * 0.05).toFixed(2)}</span>
-                </div>
-                <div className="border-t border-surface-200 pt-2 mt-2 flex justify-between font-semibold text-surface-900">
-                  <span>Hard Cap (3X)</span>
-                  <span className="font-mono">${(numAmount * 3).toFixed(2)}</span>
-                </div>
-              </div>
-            )}
 
             <Button
               onClick={handleStake}
@@ -179,14 +187,14 @@ function StakePageInner() {
           </div>
         </GlassCard>
 
-        {/* Active Stakes Grid */}
+        {/* Tier-Grouped Stakes */}
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-semibold text-surface-900">Your Stakes</h3>
             <span className="text-sm font-mono text-surface-400">{activeStakes.length} active</span>
           </div>
 
-          {activeStakes.length === 0 ? (
+          {tierGroups.length === 0 ? (
             <GlassCard>
               <div className="text-center py-10">
                 <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-400 to-secondary-400 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary-300/30">
@@ -200,49 +208,77 @@ function StakePageInner() {
               </div>
             </GlassCard>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {activeStakes.map((s) => {
-                const timeToCompound = s.nextCompoundTime - now;
-                const progressVariant = s.progress > 80 ? 'gold' : s.progress > 50 ? 'purple' : 'cyan';
+            <div className="space-y-4">
+              {tierGroups.map((tg) => {
+                const progressVariant = tg.capProgress > 80 ? 'gold' : tg.capProgress > 50 ? 'purple' : 'cyan';
                 return (
-                  <GlassCard key={s.index} padding="p-4" className="hover:shadow-card-hover">
-                    <div className="flex items-center justify-between mb-3">
-                      <Badge tier={s.tierName.toLowerCase() as any}>{s.tierName}</Badge>
-                      <span className="text-xs font-mono text-surface-400">#{s.index}</span>
-                    </div>
-                    <p className="text-2xl font-mono font-bold text-surface-900 text-center mb-3">
-                      ${s.amountFormatted}
-                    </p>
-                    <ProgressBar value={s.progress} label="3X Cap" variant={progressVariant} size="md" className="mb-3" />
-
-                    <div className="grid grid-cols-2 gap-2 text-sm mb-3">
-                      <div className="p-2 rounded-xl bg-gradient-to-br from-success-100 to-success-50 border-2 border-success-200/60 text-center">
-                        <p className="font-mono font-bold text-success-700">${s.earnedFormatted}</p>
-                        <p className="text-xs text-surface-400">earned</p>
-                      </div>
-                      <div className="p-2 rounded-xl bg-gradient-to-br from-accent-100 to-accent-50 border-2 border-accent-200/60 text-center">
-                        <p className="font-mono font-bold text-accent-700">${s.harvestableFormatted}</p>
-                        <p className="text-xs text-surface-400">harvestable</p>
-                      </div>
-                    </div>
-
-                    <div className="text-center text-sm mb-3">
-                      {s.canCompound ? (
-                        <span className="text-success-600 font-semibold animate-pulse-soft">Compound Ready!</span>
-                      ) : (
-                        <span className="font-mono text-surface-600">
-                          {formatCountdown(timeToCompound > 0 ? timeToCompound : 0)}
+                  <GlassCard key={tg.tier} padding="p-5" className="hover:shadow-card-hover">
+                    {/* Tier header */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <Badge tier={tg.tierName.toLowerCase() as any} size="md">{tg.tierName}</Badge>
+                        <span className="text-xs text-surface-400">
+                          {tg.stakeCount} stake{tg.stakeCount > 1 ? 's' : ''} &middot; auto-compound every {tg.compoundInterval / 60}m
                         </span>
-                      )}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-success-600 font-medium">
+                        <div className="w-2 h-2 rounded-full bg-success-500 animate-pulse" />
+                        Auto-Compounding
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={() => compound(BigInt(s.index))} disabled={!s.canCompound} className="flex-1" icon={<BoltIcon className="w-3.5 h-3.5" />}>
-                        Compound
-                      </Button>
-                      <Button size="sm" variant="secondary" onClick={() => harvest(BigInt(s.index), s.harvestable)} className="flex-1" icon={<ArrowDownTrayIcon className="w-3.5 h-3.5" />}>
-                        Harvest
-                      </Button>
+
+                    {/* Staked Amount (prominent) */}
+                    <div className="text-center mb-4">
+                      <p className="text-3xl font-mono font-bold text-surface-900">
+                        ${tg.originalAmountFormatted}
+                      </p>
+                      <p className="text-xs text-surface-400 mt-1">Total Staked</p>
                     </div>
+
+                    {/* 3X Cap Progress */}
+                    <ProgressBar
+                      value={tg.capProgress}
+                      label="3X Cap"
+                      variant={progressVariant}
+                      size="md"
+                      className="mb-4"
+                    />
+
+                    {/* Earnings breakdown: Total Earned | Harvestable | Total Harvested */}
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                      <div className="p-3 rounded-xl bg-gradient-to-br from-primary-100 to-primary-50 border-2 border-primary-200/60 text-center">
+                        <p className="font-mono font-bold text-primary-700 text-lg">${tg.totalEarnedFormatted}</p>
+                        <p className="text-[10px] text-surface-400 mt-0.5">Total Earned</p>
+                        {tg.pendingProfit > 0n && (
+                          <p className="text-[9px] text-success-500 mt-0.5 animate-pulse-soft">
+                            +${tg.pendingProfitFormatted} pending
+                          </p>
+                        )}
+                      </div>
+                      <div className="p-3 rounded-xl bg-gradient-to-br from-accent-100 to-accent-50 border-2 border-accent-200/60 text-center">
+                        <p className="font-mono font-bold text-accent-700 text-lg">${tg.harvestableFormatted}</p>
+                        <p className="text-[10px] text-surface-400 mt-0.5">Harvestable</p>
+                      </div>
+                      <div className="p-3 rounded-xl bg-gradient-to-br from-surface-100 to-surface-50 border-2 border-surface-200/60 text-center">
+                        <p className="font-mono font-bold text-surface-600 text-lg">${tg.totalHarvestedFormatted}</p>
+                        <p className="text-[10px] text-surface-400 mt-0.5">Harvested</p>
+                      </div>
+                    </div>
+
+                    {/* Harvest button */}
+                    <Button
+                      onClick={() => harvestTier(tg.stakes)}
+                      loading={isPending}
+                      disabled={tg.harvestable === 0n && !tg.stakes.some(s => s.canCompound)}
+                      className="w-full"
+                      icon={<ArrowDownTrayIcon className="w-4 h-4" />}
+                    >
+                      {tg.harvestable > 0n
+                        ? `Harvest $${tg.harvestableFormatted}`
+                        : tg.stakes.some(s => s.canCompound)
+                          ? 'Compound & Harvest'
+                          : 'Nothing to Harvest'}
+                    </Button>
                   </GlassCard>
                 );
               })}

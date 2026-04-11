@@ -91,11 +91,13 @@ export function useAffiliate() {
   const { writeContract: writeClaimWeekly, isPending: claimWeeklyPending, data: claimWeeklyHash } = useWriteContract();
   const { writeContract: writeClaimMonthly, isPending: claimMonthlyPending, data: claimMonthlyHash } = useWriteContract();
   const { writeContract: writeHarvest, isPending: harvestPending, data: harvestHash } = useWriteContract();
+  const { writeContract: writeCheckRank, isPending: checkRankPending, data: checkRankHash } = useWriteContract();
 
   const { isSuccess: rankSuccess, isError: rankError } = useWaitForTransactionReceipt({ hash: claimRankHash });
   const { isSuccess: weeklySuccess, isError: weeklyError } = useWaitForTransactionReceipt({ hash: claimWeeklyHash });
   const { isSuccess: monthlySuccess, isError: monthlyError } = useWaitForTransactionReceipt({ hash: claimMonthlyHash });
   const { isSuccess: harvestSuccess, isError: harvestError } = useWaitForTransactionReceipt({ hash: harvestHash });
+  const { isSuccess: checkRankSuccess, isError: checkRankError } = useWaitForTransactionReceipt({ hash: checkRankHash });
 
   useEffect(() => { if (rankSuccess) toast({ type: 'success', title: 'Rank salary harvested!' }); }, [rankSuccess]);
   useEffect(() => { if (rankError) toast({ type: 'error', title: 'Rank salary harvest failed' }); }, [rankError]);
@@ -105,6 +107,8 @@ export function useAffiliate() {
   useEffect(() => { if (monthlyError) toast({ type: 'error', title: 'Monthly qualifier harvest failed' }); }, [monthlyError]);
   useEffect(() => { if (harvestSuccess) toast({ type: 'success', title: 'Income harvested!' }); }, [harvestSuccess]);
   useEffect(() => { if (harvestError) toast({ type: 'error', title: 'Harvest failed' }); }, [harvestError]);
+  useEffect(() => { if (checkRankSuccess) toast({ type: 'success', title: 'Rank updated!' }); }, [checkRankSuccess]);
+  useEffect(() => { if (checkRankError) toast({ type: 'error', title: 'Rank check failed' }); }, [checkRankError]);
 
   const claimRankSalary = () => {
     writeClaimRank({
@@ -141,6 +145,17 @@ export function useAffiliate() {
       args: [incomeType],
     });
     toast({ type: 'pending', title: 'Harvesting income...' });
+  };
+
+  const checkRankChange = () => {
+    if (!address) return;
+    writeCheckRank({
+      address: contracts.affiliateDistributor,
+      abi: AffiliateDistributorABI,
+      functionName: 'checkRankChange',
+      args: [address],
+    });
+    toast({ type: 'pending', title: 'Checking rank...' });
   };
 
   // Fetch per-referral team volumes for leg breakdown & 50% rule
@@ -184,6 +199,13 @@ export function useAffiliate() {
   return {
     allIncome: allIncome as any,
     rankInfo: rankInfo as any,
+    // Parsed rank info fields (getUserRankInfo returns: storedRank, liveRank, salary, lastClaimed, nextClaimTime)
+    storedRank: rankInfo ? Number((rankInfo as any)[0] || 0) : 0,
+    liveRank: rankInfo ? Number((rankInfo as any)[1] || 0) : 0,
+    rankSalary: rankInfo ? BigInt((rankInfo as any)[2] || 0) : 0n,
+    lastRankClaim: rankInfo ? Number((rankInfo as any)[3] || 0) : 0,
+    nextRankClaim: rankInfo ? Number((rankInfo as any)[4] || 0) : 0,
+    isRankChangePending: rankInfo ? Number((rankInfo as any)[0] || 0) !== Number((rankInfo as any)[1] || 0) : false,
     directReferrals: directReferrals as any,
     freshBusiness: freshBusiness as any,
     upline: upline as string | undefined,
@@ -195,7 +217,8 @@ export function useAffiliate() {
     claimWeeklyQualifier,
     claimMonthlyQualifier,
     harvestIncome,
+    checkRankChange,
     isLoading: incomeLoading || rankLoading,
-    isPending: claimRankPending || claimWeeklyPending || claimMonthlyPending || harvestPending,
+    isPending: claimRankPending || claimWeeklyPending || claimMonthlyPending || harvestPending || checkRankPending,
   };
 }

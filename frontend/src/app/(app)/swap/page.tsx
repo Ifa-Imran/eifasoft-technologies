@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { GlassCard, Button, Input } from '@/components/ui';
@@ -56,9 +56,20 @@ export default function SwapPage() {
   const minOutputBigInt = minOutput > 0 ? parseUnits(minOutput.toFixed(6), USDT_DECIMALS) : BigInt(0);
   const needsApproval = numAmount > 0 && !approval.hasAllowance(kairoAmountBigInt);
   const priceImpact = poolKairo > 0 ? (numAmount / poolKairo) * 100 : 0;
+  const feePercent = SWAP_FEE_BPS / 100; // 5
+  const pendingSwapRef = useRef(false);
+
+  // Auto-swap after approval succeeds (one-click flow)
+  useEffect(() => {
+    if (pendingSwapRef.current && approval.hasAllowance(kairoAmountBigInt) && !isPending) {
+      pendingSwapRef.current = false;
+      swap(kairoAmountBigInt, minOutputBigInt);
+    }
+  }, [approval.allowance]);
 
   const handleSwap = () => {
     if (needsApproval) {
+      pendingSwapRef.current = true;
       approval.approve(kairoAmountBigInt);
       return;
     }
@@ -69,7 +80,7 @@ export default function SwapPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-orbitron font-bold gradient-text">Swap</h1>
-        <p className="text-base text-surface-500 mt-1">One-way swap with 3% fee and deflationary burn</p>
+        <p className="text-base text-surface-500 mt-1">One-way swap with {feePercent}% fee and deflationary burn</p>
       </div>
 
       <div className="max-w-lg mx-auto space-y-4">
@@ -140,7 +151,7 @@ export default function SwapPage() {
                 </div>
                 <div className="flex justify-between text-surface-500">
                   <span className="flex items-center gap-1">
-                    <FireIcon className="w-3 h-3 text-danger-400" /> Fee (3%)
+                    <FireIcon className="w-3 h-3 text-danger-400" /> Fee ({feePercent}%)
                   </span>
                   <span className="font-mono">${formatCompact(fee, 4)}</span>
                 </div>
@@ -183,7 +194,7 @@ export default function SwapPage() {
               disabled={numAmount <= 0}
               className="w-full"
             >
-              {needsApproval ? 'Approve KAIRO' : 'Swap KAIRO → USDT'}
+              {needsApproval ? 'Approve & Swap' : 'Swap KAIRO → USDT'}
             </Button>
           </div>
         </GlassCard>
