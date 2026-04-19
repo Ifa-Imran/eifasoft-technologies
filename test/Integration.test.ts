@@ -44,6 +44,8 @@ describe("Integration - Full User Journey", function () {
 
         // ========== Step 1: User1 subscribes to CMS with user2 as referrer ==========
         // user1 and user2 are already registered via integrationFixture
+        // user2 needs an active CMS subscription to earn leadership rewards
+        await cms.connect(user2).subscribe(1, ethers.ZeroAddress);
         await cms.connect(user1).subscribe(5, user2.address);
         expect(await cms.subscriptionCount(user1.address)).to.equal(5);
 
@@ -51,7 +53,10 @@ describe("Integration - Full User Journey", function () {
         const leadershipReward = await cms.leadershipRewards(user2.address);
         expect(leadershipReward).to.be.gt(0);
 
-        // ========== Step 2: User1 stakes USDT ==========
+        // ========== Step 2: User2 stakes first (needs active stake to earn referral income) ==========
+        await stakingManager.connect(user2).stake(ethers.parseEther("100"), user1.address);
+
+        // ========== Step 3: User1 stakes USDT ==========
         const stakeAmount = ethers.parseEther("1000");
         await stakingManager.connect(user1).stake(stakeAmount, user2.address);
 
@@ -65,12 +70,12 @@ describe("Integration - Full User Journey", function () {
         expect(directDiv).to.equal(ethers.parseEther("50"));
 
         // ========== Step 3: Advance time and compound multiple times ==========
-        // Tier 1 compound interval = 21600s (6h)
-        await time.increase(21600 * 10); // 10 intervals
+        // Tier 1 compound interval = 600s in test mode
+        await time.increase(600 * 10); // 10 intervals
         await stakingManager.connect(user1).compound(0);
 
         let stakeAfterCompound = await stakingManager.getStake(user1.address, 0);
-        expect(stakeAfterCompound.totalEarned).to.be.gt(0);
+        expect(stakeAfterCompound.compoundEarned).to.be.gt(0);
         expect(stakeAfterCompound.amount).to.be.gt(stakeAmount);
 
         // ========== Step 4: Harvest rewards ==========
@@ -117,24 +122,36 @@ describe("Integration - Full User Journey", function () {
         expect(stakeAfterUnstake.active).to.be.false;
     });
 
-    it("should trigger 3X cap auto-close with small stake", async function () {
+    it("should cap stake via harvest-triggered 3X model (no auto-close on compound)", async function () {
         const { user1, stakingManager, kairoToken } = await loadFixture(integrationFixture);
 
         const stakeAmount = ethers.parseEther("10");
         await stakingManager.connect(user1).stake(stakeAmount, REF);
 
-        // Tier 0: 8h interval. Need 3x = 30 USDT earned.
-        // At 0.1% per interval on a growing balance, need ~3000 intervals
-        await time.increase(28800 * 3000);
-
-        const kairoBefore = await kairoToken.balanceOf(user1.address);
+        // Tier 0: 900s test interval. Need lots of compound to build up earnings
+        await time.increase(900 * 1500);
         await stakingManager.connect(user1).compound(0);
-        const kairoAfter = await kairoToken.balanceOf(user1.address);
 
         const stake = await stakingManager.getStake(user1.address, 0);
-        expect(stake.active).to.be.false; // Auto-closed
-        expect(stake.totalEarned).to.equal(3n * stakeAmount);
-        expect(kairoAfter).to.be.gt(kairoBefore); // Received 80% as KAIRO
+        // Under harvest-triggered model, stake stays active after compound
+        expect(stake.active).to.be.true;
+        expect(stake.totalEarned).to.equal(0); // Nothing harvested yet
+        expect(stake.compoundEarned).to.be.gt(0); // But earnings accumulated
+
+        // Harvest up to 3x cap ($30)
+        await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
+        await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
+        await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
+
+        const stakeAfterHarvest = await stakingManager.getStake(user1.address, 0);
+        expect(stakeAfterHarvest.totalEarned).to.equal(3n * stakeAmount); // 3x capped
+        expect(stakeAfterHarvest.active).to.be.true; // Still active for rank purposes
+
+        // Compounding should be blocked on capped stake
+        await time.increase(900);
+        await expect(
+            stakingManager.connect(user1).compound(0)
+        ).to.be.revertedWith("StakingManager: Stake is capped");
     });
 
     it("should handle affiliate direct + team dividends through staking", async function () {
@@ -154,8 +171,10 @@ describe("Integration - Full User Journey", function () {
 
         // Fund test users
         await usdt.mint(testUser1.address, ethers.parseEther("100000"));
+        await usdt.mint(testUser2.address, ethers.parseEther("100000"));
         const stakingAddr = await stakingManager.getAddress();
         await usdt.connect(testUser1).approve(stakingAddr, ethers.MaxUint256);
+        await usdt.connect(testUser2).approve(stakingAddr, ethers.MaxUint256);
 
         // Build chain: testUser3 under genesis, testUser2 under testUser3, testUser1 under testUser2
         await affiliateDistributor.setReferrer(testUser3.address, user1.address);
@@ -166,6 +185,16 @@ describe("Integration - Full User Journey", function () {
         const dummySigner = signers[18];
         await affiliateDistributor.setReferrer(dummySigner.address, testUser3.address);
 
+        // testUser2 and testUser3 need active stakes to earn dividends
+        // dummySigner needs active stake to count as active direct for testUser3's L2 unlock
+        await stakingManager.connect(testUser2).stake(ethers.parseEther("100"), testUser3.address);
+        await usdt.mint(testUser3.address, ethers.parseEther("100000"));
+        await usdt.connect(testUser3).approve(stakingAddr, ethers.MaxUint256);
+        await stakingManager.connect(testUser3).stake(ethers.parseEther("100"), user1.address);
+        await usdt.mint(dummySigner.address, ethers.parseEther("100000"));
+        await usdt.connect(dummySigner).approve(stakingAddr, ethers.MaxUint256);
+        await stakingManager.connect(dummySigner).stake(ethers.parseEther("100"), testUser3.address);
+
         // testUser1 stakes with testUser2 as referrer
         await stakingManager.connect(testUser1).stake(ethers.parseEther("100"), testUser2.address);
 
@@ -174,7 +203,7 @@ describe("Integration - Full User Journey", function () {
         expect(directDiv).to.equal(ethers.parseEther("5"));
 
         // Compound and check team dividends
-        await time.increase(28800); // 1 interval (Tier 0)
+        await time.increase(900); // 1 interval (Tier 0 = 900s test)
         await stakingManager.connect(testUser1).compound(0);
 
         // testUser2 should have team dividend (L1: 10% of profit)
@@ -186,17 +215,13 @@ describe("Integration - Full User Journey", function () {
         expect(teamDiv3).to.be.gt(0);
     });
 
-    it("should hit 3X cap via multiple income sources (FIFO)", async function () {
+    it("should handle multi-source income with harvest-triggered FIFO cap", async function () {
         const {
             user1, user2, user3, owner, systemWallet,
             kairoToken, usdt, liquidityPool, stakingManager,
             affiliateDistributor, cms, MINTER_ROLE, STAKING_ROLE
         } = await loadFixture(integrationFixture);
 
-        // Setup referral: user2 -> user1 (user1 is referrer of user2)
-        // user1 and user2 already registered under genesis in integrationFixture
-        // We need user2's referrer to be user1 for direct dividend, but they're already registered.
-        // Use fresh signers instead
         const signers = await ethers.getSigners();
         const staker = signers[18];
         const referrer = signers[19];
@@ -212,32 +237,33 @@ describe("Integration - Full User Journey", function () {
         await affiliateDistributor.setReferrer(referrer.address, user1.address);
         await affiliateDistributor.setReferrer(staker.address, referrer.address);
 
-        // Both stake ($10 for staker, $500 for referrer)
-        const stakeAmount = ethers.parseEther("10");
-        await stakingManager.connect(staker).stake(stakeAmount, referrer.address);
-        // Cap = 3 * 10 = $30
-
+        // Both stake
         await stakingManager.connect(referrer).stake(ethers.parseEther("500"), user1.address);
+        await stakingManager.connect(staker).stake(ethers.parseEther("100"), referrer.address);
 
-        // 1) Direct dividend: staker's referrer gets 5% = $25 direct dividend
-        await affiliateDistributor.distributeDirect(referrer.address, ethers.parseEther("500"));
+        // 1) Direct dividend accrues freely for referrer: 5% of 100 = $5
+        const directDiv = await affiliateDistributor.directDividends(referrer.address);
+        expect(directDiv).to.equal(ethers.parseEther("5"));
 
-        let [totalEarned, totalCap, remaining] = await stakingManager.getGlobalCapProgress(referrer.address);
-        expect(totalEarned).to.equal(ethers.parseEther("25")); // 5% of 500
-
-        // 2) Compound enough to push past remaining cap
-        await time.increase(28800 * 500);
-        await stakingManager.connect(referrer).compound(0);
-
-        // Check that stake is auto-closed (cap reached)
-        const stake = await stakingManager.getStake(referrer.address, 0);
-        // The referrer's stake is $500, cap = $1500. With $25 from direct + compounding, it may not close.
-        // Let's check staker instead — staker's cap is $30
-        await time.increase(28800 * 500);
+        // 2) Compound staker to generate team dividends for referrer
+        await time.increase(900 * 10); // 10 Tier 0 intervals
         await stakingManager.connect(staker).compound(0);
-        const stakerStake = await stakingManager.getStake(staker.address, 0);
-        // Staker received direct dividends when staking, compound may have filled cap
-        // The key point is the multi-source FIFO works
-        expect(stakerStake.totalEarned).to.be.gt(0);
+
+        const teamDiv = await affiliateDistributor.teamDividends(referrer.address);
+        expect(teamDiv).to.be.gt(0);
+
+        // 3) Cap progress should be 0 (nothing harvested yet)
+        const [totalEarned, totalCap, remaining] = await stakingManager.getGlobalCapProgress(referrer.address);
+        expect(totalEarned).to.equal(0);
+        expect(totalCap).to.equal(ethers.parseEther("1500")); // 3 * 500
+
+        // 4) Compound referrer's own stake and harvest compound rewards
+        await time.increase(600 * 100); // Tier 1 (500 USDT) = 600s intervals
+        await stakingManager.connect(referrer).compound(0);
+        await stakingManager.connect(referrer).harvest(0, ethers.parseEther("10"));
+
+        // Now totalEarned should reflect the harvest
+        const [totalEarnedAfter] = await stakingManager.getGlobalCapProgress(referrer.address);
+        expect(totalEarnedAfter).to.equal(ethers.parseEther("10"));
     });
 });

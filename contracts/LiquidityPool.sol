@@ -39,7 +39,7 @@ contract LiquidityPool is ReentrancyGuard, AccessControl {
     address public immutable deployer;
     
     // Constants
-    uint256 public constant SWAP_FEE_PERCENT = 5; // 5% swap fee
+    uint256 public constant SWAP_FEE_PERCENT = 10; // 10% swap fee
     uint256 public constant PRICE_PRECISION = 10**18;
     uint256 public constant SOCIAL_LOCK_AMOUNT = 5000 * 10**18; // 5,000 KAIRO
     

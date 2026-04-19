@@ -2,6 +2,7 @@
 
 import { GlassCard, Button } from '@/components/ui';
 import { useAffiliate } from '@/hooks/useAffiliate';
+import { useUserStakes } from '@/hooks/useUserStakes';
 import { formatUnits } from 'viem';
 import { USDT_DECIMALS } from '@/config/contracts';
 
@@ -9,22 +10,19 @@ const incomeTypes = [
   { key: 'direct', label: 'Direct Commission', color: 'bg-primary-500', bgLight: 'bg-gradient-to-r from-primary-100 to-primary-50', textColor: 'text-primary-700', borderColor: 'border-primary-300/50' },
   { key: 'team', label: 'Team Dividends', color: 'bg-secondary-500', bgLight: 'bg-gradient-to-r from-secondary-100 to-secondary-50', textColor: 'text-secondary-700', borderColor: 'border-secondary-300/50' },
   { key: 'rank', label: 'Rank Salary', color: 'bg-accent-500', bgLight: 'bg-gradient-to-r from-accent-100 to-accent-50', textColor: 'text-accent-700', borderColor: 'border-accent-300/50' },
-  { key: 'weekly', label: 'Weekly Qualifier', color: 'bg-success-500', bgLight: 'bg-gradient-to-r from-success-100 to-success-50', textColor: 'text-success-700', borderColor: 'border-success-300/50' },
-  { key: 'monthly', label: 'Monthly Qualifier', color: 'bg-warn-500', bgLight: 'bg-gradient-to-r from-warn-100 to-warn-50', textColor: 'text-warn-700', borderColor: 'border-warn-300/50' },
 ];
 
 export function IncomeSummary() {
-  const { allIncome, harvestIncome, isPending } = useAffiliate();
+  const { allIncome, harvestIncome, lifetimeHarvested, isPending } = useAffiliate();
+  const { totalHarvestedRewards, tierGroups } = useUserStakes();
 
   const incomes = allIncome
     ? [
         Number(formatUnits(BigInt(allIncome[0] || 0), USDT_DECIMALS)),
         Number(formatUnits(BigInt(allIncome[1] || 0), USDT_DECIMALS)),
         Number(formatUnits(BigInt(allIncome[2] || 0), USDT_DECIMALS)),
-        Number(formatUnits(BigInt(allIncome[3] || 0), USDT_DECIMALS)),
-        Number(formatUnits(BigInt(allIncome[4] || 0), USDT_DECIMALS)),
       ]
-    : [0, 0, 0, 0, 0];
+    : [0, 0, 0];
 
   const total = incomes.reduce((a, b) => a + b, 0);
 
@@ -58,11 +56,47 @@ export function IncomeSummary() {
           </div>
         ))}
       </div>
-      <div className="mt-5 pt-5 border-t border-surface-200 flex justify-between items-center">
-        <span className="text-base font-semibold text-surface-900">Total Earned</span>
-        <span className="font-mono font-bold gradient-text text-2xl">
-          ${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-        </span>
+      <div className="mt-5 pt-5 border-t border-surface-200">
+        <div className="flex justify-between items-center mb-3">
+          <span className="text-base font-semibold text-surface-900">Pending Harvest</span>
+          <span className="font-mono font-bold gradient-text text-2xl">
+            ${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          </span>
+        </div>
+        {lifetimeHarvested && lifetimeHarvested.total > 0n && (
+          <div className="p-3 rounded-xl bg-gradient-to-r from-success-50 to-accent-50 border border-success-200/60">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs font-semibold text-surface-700">Affiliate Harvested</span>
+              <span className="font-mono font-bold text-success-700 text-base">{lifetimeHarvested.totalFormatted}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1 text-[10px]">
+              {lifetimeHarvested.direct > 0n && (
+                <div className="flex justify-between"><span className="text-surface-500">Direct</span><span className="font-mono text-surface-600">${Number(formatUnits(lifetimeHarvested.direct, USDT_DECIMALS)).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span></div>
+              )}
+              {lifetimeHarvested.team > 0n && (
+                <div className="flex justify-between"><span className="text-surface-500">Team</span><span className="font-mono text-surface-600">${Number(formatUnits(lifetimeHarvested.team, USDT_DECIMALS)).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span></div>
+              )}
+              {lifetimeHarvested.rank > 0n && (
+                <div className="flex justify-between"><span className="text-surface-500">Rank</span><span className="font-mono text-surface-600">${Number(formatUnits(lifetimeHarvested.rank, USDT_DECIMALS)).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span></div>
+              )}
+            </div>
+          </div>
+        )}
+        {/* Staking Earned summary */}
+        {(totalHarvestedRewards > 0n || tierGroups.some(tg => tg.displayHarvestable > 0n)) && (
+          <div className="p-3 rounded-xl bg-gradient-to-r from-primary-50 to-secondary-50 border border-primary-200/60">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs font-semibold text-surface-700">Staking Earnings</span>
+              <span className="font-mono font-bold text-primary-700 text-base">
+                ${Number(formatUnits(totalHarvestedRewards + tierGroups.reduce((s, tg) => s + tg.displayHarvestable, 0n), USDT_DECIMALS)).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-1 text-[10px]">
+              <div className="flex justify-between"><span className="text-surface-500">Harvested</span><span className="font-mono text-surface-600">${Number(formatUnits(totalHarvestedRewards, USDT_DECIMALS)).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span></div>
+              <div className="flex justify-between"><span className="text-surface-500">Harvestable</span><span className="font-mono text-surface-600">${Number(formatUnits(tierGroups.reduce((s, tg) => s + tg.displayHarvestable, 0n), USDT_DECIMALS)).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span></div>
+            </div>
+          </div>
+        )}
       </div>
     </GlassCard>
   );

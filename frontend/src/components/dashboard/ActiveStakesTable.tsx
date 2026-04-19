@@ -72,30 +72,30 @@ export function ActiveStakesTable() {
               <ProgressBar value={tg.capProgress} label="3X Cap Progress" variant={progressVariant} />
 
               <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className="p-2 rounded-lg bg-accent-50 text-center">
+                  <p className="text-surface-400">Harvestable</p>
+                  <p className="font-mono font-semibold text-accent-700">${tg.displayHarvestableFormatted}</p>
+                </div>
+                <div className="p-2 rounded-lg bg-secondary-50 text-center">
+                  <p className="text-surface-400">Harvested</p>
+                  <p className="font-mono font-semibold text-secondary-700">${tg.totalHarvestedFormatted}</p>
+                </div>
                 <div className="p-2 rounded-lg bg-primary-50 text-center">
                   <p className="text-surface-400">Total Earned</p>
                   <p className="font-mono font-semibold text-primary-700">${tg.totalEarnedFormatted}</p>
-                </div>
-                <div className="p-2 rounded-lg bg-accent-50 text-center">
-                  <p className="text-surface-400">Harvestable</p>
-                  <p className="font-mono font-semibold text-accent-700">${tg.harvestableFormatted}</p>
-                </div>
-                <div className="p-2 rounded-lg bg-surface-50 text-center">
-                  <p className="text-surface-400">Harvested</p>
-                  <p className="font-mono font-semibold text-surface-600">${tg.totalHarvestedFormatted}</p>
                 </div>
               </div>
 
               <Button
                 size="sm"
                 variant="secondary"
-                disabled={tg.harvestable === 0n && !tg.stakes.some(s => s.canCompound)}
+                disabled={tg.displayHarvestable < BigInt(10) * BigInt(10 ** 18)}
                 onClick={() => harvestTier(tg.stakes)}
                 loading={isPending}
                 className="w-full"
                 icon={<ArrowDownTrayIcon className="w-3.5 h-3.5" />}
               >
-                {tg.harvestable > 0n ? `Harvest $${tg.harvestableFormatted}` : 'Nothing to Harvest'}
+                {tg.displayHarvestable >= BigInt(10) * BigInt(10 ** 18) ? `Harvest $${tg.displayHarvestableFormatted}` : 'Min $10 to Harvest'}
               </Button>
             </div>
           );

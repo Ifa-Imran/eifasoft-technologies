@@ -53,34 +53,6 @@ export const rankUpdateQueue = new Queue('rank-update', {
 });
 
 /**
- * Qualifier weekly queue - calculates 3% global weekly profits share
- * Runs every Monday at 00:00 UTC
- */
-export const qualifierWeeklyQueue = new Queue('qualifier-weekly', {
-    connection: getRedisConnection(),
-    defaultJobOptions: {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 10000 },
-        removeOnComplete: { count: 52 },
-        removeOnFail: { count: 100 },
-    },
-});
-
-/**
- * Qualifier monthly queue - calculates 2% global monthly profits share
- * Runs on the 1st of each month
- */
-export const qualifierMonthlyQueue = new Queue('qualifier-monthly', {
-    connection: getRedisConnection(),
-    defaultJobOptions: {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 10000 },
-        removeOnComplete: { count: 12 },
-        removeOnFail: { count: 50 },
-    },
-});
-
-/**
  * Initialize recurring jobs (cron-style schedules)
  * Called once at startup
  */
@@ -108,25 +80,11 @@ export async function initQueues(): Promise<void> {
         { data: { tier: 2 }, name: 'compound-tier-2' }
     );
 
-    // TESTING: shortened from every 1 hour to every 3 hours (matches weekly cycle for testing)
+    // Rank salary update every 1 hour (TESTING) — production: 7 days
     await rankUpdateQueue.upsertJobScheduler(
         'hourly-rank-update',
-        { every: 3 * 60 * 60 * 1000 }, // TESTING: shortened from 1 hour
+        { every: 1 * 60 * 60 * 1000 }, // TESTING: 1 hour (prod: 7 days)
         { data: {}, name: 'hourly-rank-update' }
-    );
-
-    // TESTING: shortened from weekly (Monday 00:00 UTC) to every 3 hours
-    await qualifierWeeklyQueue.upsertJobScheduler(
-        'weekly-qualifier',
-        { every: 3 * 60 * 60 * 1000 }, // TESTING: shortened from cron '0 0 * * 1' (weekly)
-        { data: {}, name: 'weekly-qualifier' }
-    );
-
-    // TESTING: shortened from monthly (1st of month) to every 5 hours
-    await qualifierMonthlyQueue.upsertJobScheduler(
-        'monthly-qualifier',
-        { every: 5 * 60 * 60 * 1000 }, // TESTING: shortened from cron '0 0 1 * *' (monthly)
-        { data: {}, name: 'monthly-qualifier' }
     );
 
     console.log('BullMQ queues initialized with scheduled jobs.');
@@ -138,8 +96,6 @@ export async function initQueues(): Promise<void> {
 export async function closeQueues(): Promise<void> {
     await compoundingQueue.close();
     await rankUpdateQueue.close();
-    await qualifierWeeklyQueue.close();
-    await qualifierMonthlyQueue.close();
     if (redisConnection) {
         redisConnection.disconnect();
     }

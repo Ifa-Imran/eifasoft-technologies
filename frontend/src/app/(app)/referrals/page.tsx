@@ -3,7 +3,7 @@
 import { useAccount } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { GlassCard, Button, Badge, ProgressBar } from '@/components/ui';
-import { useAffiliate } from '@/hooks/useAffiliate';
+import { useAffiliate, type SalaryClaimEvent, type SalaryHarvestEvent } from '@/hooks/useAffiliate';
 import { RANK_NAMES, RANK_THRESHOLDS, RANK_SALARIES_USD, USDT_DECIMALS } from '@/config/contracts';
 import { formatUnits } from 'viem';
 import { shortenAddress, formatCompact } from '@/lib/utils';
@@ -17,12 +17,13 @@ import {
   ScaleIcon,
   ExclamationTriangleIcon,
   ClockIcon,
+  ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
 import { useState, useEffect } from 'react';
 
 export default function RankDividendPage() {
   const { isConnected, address } = useAccount();
-  const { allIncome, rankInfo, directReferrals, freshBusiness, teamVolume, unlockedLevels, legVolumes, largestLegVolume, claimRankSalary, harvestIncome, checkRankChange, storedRank, liveRank, rankSalary, nextRankClaim, isRankChangePending, isLoading, isPending } = useAffiliate();
+  const { allIncome, rankInfo, directReferrals, teamVolume, unlockedLevels, legVolumes, largestLegVolume, claimRankSalary, harvestIncome, checkRankChange, storedRank, liveRank, rankSalary, nextRankClaim, isRankChangePending, salaryHistory, harvestHistory, historyLoading, totalHarvestedSalary, isLoading, isPending } = useAffiliate();
 
   if (!isConnected) {
     return (
@@ -48,8 +49,6 @@ export default function RankDividendPage() {
   const secs = timeLeft % 60;
   const countdownStr = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   const referralsList = (directReferrals as any[]) || [];
-  const weeklyBiz = freshBusiness ? Number(formatUnits(BigInt(freshBusiness[0] || 0), USDT_DECIMALS)) : 0;
-  const monthlyBiz = freshBusiness ? Number(formatUnits(BigInt(freshBusiness[1] || 0), USDT_DECIMALS)) : 0;
   const teamVolumeUsd = teamVolume ? Number(formatUnits(teamVolume, USDT_DECIMALS)) : 0;
   const largestLegUsd = largestLegVolume ? Number(formatUnits(largestLegVolume, USDT_DECIMALS)) : 0;
 
@@ -79,7 +78,7 @@ export default function RankDividendPage() {
           <ExclamationTriangleIcon className="w-6 h-6 text-warn-600 flex-shrink-0" />
           <div className="flex-1">
             <p className="text-sm font-semibold text-warn-800">
-              Rank Change Detected: {RANK_NAMES[storedRank]} → {RANK_NAMES[liveRank]}
+              Rank Change Detected: {RANK_NAMES[storedRank]} &rarr; {RANK_NAMES[liveRank]}
             </p>
             <p className="text-xs text-warn-600 mt-0.5">
               Your salary timer will reset when you confirm. Click below to update your rank.
@@ -91,46 +90,100 @@ export default function RankDividendPage() {
         </div>
       )}
 
-      {/* Top Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Current Rank */}
-        <GlassCard variant="gradient" className="text-center">
-          <div className="w-16 h-16 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-4 shadow-xl shadow-primary-400/30">
-            <TrophyIcon className="w-8 h-8 text-white" />
-          </div>
-          <h3 className="text-sm text-surface-500 mb-2">Current Rank</h3>
-          <div className="text-3xl font-orbitron font-bold gradient-text mb-2">{rankName}</div>
-          <Badge tier="purple" size="md">Level {currentRank} / 10</Badge>
-
-          <div className="mt-4">
-            <ProgressBar
-              value={currentRank}
-              max={10}
-              label="Rank Progress"
-              variant="purple"
-            />
-          </div>
-
-          {/* Countdown to next salary */}
-          {currentRank > 0 && (
-            <div className="mt-4 p-3 rounded-xl bg-gradient-to-r from-surface-50 to-primary-50/40 border border-primary-100/40">
-              <div className="flex items-center gap-2 mb-1">
-                <ClockIcon className="w-4 h-4 text-primary-500" />
-                <span className="text-xs text-surface-500">Next Salary In</span>
-              </div>
-              <p className="text-2xl font-mono font-bold text-center gradient-text">
-                {timeLeft > 0 ? countdownStr : 'Ready!'}
-              </p>
-              <p className="text-[10px] text-surface-400 text-center mt-1">
-                ${rankSalary ? Number(formatUnits(rankSalary, USDT_DECIMALS)).toFixed(2) : '0.00'} / period
-              </p>
+      {/* ─── Rank Dividend Dashboard ─── */}
+      <GlassCard variant="gradient" padding="p-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          {/* Current Rank */}
+          <div className="text-center p-4 rounded-2xl bg-white/60 border-2 border-primary-200/50 shadow-sm">
+            <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center mx-auto mb-3 shadow-lg shadow-primary-400/30">
+              <TrophyIcon className="w-6 h-6 text-white" />
             </div>
-          )}
+            <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Current Rank</p>
+            <p className="text-2xl font-orbitron font-bold gradient-text">{rankName}</p>
+            <Badge tier="purple" size="sm">Level {currentRank} / 10</Badge>
+          </div>
 
-          <Button onClick={claimRankSalary} loading={isPending} className="w-full mt-4" disabled={timeLeft > 0 && !isRankChangePending}>
-            {isRankChangePending ? 'Update Rank & Reset Timer' : timeLeft > 0 ? `Claim in ${countdownStr}` : 'Harvest Rank Salary'}
+          {/* Rank Salary */}
+          <div className="text-center p-4 rounded-2xl bg-white/60 border-2 border-accent-200/50 shadow-sm">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-400 to-accent-300 flex items-center justify-center mx-auto mb-3 shadow-lg shadow-accent-300/30">
+              <CurrencyDollarIcon className="w-6 h-6 text-white" />
+            </div>
+            <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Rank Salary</p>
+            <p className="text-2xl font-mono font-bold text-accent-700">
+              ${rankSalary ? Number(formatUnits(rankSalary, USDT_DECIMALS)).toFixed(2) : '0.00'}
+            </p>
+            <p className="text-[10px] text-surface-400">per period</p>
+          </div>
+
+          {/* Harvestable Salary */}
+          <div className="text-center p-4 rounded-2xl bg-white/60 border-2 border-success-200/50 shadow-sm">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-success-400 to-success-300 flex items-center justify-center mx-auto mb-3 shadow-lg shadow-success-300/30">
+              <ArrowTrendingUpIcon className="w-6 h-6 text-white" />
+            </div>
+            <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Harvestable Salary</p>
+            <p className="text-2xl font-mono font-bold text-success-700">
+              ${allIncome ? Number(formatUnits(BigInt(allIncome[2] || 0), USDT_DECIMALS)).toFixed(2) : '0.00'}
+            </p>
+            <p className="text-[10px] text-surface-400">pending harvest</p>
+          </div>
+
+          {/* Harvested Salary */}
+          <div className="text-center p-4 rounded-2xl bg-white/60 border-2 border-secondary-200/50 shadow-sm">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-secondary-400 to-secondary-300 flex items-center justify-center mx-auto mb-3 shadow-lg shadow-secondary-300/30">
+              <ArrowDownTrayIcon className="w-6 h-6 text-white" />
+            </div>
+            <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Harvested Salary</p>
+            <p className="text-2xl font-mono font-bold text-secondary-700">
+              ${totalHarvestedSalary ? Number(formatUnits(totalHarvestedSalary, USDT_DECIMALS)).toFixed(2) : '0.00'}
+            </p>
+            <p className="text-[10px] text-surface-400">total claimed</p>
+          </div>
+        </div>
+
+        {/* Rank Progress Bar */}
+        <ProgressBar
+          value={currentRank}
+          max={10}
+          label="Rank Progress"
+          variant="purple"
+          size="md"
+          className="mb-4"
+        />
+
+        {/* Next Payout Timer */}
+        {currentRank > 0 && (
+          <div className="flex items-center justify-between p-3 rounded-xl bg-white/50 border border-surface-200 mb-4">
+            <div className="flex items-center gap-2">
+              <ClockIcon className="w-5 h-5 text-secondary-500" />
+              <span className="text-sm text-surface-600">Next Payout</span>
+            </div>
+            <p className={`text-lg font-mono font-bold ${timeLeft > 0 ? 'text-secondary-700' : 'text-success-600 animate-pulse-soft'}`}>
+              {timeLeft > 0 ? countdownStr : 'Ready!'}
+            </p>
+          </div>
+        )}
+
+        {/* Harvest / Claim Buttons */}
+        <div className="grid grid-cols-2 gap-3">
+          <Button onClick={claimRankSalary} loading={isPending} disabled={timeLeft > 0 && !isRankChangePending}>
+            {isRankChangePending ? 'Update Rank' : timeLeft > 0 ? `Claim in ${countdownStr}` : 'Claim Rank Salary'}
           </Button>
-        </GlassCard>
+          <Button
+            variant="secondary"
+            onClick={() => harvestIncome(2)}
+            loading={isPending}
+            disabled={!allIncome || BigInt(allIncome[2] || 0) === 0n}
+            icon={<ArrowDownTrayIcon className="w-4 h-4" />}
+          >
+            {allIncome && BigInt(allIncome[2] || 0) > 0n
+              ? `Harvest $${Number(formatUnits(BigInt(allIncome[2] || 0), USDT_DECIMALS)).toFixed(2)}`
+              : 'Nothing to Harvest'}
+          </Button>
+        </div>
+      </GlassCard>
+
+      {/* Top Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
         {/* Team Volume & Progress */}
         <GlassCard>
@@ -202,17 +255,6 @@ export default function RankDividendPage() {
                 </div>
               );
             })}
-          </div>
-
-          <div className="mt-3 grid grid-cols-2 gap-2 text-center">
-            <div className="p-2 rounded-xl bg-gradient-to-r from-success-50 to-success-100/60 border border-success-200/40">
-              <p className="text-[10px] uppercase text-surface-400">Weekly Biz</p>
-              <p className="font-mono font-bold text-success-700">${formatCompact(weeklyBiz, 0)}</p>
-            </div>
-            <div className="p-2 rounded-xl bg-gradient-to-r from-warn-50 to-warn-100/60 border border-warn-200/40">
-              <p className="text-[10px] uppercase text-surface-400">Monthly Biz</p>
-              <p className="font-mono font-bold text-warn-700">${formatCompact(monthlyBiz, 0)}</p>
-            </div>
           </div>
         </GlassCard>
       </div>
@@ -377,27 +419,91 @@ export default function RankDividendPage() {
         </div>
       </GlassCard>
 
-      {/* Direct Referrals List */}
+      {/* Salary History */}
       <GlassCard>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-surface-900">Direct Referrals</h3>
-          <Badge tier="cyan">{referralsList.length} members</Badge>
+          <div className="flex items-center gap-2">
+            <CurrencyDollarIcon className="w-5 h-5 text-accent-600" />
+            <h3 className="text-lg font-semibold text-surface-900">Salary History</h3>
+          </div>
+          <span className="text-sm font-mono text-surface-400">
+            {salaryHistory.length + harvestHistory.length} records
+          </span>
         </div>
-        {referralsList.length === 0 ? (
+
+        {historyLoading ? (
+          <div className="flex items-center gap-2 text-surface-400 text-sm py-8 justify-center">
+            <div className="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+            Loading history...
+          </div>
+        ) : (salaryHistory.length === 0 && harvestHistory.length === 0) ? (
           <div className="text-center py-8">
-            <UserGroupIcon className="w-12 h-12 text-surface-300 mx-auto mb-3" />
-            <p className="text-surface-500 text-sm">No referrals yet. Share your link to start earning!</p>
+            <CurrencyDollarIcon className="w-12 h-12 text-surface-300 mx-auto mb-3" />
+            <p className="text-surface-500 text-sm">No salary history yet. Achieve a rank to start earning!</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-            {referralsList.map((ref: any, i: number) => (
-              <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-primary-50/60 to-secondary-50/30 border border-primary-100/30 hover:border-primary-200 transition-colors">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-400 to-secondary-400 flex items-center justify-center text-xs font-bold text-white shadow-sm shadow-primary-300/30">
-                  {i + 1}
-                </div>
-                <span className="text-sm font-mono text-surface-600">{shortenAddress(String(ref))}</span>
-              </div>
-            ))}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-surface-200">
+                  <th className="text-left py-2 px-2 text-xs font-semibold text-surface-500">Type</th>
+                  <th className="text-left py-2 px-2 text-xs font-semibold text-surface-500">Date</th>
+                  <th className="text-left py-2 px-2 text-xs font-semibold text-surface-500">Rank</th>
+                  <th className="text-right py-2 px-2 text-xs font-semibold text-surface-500">Amount</th>
+                  <th className="text-right py-2 px-2 text-xs font-semibold text-surface-500">Tx</th>
+                </tr>
+              </thead>
+              <tbody>
+                {/* Merge claim and harvest events, sorted by time desc */}
+                {[
+                  ...salaryHistory.map(e => ({ ...e, type: 'claim' as const })),
+                  ...harvestHistory.map(e => ({ ...e, type: 'harvest' as const })),
+                ].sort((a, b) => b.timestamp - a.timestamp).map((event, idx) => {
+                  const date = new Date(event.timestamp * 1000);
+                  const isClaim = event.type === 'claim';
+                  return (
+                    <tr key={`${event.type}-${idx}`} className="border-b border-surface-100">
+                      <td className="py-2.5 px-2">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                          isClaim
+                            ? 'text-accent-600 bg-accent-50 border-accent-200'
+                            : 'text-success-600 bg-success-50 border-success-200'
+                        }`}>
+                          {isClaim ? 'Salary Credited' : 'Harvested'}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-2 text-xs text-surface-500">
+                        {date.toLocaleDateString()} {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td className="py-2.5 px-2">
+                        {isClaim && (event as SalaryClaimEvent).rankLevel > 0
+                          ? <Badge tier="purple" size="sm">{RANK_NAMES[(event as SalaryClaimEvent).rankLevel] || `Rank ${(event as SalaryClaimEvent).rankLevel}`}</Badge>
+                          : <span className="text-xs text-surface-400">—</span>
+                        }
+                      </td>
+                      <td className="py-2.5 px-2 text-right font-mono font-semibold">
+                        <span className={isClaim ? 'text-accent-600' : 'text-success-600'}>
+                          ${isClaim
+                            ? Number((event as SalaryClaimEvent).salaryFormatted).toFixed(2)
+                            : Number((event as SalaryHarvestEvent).amountFormatted).toFixed(2)
+                          }
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-2 text-right">
+                        <a
+                          href={`https://testnet.opbnbscan.com/tx/${event.txHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary-500 hover:text-primary-700 font-mono"
+                        >
+                          {event.txHash.slice(0, 6)}...{event.txHash.slice(-4)}
+                        </a>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </GlassCard>

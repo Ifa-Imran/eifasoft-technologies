@@ -31,6 +31,9 @@ export default function ExchangePage() {
   const kairoApproval = useApproval(contracts.kairoToken, contracts.atomicP2p);
   const pendingOrderRef = useRef<'buy' | 'sell' | null>(null);
   const pendingAmountRef = useRef('');
+  const pendingFillRef = useRef<'sellTo' | 'buyFrom' | null>(null);
+  const pendingFillIdRef = useRef<bigint>(0n);
+  const pendingFillAmountRef = useRef<bigint>(0n);
 
   // Auto-create order after approval succeeds (one-click flow)
   useEffect(() => {
@@ -54,6 +57,26 @@ export default function ExchangePage() {
       }
     }
   }, [kairoApproval.allowance]);
+
+  // Auto-fill order after approval succeeds (one-click flow for Fill buttons)
+  useEffect(() => {
+    if (pendingFillRef.current === 'sellTo') {
+      if (kairoApproval.hasAllowance(pendingFillAmountRef.current) && !isPending) {
+        pendingFillRef.current = null;
+        sellToOrder(pendingFillIdRef.current, pendingFillAmountRef.current);
+      }
+    }
+  }, [kairoApproval.allowance]);
+
+  useEffect(() => {
+    if (pendingFillRef.current === 'buyFrom') {
+      const usdtNeeded = pendingFillAmountRef.current * (currentPrice ?? 1n) / BigInt(10 ** KAIRO_DECIMALS);
+      if (usdtApproval.hasAllowance(usdtNeeded) && !isPending) {
+        pendingFillRef.current = null;
+        buyFromOrder(pendingFillIdRef.current, pendingFillAmountRef.current);
+      }
+    }
+  }, [usdtApproval.allowance]);
 
   if (!isConnected) {
     return (
@@ -186,8 +209,14 @@ export default function ExchangePage() {
                         </div>
                         {order.creator?.toLowerCase() !== address?.toLowerCase() && priceVal > 0 && (
                           <Button size="sm" variant="success" onClick={() => {
-                            // Calculate KAIRO amount from USDT remaining at current price
                             const kairoWei = order.usdtRemaining * BigInt(10 ** KAIRO_DECIMALS) / (currentPrice ?? 1n);
+                            if (!kairoApproval.hasAllowance(kairoWei)) {
+                              pendingFillRef.current = 'sellTo';
+                              pendingFillIdRef.current = order.id;
+                              pendingFillAmountRef.current = kairoWei;
+                              kairoApproval.approve(kairoWei);
+                              return;
+                            }
                             sellToOrder(order.id, kairoWei);
                           }}>
                             Fill
@@ -229,7 +258,17 @@ export default function ExchangePage() {
                           <p className="text-xs text-surface-400 truncate">{order.creator}</p>
                         </div>
                         {order.creator?.toLowerCase() !== address?.toLowerCase() && (
-                          <Button size="sm" onClick={() => buyFromOrder(order.id, order.kairoRemaining)}>
+                          <Button size="sm" onClick={() => {
+                            const usdtNeeded = order.kairoRemaining * (currentPrice ?? 1n) / BigInt(10 ** KAIRO_DECIMALS);
+                            if (!usdtApproval.hasAllowance(usdtNeeded)) {
+                              pendingFillRef.current = 'buyFrom';
+                              pendingFillIdRef.current = order.id;
+                              pendingFillAmountRef.current = order.kairoRemaining;
+                              usdtApproval.approve(usdtNeeded);
+                              return;
+                            }
+                            buyFromOrder(order.id, order.kairoRemaining);
+                          }}>
                             Fill
                           </Button>
                         )}

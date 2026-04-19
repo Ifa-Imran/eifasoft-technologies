@@ -93,8 +93,6 @@ router.get('/user/:address/dashboard', validateAddressParam, async (req: Request
             direct: incomeMap['direct'] || '0',
             team: incomeMap['team'] || '0',
             rank: incomeMap['rank'] || '0',
-            qualifierWeekly: incomeMap['qualifier_weekly'] || '0',
-            qualifierMonthly: incomeMap['qualifier_monthly'] || '0',
             totalHarvestable: '0',
         };
 
@@ -102,14 +100,12 @@ router.get('/user/:address/dashboard', validateAddressParam, async (req: Request
             const affiliate = getAffiliateDistributor();
             if (!affiliate) throw new Error('Contracts not configured');
             const allIncome = await affiliate.getAllIncome(walletAddress);
-            // allIncome typically returns [direct, team, rank, qualifierWeekly, qualifierMonthly]
-            if (allIncome && allIncome.length >= 5) {
+            // allIncome returns [direct, team, rank]
+            if (allIncome && allIncome.length >= 3) {
                 liveIncome = {
                     direct: ethers.formatEther(allIncome[0]),
                     team: ethers.formatEther(allIncome[1]),
                     rank: ethers.formatEther(allIncome[2]),
-                    qualifierWeekly: ethers.formatEther(allIncome[3]),
-                    qualifierMonthly: ethers.formatEther(allIncome[4]),
                     totalHarvestable: ethers.formatEther(
                         allIncome.reduce((a: bigint, b: bigint) => a + b, BigInt(0))
                     ),

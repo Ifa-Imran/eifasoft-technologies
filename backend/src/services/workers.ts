@@ -44,9 +44,7 @@ async function setLastRun(key: string, timestamp: number): Promise<void> {
 
 // ============ Closing Interval Constants (TESTING) ============
 
-const RANK_INTERVAL_SECS = 3 * 3600;     // TESTING: shortened from 1 hour
-const WEEKLY_INTERVAL_SECS = 3 * 3600;   // TESTING: shortened from 7 days
-const MONTHLY_INTERVAL_SECS = 5 * 3600;  // TESTING: shortened from 30 days
+const RANK_INTERVAL_SECS = 1 * 3600;     // TESTING: 1 hour (prod: 7 days)
 
 // ============ Rank Thresholds & Salaries (mirrors AffiliateDistributor.sol) ============
 
@@ -254,180 +252,6 @@ function createRankUpdateWorker(): Worker {
     );
 }
 
-// ============ Qualifier Weekly Core Logic ============
-
-export async function runWeeklyClosing(): Promise<void> {
-    console.log('[Closing] Event-triggered weekly closing starting...');
-
-    // Calculate global weekly profits (sum of TEAM income in the last 3 hours)
-    const profitResult = await query(
-        `SELECT COALESCE(SUM(amount_usd), 0) AS total_profits
-         FROM income_ledger
-         WHERE income_type IN ('TEAM', 'DIRECT', 'STAKING_HARVEST')
-           AND created_at >= NOW() - INTERVAL '3 hours'` // TESTING: shortened from '7 days'
-    );
-
-    const totalProfits = parseFloat(profitResult.rows[0]?.total_profits || '0');
-    const qualifierPool = totalProfits * 0.03; // 3% of global weekly profits
-
-    if (qualifierPool <= 0) {
-        console.log('[Closing] No profits for weekly qualifier distribution');
-        return;
-    }
-
-    console.log(`[Closing] Weekly qualifier pool: $${qualifierPool.toFixed(2)} (3% of $${totalProfits.toFixed(2)})`);
-
-    // Get qualifying users: rank level >= 5 (Ambassador rank)
-    const qualifyingResult = await query(
-        `SELECT wallet_address, rank_level
-         FROM users
-         WHERE rank_level >= 5
-         ORDER BY rank_level DESC`
-    );
-
-    if (qualifyingResult.rows.length === 0) {
-        console.log('[Closing] No qualifying users for weekly');
-        return;
-    }
-
-    // Equal distribution among qualifying users
-    const sharePerUser = qualifierPool / qualifyingResult.rows.length;
-
-    const users: string[] = [];
-    const amounts: bigint[] = [];
-
-    for (const row of qualifyingResult.rows) {
-        users.push(row.wallet_address);
-        amounts.push(BigInt(Math.floor(sharePerUser * 1e18)));
-    }
-
-    // Batch update on-chain
-    const affiliateDistributor = getAffiliateDistributor(true);
-    if (!affiliateDistributor) {
-        console.warn('[Closing] Contracts not configured, skipping weekly');
-        return;
-    }
-    const tx = await affiliateDistributor.updateQualifierWeekly(users, amounts);
-    await tx.wait();
-    console.log(`[Closing] Weekly closing completed, distributed to ${users.length} users, $${sharePerUser.toFixed(2)} each`);
-}
-
-// ============ Qualifier Weekly Worker ============
-
-function createQualifierWeeklyWorker(): Worker {
-    return new Worker(
-        'qualifier-weekly',
-        async (_job: Job) => {
-            // Check if already triggered by event within this period
-            const lastWeekly = await getLastRun('closing:weekly:lastRun');
-            const now = Math.floor(Date.now() / 1000);
-            if (now - lastWeekly < WEEKLY_INTERVAL_SECS) {
-                console.log('[Worker] Weekly closing already triggered by event, skipping');
-                return;
-            }
-
-            try {
-                await runWeeklyClosing();
-                await setLastRun('closing:weekly:lastRun', Math.floor(Date.now() / 1000));
-            } catch (err) {
-                console.error('[QualifierWeekly] Error in weekly qualifier:', err);
-                throw err;
-            }
-        },
-        {
-            connection: getRedisConnection(),
-            concurrency: 1,
-        }
-    );
-}
-
-// ============ Qualifier Monthly Core Logic ============
-
-export async function runMonthlyClosing(): Promise<void> {
-    console.log('[Closing] Event-triggered monthly closing starting...');
-
-    // Calculate global monthly profits
-    const profitResult = await query(
-        `SELECT COALESCE(SUM(amount_usd), 0) AS total_profits
-         FROM income_ledger
-         WHERE income_type IN ('TEAM', 'DIRECT', 'STAKING_HARVEST')
-           AND created_at >= NOW() - INTERVAL '5 hours'` // TESTING: shortened from '30 days'
-    );
-
-    const totalProfits = parseFloat(profitResult.rows[0]?.total_profits || '0');
-    const qualifierPool = totalProfits * 0.02; // 2% of global monthly profits
-
-    if (qualifierPool <= 0) {
-        console.log('[Closing] No profits for monthly qualifier distribution');
-        return;
-    }
-
-    console.log(`[Closing] Monthly qualifier pool: $${qualifierPool.toFixed(2)} (2% of $${totalProfits.toFixed(2)})`);
-
-    // Get qualifying users: rank level >= 7 (Senior Ambassador)
-    const qualifyingResult = await query(
-        `SELECT wallet_address, rank_level
-         FROM users
-         WHERE rank_level >= 7
-         ORDER BY rank_level DESC`
-    );
-
-    if (qualifyingResult.rows.length === 0) {
-        console.log('[Closing] No qualifying users for monthly');
-        return;
-    }
-
-    // Equal distribution among qualifying users
-    const sharePerUser = qualifierPool / qualifyingResult.rows.length;
-
-    const users: string[] = [];
-    const amounts: bigint[] = [];
-
-    for (const row of qualifyingResult.rows) {
-        users.push(row.wallet_address);
-        amounts.push(BigInt(Math.floor(sharePerUser * 1e18)));
-    }
-
-    // Batch update on-chain
-    const affiliateDistributor = getAffiliateDistributor(true);
-    if (!affiliateDistributor) {
-        console.warn('[Closing] Contracts not configured, skipping monthly');
-        return;
-    }
-    const tx = await affiliateDistributor.updateQualifierMonthly(users, amounts);
-    await tx.wait();
-    console.log(`[Closing] Monthly closing completed, distributed to ${users.length} users, $${sharePerUser.toFixed(2)} each`);
-}
-
-// ============ Qualifier Monthly Worker ============
-
-function createQualifierMonthlyWorker(): Worker {
-    return new Worker(
-        'qualifier-monthly',
-        async (_job: Job) => {
-            // Check if already triggered by event within this period
-            const lastMonthly = await getLastRun('closing:monthly:lastRun');
-            const now = Math.floor(Date.now() / 1000);
-            if (now - lastMonthly < MONTHLY_INTERVAL_SECS) {
-                console.log('[Worker] Monthly closing already triggered by event, skipping');
-                return;
-            }
-
-            try {
-                await runMonthlyClosing();
-                await setLastRun('closing:monthly:lastRun', Math.floor(Date.now() / 1000));
-            } catch (err) {
-                console.error('[QualifierMonthly] Error in monthly qualifier:', err);
-                throw err;
-            }
-        },
-        {
-            connection: getRedisConnection(),
-            concurrency: 1,
-        }
-    );
-}
-
 // ============ Event-Triggered Closing Check ============
 
 /**
@@ -438,7 +262,7 @@ function createQualifierMonthlyWorker(): Worker {
 export async function checkAndTriggerClosings(): Promise<void> {
     const now = Math.floor(Date.now() / 1000);
 
-    // Check rank update (same interval as weekly: 3 hours for testing)
+    // Check rank update
     const lastRank = await getLastRun('closing:rank:lastRun');
     if (now - lastRank >= RANK_INTERVAL_SECS) {
         if (await acquireLock('rank-closing', 120)) {
@@ -456,42 +280,6 @@ export async function checkAndTriggerClosings(): Promise<void> {
             }
         }
     }
-
-    // Check weekly closing (3 hours for testing)
-    const lastWeekly = await getLastRun('closing:weekly:lastRun');
-    if (now - lastWeekly >= WEEKLY_INTERVAL_SECS) {
-        if (await acquireLock('weekly-closing', 120)) {
-            try {
-                const freshLastWeekly = await getLastRun('closing:weekly:lastRun');
-                if (now - freshLastWeekly >= WEEKLY_INTERVAL_SECS) {
-                    await runWeeklyClosing();
-                    await setLastRun('closing:weekly:lastRun', Math.floor(Date.now() / 1000));
-                }
-            } catch (err) {
-                console.error('[Closing] Event-triggered weekly closing failed:', err);
-            } finally {
-                await releaseLock('weekly-closing');
-            }
-        }
-    }
-
-    // Check monthly closing (5 hours for testing)
-    const lastMonthly = await getLastRun('closing:monthly:lastRun');
-    if (now - lastMonthly >= MONTHLY_INTERVAL_SECS) {
-        if (await acquireLock('monthly-closing', 120)) {
-            try {
-                const freshLastMonthly = await getLastRun('closing:monthly:lastRun');
-                if (now - freshLastMonthly >= MONTHLY_INTERVAL_SECS) {
-                    await runMonthlyClosing();
-                    await setLastRun('closing:monthly:lastRun', Math.floor(Date.now() / 1000));
-                }
-            } catch (err) {
-                console.error('[Closing] Event-triggered monthly closing failed:', err);
-            } finally {
-                await releaseLock('monthly-closing');
-            }
-        }
-    }
 }
 
 // ============ Worker Lifecycle ============
@@ -506,10 +294,8 @@ export async function startWorkers(): Promise<void> {
 
     const compoundWorker = createCompoundWorker();
     const rankUpdateWorker = createRankUpdateWorker();
-    const qualifierWeeklyWorker = createQualifierWeeklyWorker();
-    const qualifierMonthlyWorker = createQualifierMonthlyWorker();
 
-    workers = [compoundWorker, rankUpdateWorker, qualifierWeeklyWorker, qualifierMonthlyWorker];
+    workers = [compoundWorker, rankUpdateWorker];
 
     // Set up error handlers
     for (const worker of workers) {
@@ -526,7 +312,7 @@ export async function startWorkers(): Promise<void> {
         });
     }
 
-    console.log('BullMQ workers started: compounding, rank-update, qualifier-weekly, qualifier-monthly');
+    console.log('BullMQ workers started: compounding, rank-update');
 }
 
 /**

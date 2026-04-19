@@ -50,12 +50,12 @@ describe("LiquidityPool", function () {
             return f;
         }
 
-        it("should swap KAIRO for USDT with 3% fee", async function () {
+        it("should swap KAIRO for USDT with 10% fee", async function () {
             const { liquidityPool, usdt, kairoToken, user1 } = await loadFixture(swapFixture);
             const kairoAmount = ethers.parseEther("10");
             const price = await liquidityPool.getCurrentPrice(); // 1 USDT/KAIRO
             const grossUsdt = (kairoAmount * price) / ethers.parseEther("1");
-            const fee = (grossUsdt * 3n) / 100n;
+            const fee = (grossUsdt * 10n) / 100n;
             const expectedUsdt = grossUsdt - fee;
 
             const balBefore = await usdt.balanceOf(user1.address);
@@ -166,9 +166,9 @@ describe("LiquidityPool", function () {
         it("should calculate min output correctly", async function () {
             const { liquidityPool } = await loadFixture(deployFullEcosystemFixture);
             const minOut = await liquidityPool.calculateMinOutput(ethers.parseEther("10"), 1, true);
-            // 10 KAIRO * 1 USDT = 10 USDT, minus 3% fee = 9.7, minus 1% slippage = 9.603
+            // 10 KAIRO * 1 USDT = 10 USDT, minus 10% fee = 9.0, minus 1% slippage = 8.91
             const gross = ethers.parseEther("10");
-            const fee = (gross * 3n) / 100n;
+            const fee = (gross * 10n) / 100n;
             const net = gross - fee;
             const slip = (net * 1n) / 100n;
             expect(minOut).to.equal(net - slip);

@@ -22,11 +22,11 @@ interface ILiquidityPool {
 }
 
 /**
- * @title IStakingManager - Interface for StakingManager active stake queries
+ * @title IStakingManager - Interface for StakingManager active stake queries and harvest cap
  */
 interface IStakingManager {
     function getTotalActiveStakeValue(address _user) external view returns (uint256);
-    function addEarnings(address _user, uint256 _usdAmount) external;
+    function applyCappedHarvest(address _user, uint256 _usdAmount) external returns (uint256 applied);
     function getRemainingCap(address _user) external view returns (uint256);
 }
 
@@ -150,16 +150,7 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
         uint256 loyaltyReward = _amount * REWARD_PER_SUB;
         loyaltyRewards[msg.sender] += loyaltyReward;
 
-        // Report USDT value of loyalty reward to FIFO 3X cap (only if user has active stake + cap space)
-        uint256 livePrice = liquidityPool.getLivePrice();
-        if (livePrice > 0 && stakingManager.getTotalActiveStakeValue(msg.sender) > 0) {
-            uint256 loyaltyUsdValue = (loyaltyReward * livePrice) / 1e18;
-            uint256 remainingCap = stakingManager.getRemainingCap(msg.sender);
-            if (loyaltyUsdValue > remainingCap) loyaltyUsdValue = remainingCap;
-            if (loyaltyUsdValue > 0) {
-                stakingManager.addEarnings(msg.sender, loyaltyUsdValue);
-            }
-        }
+        // Loyalty rewards accrue freely — 3x cap is enforced at claim time
 
         // Handle referrer (CMS-internal referrer tracking for leadership rewards)
         if (_referrer != address(0) && referrerOf[msg.sender] == address(0)) {
@@ -201,8 +192,9 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
 
     /**
      * @dev Claim CMS rewards (one-time, "use it or lose it")
-     *      Requires active stake in StakingManager. Excess beyond stake cap is permanently deleted.
-     *      90% goes to user, 10% to system wallet.
+     *      Requires active stake in StakingManager. CMS claims are capped income
+     *      subject to the 3x harvest-triggered cap via StakingManager FIFO.
+     *      90% goes to user, 10% is deflationary (not minted).
      */
     function claimCMSRewards() external nonReentrant whenNotPaused {
         require(block.timestamp <= CLAIM_DEADLINE, "CMS: Claim period ended");
@@ -222,11 +214,23 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
 
         uint256 maxClaimableKairo = (activeStakeValue * 1e18) / livePrice;
 
-        // Apply cap - excess is permanently deleted
+        // Apply stake-based cap - excess is permanently deleted
         uint256 excessDeleted = 0;
         if (totalClaimable > maxClaimableKairo) {
             excessDeleted = totalClaimable - maxClaimableKairo;
             totalClaimable = maxClaimableKairo;
+        }
+
+        // Apply 3x harvest-triggered cap (CMS claims are capped income)
+        // Convert KAIRO claimable to USD value for FIFO cap check
+        uint256 claimUsdValue = (totalClaimable * livePrice) / 1e18;
+        if (claimUsdValue > 0) {
+            uint256 applied = stakingManager.applyCappedHarvest(msg.sender, claimUsdValue);
+            if (applied < claimUsdValue) {
+                // Reduce totalClaimable proportionally to what FIFO allowed
+                totalClaimable = (applied * 1e18) / livePrice;
+                excessDeleted = (loyaltyRewards[msg.sender] + leadershipRewards[msg.sender]) - totalClaimable;
+            }
         }
 
         // Mint 90% to user, 10% is not minted (deflationary burn)

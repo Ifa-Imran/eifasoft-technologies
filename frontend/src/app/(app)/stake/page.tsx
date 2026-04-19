@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense, useRef, useEffect } from 'react';
+import { useState, Suspense, useRef, useEffect, useMemo } from 'react';
 import { useAccount } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { GlassCard, Button, Input, Badge, ProgressBar } from '@/components/ui';
@@ -13,7 +13,7 @@ import { useCMS } from '@/hooks/useCMS';
 import { contracts, STAKING_TIERS, USDT_DECIMALS } from '@/config/contracts';
 import { parseUnits, isAddress, zeroAddress, formatUnits } from 'viem';
 import { useAffiliate } from '@/hooks/useAffiliate';
-import { ArrowDownTrayIcon, ClockIcon, LockClosedIcon, LockOpenIcon, BoltIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, ClockIcon, LockClosedIcon, LockOpenIcon, BoltIcon, CheckCircleIcon, XCircleIcon, FireIcon, CalculatorIcon } from '@heroicons/react/24/outline';
 
 function getTier(amount: number) {
   if (amount >= 2000) return STAKING_TIERS[2];
@@ -21,11 +21,131 @@ function getTier(amount: number) {
   return STAKING_TIERS[0];
 }
 
+const DURATION_OPTIONS = [1, 2, 3, 5, 6, 8] as const;
+const DAILY_RATE = 0.001; // 0.1% per compound
+
+function CompoundingCalculator() {
+  const [principal, setPrincipal] = useState('1000');
+  const [months, setMonths] = useState(3);
+
+  const result = useMemo(() => {
+    const P = Number(principal) || 0;
+    if (P <= 0) return { finalAmount: 0, profit: 0, roi: 0 };
+
+    const tier = getTier(P);
+    // Compounds per day = 86400 / compoundInterval
+    const compoundsPerDay = 86400 / tier.compoundInterval;
+    const r = DAILY_RATE; // rate per compound
+    const n = compoundsPerDay; // compounds per day
+    const t = months * 30; // total days
+
+    // A = P(1 + r/n)^(nt) — here r is per-compound, n=1 per compound, total compounds = compoundsPerDay * days
+    const totalCompounds = compoundsPerDay * t;
+    const A = P * Math.pow(1 + r, totalCompounds);
+    const cap = P * 3; // 3X cap
+    const capped = Math.min(A, cap);
+
+    return {
+      finalAmount: capped,
+      profit: capped - P,
+      roi: P > 0 ? ((capped - P) / P) * 100 : 0,
+      tierName: tier.name,
+      compoundsPerDay,
+      totalCompounds,
+      hitsCap: A >= cap,
+    };
+  }, [principal, months]);
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="text-xs font-semibold text-surface-600 mb-1.5 block">Principal (USDT)</label>
+          <input
+            type="number"
+            value={principal}
+            onChange={(e) => setPrincipal(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-xl border-2 border-surface-200 bg-white/70 font-mono text-surface-900 focus:border-primary-400 focus:outline-none transition-colors"
+            placeholder="Enter stake amount..."
+            min={10}
+          />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-surface-600 mb-1.5 block">Duration: {months} month{months > 1 ? 's' : ''}</label>
+          <input
+            type="range"
+            min={1}
+            max={8}
+            step={1}
+            value={months}
+            onChange={(e) => setMonths(Number(e.target.value))}
+            className="w-full h-2 rounded-full appearance-none cursor-pointer accent-primary-500 bg-gradient-to-r from-primary-200 to-secondary-200"
+          />
+          <div className="flex justify-between mt-1">
+            {DURATION_OPTIONS.map((m) => (
+              <button
+                key={m}
+                onClick={() => setMonths(m)}
+                className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono transition-colors ${
+                  months === m
+                    ? 'bg-primary-500 text-white font-bold'
+                    : 'text-surface-400 hover:text-primary-600'
+                }`}
+              >
+                {m}m
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {Number(principal) >= 10 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="p-3 rounded-xl bg-gradient-to-br from-primary-50 to-primary-100/60 border-2 border-primary-200/50 text-center">
+            <p className="font-mono font-bold text-primary-700 text-lg">
+              ${result.finalAmount.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+            </p>
+            <p className="text-[10px] text-surface-400 mt-0.5">Final Amount</p>
+          </div>
+          <div className="p-3 rounded-xl bg-gradient-to-br from-success-50 to-success-100/60 border-2 border-success-200/50 text-center">
+            <p className="font-mono font-bold text-success-700 text-lg">
+              ${result.profit.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+            </p>
+            <p className="text-[10px] text-surface-400 mt-0.5">Projected Profit</p>
+          </div>
+          <div className="p-3 rounded-xl bg-gradient-to-br from-accent-50 to-accent-100/60 border-2 border-accent-200/50 text-center">
+            <p className="font-mono font-bold text-accent-700 text-lg">
+              {result.roi.toFixed(1)}%
+            </p>
+            <p className="text-[10px] text-surface-400 mt-0.5">ROI</p>
+          </div>
+          <div className="p-3 rounded-xl bg-gradient-to-br from-secondary-50 to-secondary-100/60 border-2 border-secondary-200/50 text-center">
+            <p className="font-mono font-bold text-secondary-700 text-lg">
+              {result.tierName}
+            </p>
+            <p className="text-[10px] text-surface-400 mt-0.5">Tier ({result.compoundsPerDay}x/day)</p>
+          </div>
+        </div>
+      )}
+
+      {result.hitsCap && (
+        <div className="text-xs text-center text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-2">
+          3X cap reached — projected earnings capped at ${(Number(principal) * 3).toLocaleString()} (3x principal).
+        </div>
+      )}
+
+      <p className="text-[10px] text-surface-400 text-center">
+        Formula: A = P(1 + r)<sup>nt</sup> &middot; 0.1% per compound &middot; Capped at 3X principal
+      </p>
+    </div>
+  );
+}
+
 function StakePageInner() {
   const { isConnected } = useAccount();
   const [amount, setAmount] = useState('');
   const { stake, harvestTier, isPending } = useStaking();
-  const { tierGroups, activeStakes, isLoading } = useUserStakes();
+  const { tierGroups, activeStakes, stakes, isLoading } = useUserStakes();
   const { usdtFormatted } = useTokenBalances();
   const { storedReferrer, hasOnChainReferrer } = useRegistration();
   const { remainingSubscriptions, isSubscriptionEnded, subscribeDeadline } = useCMS();
@@ -218,7 +338,7 @@ function StakePageInner() {
                       <div className="flex items-center gap-3">
                         <Badge tier={tg.tierName.toLowerCase() as any} size="md">{tg.tierName}</Badge>
                         <span className="text-xs text-surface-400">
-                          {tg.stakeCount} stake{tg.stakeCount > 1 ? 's' : ''} &middot; auto-compound every {tg.compoundInterval / 60}m
+                          {tg.stakeCount} stake{tg.stakeCount > 1 ? 's' : ''}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 text-xs text-success-600 font-medium">
@@ -244,40 +364,32 @@ function StakePageInner() {
                       className="mb-4"
                     />
 
-                    {/* Earnings breakdown: Total Earned | Harvestable | Total Harvested */}
-                    <div className="grid grid-cols-3 gap-3 mb-4">
+                    {/* Earnings: Harvestable | Harvested | Total Earned */}
+                    <div className="grid grid-cols-3 gap-3 mb-4 items-center">
+                      <div className="p-3 rounded-xl bg-gradient-to-br from-accent-100 to-accent-50 border-2 border-accent-200/60 text-center">
+                        <p className="font-mono font-bold text-accent-700 text-lg">${tg.displayHarvestableFormatted}</p>
+                        <p className="text-[10px] text-surface-400 mt-0.5">Harvestable</p>
+                      </div>
+                      <div className="p-3 rounded-xl bg-gradient-to-br from-secondary-100 to-secondary-50 border-2 border-secondary-200/60 text-center">
+                        <p className="font-mono font-bold text-secondary-700 text-lg">${tg.totalHarvestedFormatted}</p>
+                        <p className="text-[10px] text-surface-400 mt-0.5">Harvested</p>
+                      </div>
                       <div className="p-3 rounded-xl bg-gradient-to-br from-primary-100 to-primary-50 border-2 border-primary-200/60 text-center">
                         <p className="font-mono font-bold text-primary-700 text-lg">${tg.totalEarnedFormatted}</p>
                         <p className="text-[10px] text-surface-400 mt-0.5">Total Earned</p>
-                        {tg.pendingProfit > 0n && (
-                          <p className="text-[9px] text-success-500 mt-0.5 animate-pulse-soft">
-                            +${tg.pendingProfitFormatted} pending
-                          </p>
-                        )}
-                      </div>
-                      <div className="p-3 rounded-xl bg-gradient-to-br from-accent-100 to-accent-50 border-2 border-accent-200/60 text-center">
-                        <p className="font-mono font-bold text-accent-700 text-lg">${tg.harvestableFormatted}</p>
-                        <p className="text-[10px] text-surface-400 mt-0.5">Harvestable</p>
-                      </div>
-                      <div className="p-3 rounded-xl bg-gradient-to-br from-surface-100 to-surface-50 border-2 border-surface-200/60 text-center">
-                        <p className="font-mono font-bold text-surface-600 text-lg">${tg.totalHarvestedFormatted}</p>
-                        <p className="text-[10px] text-surface-400 mt-0.5">Harvested</p>
                       </div>
                     </div>
 
-                    {/* Harvest button */}
+                    {/* Harvest Button — enabled when displayHarvestable >= $10 */}
                     <Button
                       onClick={() => harvestTier(tg.stakes)}
                       loading={isPending}
-                      disabled={tg.harvestable === 0n && !tg.stakes.some(s => s.canCompound)}
+                      disabled={tg.displayHarvestable < BigInt(10) * BigInt(10 ** 18)}
                       className="w-full"
+                      size="sm"
                       icon={<ArrowDownTrayIcon className="w-4 h-4" />}
                     >
-                      {tg.harvestable > 0n
-                        ? `Harvest $${tg.harvestableFormatted}`
-                        : tg.stakes.some(s => s.canCompound)
-                          ? 'Compound & Harvest'
-                          : 'Nothing to Harvest'}
+                      {tg.displayHarvestable >= BigInt(10) * BigInt(10 ** 18) ? `Harvest $${tg.displayHarvestableFormatted}` : 'Min $10 to Harvest'}
                     </Button>
                   </GlassCard>
                 );
@@ -286,6 +398,94 @@ function StakePageInner() {
           )}
         </div>
       </div>
+
+      {/* Staking History */}
+      {stakes.length > 0 && (
+        <GlassCard>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-surface-900">Staking History</h3>
+            <span className="text-sm font-mono text-surface-400">{stakes.length} total</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-surface-200">
+                  <th className="text-left py-2 px-2 text-xs font-semibold text-surface-500">#</th>
+                  <th className="text-left py-2 px-2 text-xs font-semibold text-surface-500">Tier</th>
+                  <th className="text-right py-2 px-2 text-xs font-semibold text-surface-500">Staked</th>
+                  <th className="text-right py-2 px-2 text-xs font-semibold text-surface-500">Earned</th>
+                  <th className="text-right py-2 px-2 text-xs font-semibold text-surface-500">Harvested</th>
+                  <th className="text-right py-2 px-2 text-xs font-semibold text-surface-500">3X Cap</th>
+                  <th className="text-left py-2 px-2 text-xs font-semibold text-surface-500">Started</th>
+                  <th className="text-center py-2 px-2 text-xs font-semibold text-surface-500">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stakes.map((s) => {
+                  const capPct = s.hardCap > 0n ? Number((s.totalEarned * 100n) / s.hardCap) : 0;
+                  const startDate = new Date(s.startTime * 1000);
+                  const statusLabel = s.active ? 'Active' : capPct >= 100 ? 'Capped' : 'Closed';
+                  const statusColor = s.active ? 'text-success-600 bg-success-50 border-success-200' : capPct >= 100 ? 'text-amber-600 bg-amber-50 border-amber-200' : 'text-surface-500 bg-surface-100 border-surface-200';
+                  const StatusIcon = s.active ? BoltIcon : capPct >= 100 ? FireIcon : XCircleIcon;
+                  return (
+                    <tr key={s.index} className={`border-b border-surface-100 ${!s.active ? 'opacity-60' : ''}`}>
+                      <td className="py-2.5 px-2 font-mono text-surface-400">{s.index + 1}</td>
+                      <td className="py-2.5 px-2">
+                        <Badge tier={s.tierName.toLowerCase() as any} size="sm">{s.tierName}</Badge>
+                      </td>
+                      <td className="py-2.5 px-2 text-right font-mono font-semibold text-surface-900">
+                        ${Number(formatUnits(s.originalAmount, USDT_DECIMALS)).toFixed(2)}
+                      </td>
+                      <td className="py-2.5 px-2 text-right font-mono text-primary-600">
+                        ${Number(formatUnits(s.totalEarned, USDT_DECIMALS)).toFixed(2)}
+                      </td>
+                      <td className="py-2.5 px-2 text-right font-mono text-secondary-600">
+                        ${Number(formatUnits(s.harvestedRewards, USDT_DECIMALS)).toFixed(2)}
+                      </td>
+                      <td className="py-2.5 px-2 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="w-16 h-1.5 rounded-full bg-surface-200 overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                capPct >= 100 ? 'bg-amber-500' : capPct > 50 ? 'bg-primary-500' : 'bg-accent-500'
+                              }`}
+                              style={{ width: `${Math.min(capPct, 100)}%` }}
+                            />
+                          </div>
+                          <span className="text-xs font-mono text-surface-400">{Math.min(capPct, 100)}%</span>
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-2 text-xs text-surface-500">
+                        {startDate.toLocaleDateString()}
+                      </td>
+                      <td className="py-2.5 px-2 text-center">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${statusColor}`}>
+                          <StatusIcon className="w-3 h-3" />
+                          {statusLabel}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </GlassCard>
+      )}
+
+      {/* Compounding Calculator */}
+      <GlassCard>
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center shadow-md shadow-primary-300/30">
+            <CalculatorIcon className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-surface-900">Compounding Calculator</h3>
+            <p className="text-xs text-surface-500">Project potential profit accumulation over time</p>
+          </div>
+        </div>
+        <CompoundingCalculator />
+      </GlassCard>
 
       {/* Level Unlock Requirements */}
       <GlassCard>

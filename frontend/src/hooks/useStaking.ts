@@ -42,18 +42,18 @@ export function useStaking() {
   };
 
   /**
-   * Auto-compound + harvest flow:
-   * 1. Compound all eligible stakes in the tier (pending intervals > 0)
+   * Harvest flow:
+   * 1. Silently compound all eligible stakes (makes pending profit harvestable on-chain)
    * 2. Then harvest all harvestable amounts from each stake
    */
   const harvestTier = useCallback(async (tierStakes: StakeInfo[]) => {
     if (!publicClient || !address) return;
     setHarvesting(true);
     try {
-      // Step 1: Compound all stakes that have pending intervals
+      // Step 1: Silently compound eligible stakes to move pending profit on-chain
       const compoundable = tierStakes.filter((s) => s.canCompound);
       if (compoundable.length > 0) {
-        toast({ type: 'pending', title: 'Auto-compounding...', description: `Compounding ${compoundable.length} stake(s)` });
+        toast({ type: 'pending', title: 'Preparing harvest...', description: 'Syncing pending rewards' });
         for (const s of compoundable) {
           const hash = await writeContractAsync({
             address: contracts.stakingManager,
@@ -63,24 +63,27 @@ export function useStaking() {
           });
           await publicClient.waitForTransactionReceipt({ hash });
         }
-        toast({ type: 'success', title: 'Auto-compound complete' });
       }
 
-      // Step 2: Harvest from each stake that has harvestable balance
-      const harvestable = tierStakes.filter((s) => s.harvestable > 0n);
+      // Step 2: Re-read harvestable amounts after compound and harvest
+      const harvestable = tierStakes.filter((s) => s.harvestable > 0n || s.canCompound);
       if (harvestable.length > 0) {
         toast({ type: 'pending', title: 'Harvesting...', description: `Harvesting from ${harvestable.length} stake(s)` });
         for (const s of harvestable) {
-          const hash = await writeContractAsync({
-            address: contracts.stakingManager,
-            abi: StakingManagerABI,
-            functionName: 'harvest',
-            args: [BigInt(s.index), s.harvestable],
-          });
-          await publicClient.waitForTransactionReceipt({ hash });
+          try {
+            const hash = await writeContractAsync({
+              address: contracts.stakingManager,
+              abi: StakingManagerABI,
+              functionName: 'harvest',
+              args: [BigInt(s.index), s.harvestable > 0n ? s.harvestable : s.amount / 1000n],
+            });
+            await publicClient.waitForTransactionReceipt({ hash });
+          } catch {
+            // Skip stakes that fail (e.g. nothing to harvest after compound)
+          }
         }
         toast({ type: 'success', title: 'Harvest complete!' });
-      } else if (compoundable.length === 0) {
+      } else {
         toast({ type: 'error', title: 'Nothing to harvest yet' });
       }
     } catch (err: any) {

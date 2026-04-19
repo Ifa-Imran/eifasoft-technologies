@@ -109,7 +109,7 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
     mapping(address => uint256) public lastMonthlyEpochClaimed;
 
     // ============ Closing Intervals ============
-    uint256 public constant RANK_INTERVAL = 3 hours;        // TESTING (prod: 1 hour)
+    uint256 public constant RANK_INTERVAL = 7 days;        // PRODUCTION (test: 1 hour)
     uint256 public constant WEEKLY_INTERVAL = 3 hours;      // TESTING (prod: 7 days)
     uint256 public constant MONTHLY_INTERVAL = 5 hours;     // TESTING (prod: 30 days)
 

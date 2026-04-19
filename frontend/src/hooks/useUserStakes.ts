@@ -40,12 +40,14 @@ export interface TierGroup {
   // Virtual pending compound (calculated client-side)
   pendingProfit: bigint;
   // Derived display values
-  displayTotalEarned: bigint; // compoundEarned + pendingProfit
+  displayHarvestable: bigint; // on-chain harvestable + pending profit
+  displayTotalEarned: bigint; // displayHarvestable + totalHarvestedRewards
   harvestable: bigint;        // on-chain confirmed only
   // Formatted strings
   originalAmountFormatted: string;
   totalEarnedFormatted: string;
   harvestableFormatted: string;
+  displayHarvestableFormatted: string;
   totalHarvestedFormatted: string;
   pendingProfitFormatted: string;
   // Underlying stakes for tx operations
@@ -169,7 +171,8 @@ export function useUserStakes() {
         pendingProfit += calcPendingProfit(s.amount, s.lastCompoundTime, s.compoundInterval, now);
       }
 
-      const displayTotalEarned = totalCompoundEarned + pendingProfit;
+      const displayHarvestable = harvestable + pendingProfit;
+      const displayTotalEarned = displayHarvestable + totalHarvestedRewards;
       const capProgress = totalHardCap > 0n ? Number((totalCapEarned * 100n) / totalHardCap) : 0;
 
       return {
@@ -184,11 +187,13 @@ export function useUserStakes() {
         totalHardCap,
         capProgress: Math.min(capProgress, 100),
         pendingProfit,
+        displayHarvestable,
         displayTotalEarned,
         harvestable,
         originalAmountFormatted: formatUnits(totalOriginalAmount, USDT_DECIMALS),
         totalEarnedFormatted: formatUnits(displayTotalEarned, USDT_DECIMALS),
         harvestableFormatted: formatUnits(harvestable, USDT_DECIMALS),
+        displayHarvestableFormatted: formatUnits(displayHarvestable, USDT_DECIMALS),
         totalHarvestedFormatted: formatUnits(totalHarvestedRewards, USDT_DECIMALS),
         pendingProfitFormatted: formatUnits(pendingProfit, USDT_DECIMALS),
         stakes: tierStakes,
@@ -198,6 +203,8 @@ export function useUserStakes() {
 
   const totalStaked = activeStakes.reduce((sum, s) => sum + s.originalAmount, 0n);
   const totalHarvestable = activeStakes.reduce((sum, s) => sum + s.harvestable, 0n);
+  // Sum harvestedRewards across ALL stakes (active + inactive) for lifetime tracking
+  const totalHarvestedRewards = stakes.reduce((sum, s) => sum + s.harvestedRewards, 0n);
 
   return {
     stakes,
@@ -205,6 +212,7 @@ export function useUserStakes() {
     tierGroups,
     totalStaked,
     totalHarvestable,
+    totalHarvestedRewards,
     stakeCount: Number(stakeCount || 0),
     isLoading: countLoading || stakesLoading,
   };

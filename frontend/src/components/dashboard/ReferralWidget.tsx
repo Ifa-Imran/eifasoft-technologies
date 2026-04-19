@@ -5,12 +5,13 @@ import { useAccount } from 'wagmi';
 import { useAffiliate } from '@/hooks/useAffiliate';
 import { RANK_NAMES, USDT_DECIMALS } from '@/config/contracts';
 import { useState } from 'react';
-import { ClipboardDocumentIcon, CheckIcon, ShareIcon } from '@heroicons/react/24/outline';
+import { ClipboardDocumentIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { formatUnits } from 'viem';
+import { formatCompact } from '@/lib/utils';
 
 export function ReferralWidget() {
   const { address } = useAccount();
-  const { rankInfo, directReferrals, freshBusiness } = useAffiliate();
+  const { rankInfo, directReferrals, teamVolume, teamAnalytics, teamLevelLoading } = useAffiliate();
   const [copied, setCopied] = useState(false);
 
   const referralLink = address
@@ -20,7 +21,7 @@ export function ReferralWidget() {
   const currentRank = rankInfo ? Number(rankInfo[0] || 0) : 0;
   const rankName = RANK_NAMES[currentRank] || 'None';
   const referralCount = ((directReferrals as any[]) || []).length;
-  const weeklyBiz = freshBusiness ? Number(formatUnits(BigInt(freshBusiness[0] || 0), USDT_DECIMALS)) : 0;
+  const totalTeamBiz = teamVolume ? Number(formatUnits(teamVolume as bigint, USDT_DECIMALS)) : 0;
 
   const copyLink = async () => {
     try {
@@ -61,19 +62,52 @@ export function ReferralWidget() {
     <GlassCard>
       <h3 className="text-xl font-semibold text-surface-900 mb-5">Referral Network</h3>
 
-      {/* Quick rank & stats */}
-      <div className="grid grid-cols-3 gap-3 mb-5">
+      {/* Rank & quick stats */}
+      <div className="grid grid-cols-2 gap-3 mb-4">
         <div className="p-4 rounded-xl bg-gradient-to-br from-secondary-200 to-secondary-100 border-2 border-secondary-300/50 text-center shadow-sm shadow-secondary-200/30">
           <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Rank</p>
           <p className="text-base font-bold text-secondary-700">{rankName}</p>
         </div>
         <div className="p-4 rounded-xl bg-gradient-to-br from-primary-200 to-primary-100 border-2 border-primary-300/50 text-center shadow-sm shadow-primary-200/30">
-          <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Referrals</p>
-          <p className="text-xl font-mono font-bold text-primary-700">{referralCount}</p>
+          <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Direct Referrals</p>
+          <p className="text-xl font-mono font-bold text-primary-700">
+            {referralCount}
+            {teamAnalytics && (
+              <span className="text-xs font-normal text-success-600 ml-1">({teamAnalytics.directActive} active)</span>
+            )}
+          </p>
         </div>
-        <div className="p-4 rounded-xl bg-gradient-to-br from-accent-200 to-accent-100 border-2 border-accent-300/50 text-center shadow-sm shadow-accent-200/30">
-          <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Weekly Biz</p>
-          <p className="text-xl font-mono font-bold text-accent-700">${weeklyBiz.toFixed(0)}</p>
+      </div>
+
+      {/* Team Analytics */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
+        <div className="p-3 rounded-lg bg-surface-50 border border-surface-200 text-center">
+          <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-0.5">Total Team</p>
+          <p className="text-lg font-mono font-bold text-surface-800">
+            {teamLevelLoading ? <span className="animate-pulse text-surface-300">...</span> : (teamAnalytics?.totalTeamSize || 0)}
+          </p>
+          <p className="text-[10px] text-surface-400">registrations</p>
+        </div>
+        <div className="p-3 rounded-lg bg-surface-50 border border-surface-200 text-center">
+          <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-0.5">Active Stakes</p>
+          <p className="text-lg font-mono font-bold text-success-600">
+            {teamLevelLoading ? <span className="animate-pulse text-surface-300">...</span> : (teamAnalytics?.activeTeamStakes || 0)}
+          </p>
+          <p className="text-[10px] text-surface-400">in team</p>
+        </div>
+        <div className="p-3 rounded-lg bg-surface-50 border border-surface-200 text-center">
+          <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-0.5">Direct Business</p>
+          <p className="text-lg font-mono font-bold text-primary-700">
+            {teamLevelLoading ? <span className="animate-pulse text-surface-300">...</span> : (teamAnalytics?.directBusinessFormatted || '$0')}
+          </p>
+          <p className="text-[10px] text-surface-400">referral volume</p>
+        </div>
+        <div className="p-3 rounded-lg bg-surface-50 border border-surface-200 text-center">
+          <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-0.5">Team Business</p>
+          <p className="text-lg font-mono font-bold text-accent-700">
+            ${formatCompact(totalTeamBiz, 0)}
+          </p>
+          <p className="text-[10px] text-surface-400">total volume</p>
         </div>
       </div>
 

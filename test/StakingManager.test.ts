@@ -58,23 +58,29 @@ describe("StakingManager", function () {
             expect(balAfter - balBefore).to.equal((stakeAmount * 90n) / 100n);
         });
 
-        it("should forward 1% to each DAO wallet", async function () {
-            const { stakingManager, usdt, user1, dao1, dao2, dao3, dao4, dao5 } = await loadFixture(stakeFixture);
+        it("should forward 1% to DAOs 1-4 and 0.5% to DAOs 5-6", async function () {
+            const { stakingManager, usdt, user1, dao1, dao2, dao3, dao4, dao5, dao6 } = await loadFixture(stakeFixture);
             const stakeAmount = ethers.parseEther("100");
-            const expectedPerWallet = (stakeAmount * 1n) / 100n;
+            const expected1Pct = (stakeAmount * 1n) / 100n;
+            const expected05Pct = (stakeAmount * 5n) / 1000n;
 
             const balsBefore = await Promise.all(
-                [dao1, dao2, dao3, dao4, dao5].map(d => usdt.balanceOf(d.address))
+                [dao1, dao2, dao3, dao4, dao5, dao6].map(d => usdt.balanceOf(d.address))
             );
 
             await stakingManager.connect(user1).stake(stakeAmount, REF);
 
             const balsAfter = await Promise.all(
-                [dao1, dao2, dao3, dao4, dao5].map(d => usdt.balanceOf(d.address))
+                [dao1, dao2, dao3, dao4, dao5, dao6].map(d => usdt.balanceOf(d.address))
             );
 
-            for (let i = 0; i < 5; i++) {
-                expect(balsAfter[i] - balsBefore[i]).to.equal(expectedPerWallet);
+            // DAOs 1-4: 1% each
+            for (let i = 0; i < 4; i++) {
+                expect(balsAfter[i] - balsBefore[i]).to.equal(expected1Pct);
+            }
+            // DAOs 5-6: 0.5% each
+            for (let i = 4; i < 6; i++) {
+                expect(balsAfter[i] - balsBefore[i]).to.equal(expected05Pct);
             }
         });
 
@@ -98,20 +104,22 @@ describe("StakingManager", function () {
     });
 
     describe("Compounding", function () {
-        it("should compound 0.1% per interval for Tier 0 (8h)", async function () {
+        it("should compound 0.1% per interval for Tier 0 (900s TEST)", async function () {
             const { stakingManager, user1 } = await loadFixture(stakeFixture);
             const stakeAmount = ethers.parseEther("100");
             await stakingManager.connect(user1).stake(stakeAmount, REF);
 
-            // Advance 8 hours (1 interval for Tier 0)
-            await time.increase(28800);
+            // Advance 1 interval for Tier 0 (900s in test mode)
+            await time.increase(900);
             await stakingManager.connect(user1).compound(0);
 
             const stakes = await stakingManager.getUserStakes(user1.address);
             // 100 * 0.1% = 0.1
             const expectedAmount = stakeAmount + (stakeAmount / 1000n);
             expect(stakes[0].amount).to.equal(expectedAmount);
-            expect(stakes[0].totalEarned).to.equal(stakeAmount / 1000n);
+            // totalEarned is now harvest-based (0 after compound, no harvest yet)
+            expect(stakes[0].totalEarned).to.equal(0);
+            expect(stakes[0].compoundEarned).to.equal(stakeAmount / 1000n);
         });
 
         it("should compound multiple intervals correctly", async function () {
@@ -119,8 +127,8 @@ describe("StakingManager", function () {
             const stakeAmount = ethers.parseEther("1000");
             await stakingManager.connect(user1).stake(stakeAmount, REF);
 
-            // Advance 24 hours (3 intervals for Tier 1 at 6h each -> tier is 1 for 1000)
-            await time.increase(21600 * 4); // 4 intervals
+            // Advance 4 intervals for Tier 1 (600s each in test mode)
+            await time.increase(600 * 4); // 4 intervals
             await stakingManager.connect(user1).compound(0);
 
             const stakes = await stakingManager.getUserStakes(user1.address);
@@ -141,157 +149,156 @@ describe("StakingManager", function () {
         it("should allow compoundFor by COMPOUNDER_ROLE", async function () {
             const { stakingManager, owner, user1 } = await loadFixture(stakeFixture);
             await stakingManager.connect(user1).stake(ethers.parseEther("100"), REF);
-            await time.increase(28800);
+            await time.increase(900);
             await stakingManager.compoundFor(user1.address, 0); // owner has COMPOUNDER_ROLE
             const stakes = await stakingManager.getUserStakes(user1.address);
-            expect(stakes[0].totalEarned).to.be.gt(0);
+            expect(stakes[0].compoundEarned).to.be.gt(0);
         });
 
         it("should allow compoundFor by any user (permissionless)", async function () {
             const { stakingManager, user1, user2 } = await loadFixture(stakeFixture);
             await stakingManager.connect(user1).stake(ethers.parseEther("100"), REF);
-            await time.increase(28800);
+            await time.increase(900);
             // Anyone can call compoundFor
             await stakingManager.connect(user2).compoundFor(user1.address, 0);
             const stakes = await stakingManager.getUserStakes(user1.address);
-            expect(stakes[0].totalEarned).to.be.gt(0);
+            expect(stakes[0].compoundEarned).to.be.gt(0);
         });
 
-        it("should update totalEarned correctly", async function () {
+        it("should not update totalEarned on compound (harvest-triggered cap)", async function () {
             const { stakingManager, user1 } = await loadFixture(stakeFixture);
             await stakingManager.connect(user1).stake(ethers.parseEther("100"), REF);
-            await time.increase(28800);
+            await time.increase(900);
             await stakingManager.connect(user1).compound(0);
             const stakes = await stakingManager.getUserStakes(user1.address);
-            expect(stakes[0].totalEarned).to.equal(ethers.parseEther("0.1")); // 100 * 0.1%
+            // totalEarned tracks harvested capped income, not earned
+            expect(stakes[0].totalEarned).to.equal(0);
+            // compoundEarned should have the profit
+            expect(stakes[0].compoundEarned).to.equal(ethers.parseEther("0.1")); // 100 * 0.1%
         });
     });
 
-    describe("3X Cap", function () {
-        it("should auto-close when totalEarned >= 3x original", async function () {
+    describe("3X Harvest-Triggered Cap", function () {
+        it("should cap stake when total harvested reaches 3x via compound harvests", async function () {
             const { stakingManager, user1 } = await loadFixture(stakeFixture);
             const stakeAmount = ethers.parseEther("10"); // small amount for faster cap
             await stakingManager.connect(user1).stake(stakeAmount, REF);
 
-            // 3x = 30 USDT earned. At 0.1% per 8h interval, need many intervals.
-            const intervalsNeeded = 3000; // should be enough for 3x with compounding
-            await time.increase(28800 * intervalsNeeded);
+            // Compound many times to accumulate large compoundEarned
+            // Need ~1387 intervals for $10 to accumulate $30 compoundEarned
+            await time.increase(900 * 1500);
             await stakingManager.connect(user1).compound(0);
 
-            const stakes = await stakingManager.getUserStakes(user1.address);
-            expect(stakes[0].active).to.be.false;
-            expect(stakes[0].totalEarned).to.equal(3n * stakeAmount);
+            const stk = await stakingManager.getStake(user1.address, 0);
+            // Stake should still be active (no auto-close on compound)
+            expect(stk.active).to.be.true;
+            // totalEarned should be 0 (nothing harvested yet)
+            expect(stk.totalEarned).to.equal(0);
+            // compoundEarned should be large
+            expect(stk.compoundEarned).to.be.gt(0);
+
+            // Now harvest up to 3x cap ($30)
+            const cap = 3n * stakeAmount; // $30
+            // Harvest in chunks
+            await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
+            await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
+            await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
+
+            const stkAfter = await stakingManager.getStake(user1.address, 0);
+            expect(stkAfter.totalEarned).to.equal(cap);
+            // Stake is now capped but still active
+            expect(stkAfter.active).to.be.true;
         });
 
-        it("should return 80% as KAIRO via mintTo on auto-close", async function () {
+        it("should revert compounding on capped stakes", async function () {
+            const { stakingManager, user1 } = await loadFixture(stakeFixture);
+            const stakeAmount = ethers.parseEther("10");
+            await stakingManager.connect(user1).stake(stakeAmount, REF);
+
+            // Compound a lot
+            await time.increase(900 * 1500);
+            await stakingManager.connect(user1).compound(0);
+
+            // Harvest full 3x cap
+            await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
+            await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
+            await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
+
+            // Try to compound again - should revert (stake is capped)
+            await time.increase(900);
+            await expect(
+                stakingManager.connect(user1).compound(0)
+            ).to.be.revertedWith("StakingManager: Stake is capped");
+        });
+
+        it("should allow unstaking on capped stakes", async function () {
             const { stakingManager, kairoToken, user1 } = await loadFixture(stakeFixture);
             const stakeAmount = ethers.parseEther("10");
             await stakingManager.connect(user1).stake(stakeAmount, REF);
 
-            const balBefore = await kairoToken.balanceOf(user1.address);
-            await time.increase(28800 * 3000);
+            // Compound + harvest to 3x cap
+            await time.increase(900 * 1500);
             await stakingManager.connect(user1).compound(0);
-            const balAfter = await kairoToken.balanceOf(user1.address);
+            await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
+            await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
+            await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
 
-            // User should have received KAIRO (minted via mintTo)
+            // Unstake should still work on capped stake
+            const balBefore = await kairoToken.balanceOf(user1.address);
+            await stakingManager.connect(user1).unstake(0);
+            const balAfter = await kairoToken.balanceOf(user1.address);
             expect(balAfter).to.be.gt(balBefore);
+
+            const stk = await stakingManager.getStake(user1.address, 0);
+            expect(stk.active).to.be.false;
         });
 
-        it("should fill oldest stake first (FIFO)", async function () {
+        it("should fill oldest stake first via FIFO on harvest", async function () {
             const { stakingManager, user1 } = await loadFixture(stakeFixture);
             // Create two stakes
             await stakingManager.connect(user1).stake(ethers.parseEther("100"), REF);
             await stakingManager.connect(user1).stake(ethers.parseEther("500"), REF);
 
-            // Compound stake 1 for a few intervals
-            await time.increase(28800 * 5);
+            // Compound stake 0 for enough to harvest $10
+            await time.increase(900 * 100);
             await stakingManager.connect(user1).compound(0);
 
+            // Harvest from stake 0 - should apply to FIFO (oldest stake first)
+            await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
+
             const stakes = await stakingManager.getUserStakes(user1.address);
-            // FIFO: compound earnings on stake 0 should fill stake 0's totalEarned first
-            expect(stakes[0].totalEarned).to.be.gt(0);
-            // Stake 1 should have 0 totalEarned since stake 0 still has space
+            // FIFO: harvest applied to stake 0 first
+            expect(stakes[0].totalEarned).to.equal(ethers.parseEther("10"));
+            // Stake 1 should have 0 totalEarned
             expect(stakes[1].totalEarned).to.equal(0);
         });
 
-        it("should roll earnings to next stake when oldest caps via FIFO", async function () {
-            const { stakingManager, user1 } = await loadFixture(stakeFixture);
-            // Stake 0: small, will cap quickly (cap = $30)
-            await stakingManager.connect(user1).stake(ethers.parseEther("10"), REF);
-            // Stake 1: larger (cap = $1500)
-            await stakingManager.connect(user1).stake(ethers.parseEther("500"), REF);
-
-            // Compound stake 1 with enough intervals to exceed stake 0's cap ($30)
-            // but NOT enough to cap stake 1 ($1500)
-            // Each interval on $500 gives ~$0.5 profit. Need ~100 intervals for ~$50.
-            // $30 fills stake 0, ~$20 goes to stake 1.
-            await time.increase(28800 * 100);
-            await stakingManager.connect(user1).compound(1);
-
-            const stakes = await stakingManager.getUserStakes(user1.address);
-            // Stake 0 should be auto-closed (capped at 3x = $30)
-            expect(stakes[0].active).to.be.false;
-            expect(stakes[0].totalEarned).to.equal(ethers.parseEther("30"));
-            // Stake 1 should have received the overflow and still be active
-            expect(stakes[1].totalEarned).to.be.gt(0);
-            expect(stakes[1].active).to.be.true;
-        });
-
-        it("should close oldest stake via external addEarnings", async function () {
-            const { stakingManager, affiliateDistributor, owner, user1, user2, genesisAccount, STAKING_ROLE } = await loadFixture(stakeFixture);
-            // User1 stakes small amount
-            await stakingManager.connect(user1).stake(ethers.parseEther("10"), REF);
-
-            // Register user2 under genesis, then user1 under user2
-            await affiliateDistributor.setReferrer(user2.address, genesisAccount.address);
-            await affiliateDistributor.setReferrer(user1.address, user2.address);
-
-            // User2 also stakes so they have a stake to be capped
-            await stakingManager.connect(user2).stake(ethers.parseEther("10"), REF);
-
-            // Distribute a large direct dividend to user2 via a huge stake from user1
-            // 5% of a large amount should push user2's cap
-            // User2's cap = 3 * 10 = 30 USDT
-            // Direct dividend reports to addEarnings
-            // Let's directly call addEarnings from affiliateDistributor context
-            // Actually, distributeDirect will call addEarnings internally
-            // Let's use distributeDirect with a large stake amount
-            await affiliateDistributor.distributeDirect(user2.address, ethers.parseEther("700")); // 5% = $35 > $30 cap
-
-            const stakes = await stakingManager.getUserStakes(user2.address);
-            // User2's stake should be auto-closed by the $35 direct dividend exceeding $30 cap
-            expect(stakes[0].active).to.be.false;
-            expect(stakes[0].totalEarned).to.equal(ethers.parseEther("30")); // capped at 3x
-        });
-
-        it("should revert addEarnings from unauthorized caller", async function () {
+        it("should revert applyCappedHarvest from unauthorized caller", async function () {
             const { stakingManager, user1 } = await loadFixture(stakeFixture);
             await expect(
-                stakingManager.connect(user1).addEarnings(user1.address, ethers.parseEther("100"))
+                stakingManager.connect(user1).applyCappedHarvest(user1.address, ethers.parseEther("100"))
             ).to.be.revertedWith("StakingManager: Unauthorized");
         });
 
-        it("should track compoundEarned separately from totalEarned", async function () {
-            const { stakingManager, affiliateDistributor, owner, user1, user2, genesisAccount, STAKING_ROLE } = await loadFixture(stakeFixture);
+        it("should track compoundEarned separately from totalEarned (harvest-based)", async function () {
+            const { stakingManager, user1 } = await loadFixture(stakeFixture);
             await stakingManager.connect(user1).stake(ethers.parseEther("100"), REF);
 
             // Compound to generate compound earnings
-            await time.increase(28800 * 5);
+            await time.increase(900 * 100);
             await stakingManager.connect(user1).compound(0);
 
             let stk = await stakingManager.getStake(user1.address, 0);
             const compoundProfit = stk.compoundEarned;
             expect(compoundProfit).to.be.gt(0);
+            // totalEarned should be 0 (nothing harvested)
+            expect(stk.totalEarned).to.equal(0);
 
-            // Now push external earnings via affiliateDistributor
-            await affiliateDistributor.setReferrer(user1.address, genesisAccount.address);
-            await affiliateDistributor.setReferrer(user2.address, user1.address);
-            await affiliateDistributor.distributeDirect(user1.address, ethers.parseEther("200")); // $10 dividend
-
+            // Harvest $10 - totalEarned should increase
+            await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
             stk = await stakingManager.getStake(user1.address, 0);
-            // totalEarned should include both compound + external
-            expect(stk.totalEarned).to.be.gt(compoundProfit);
-            // compoundEarned should only have compound profit
+            expect(stk.totalEarned).to.equal(ethers.parseEther("10"));
+            // compoundEarned stays the same
             expect(stk.compoundEarned).to.equal(compoundProfit);
         });
 
@@ -305,6 +312,26 @@ describe("StakingManager", function () {
             expect(cap).to.equal(ethers.parseEther("900")); // 3 * (100 + 200)
             expect(remaining).to.equal(ethers.parseEther("900"));
         });
+
+        it("should return true from hasActivePosition for capped stakes", async function () {
+            const { stakingManager, user1 } = await loadFixture(stakeFixture);
+            const stakeAmount = ethers.parseEther("10");
+            await stakingManager.connect(user1).stake(stakeAmount, REF);
+
+            // Compound + harvest to 3x cap
+            await time.increase(900 * 1500);
+            await stakingManager.connect(user1).compound(0);
+            await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
+            await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
+            await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
+
+            // Stake is capped but still active
+            expect(await stakingManager.hasActivePosition(user1.address)).to.be.true;
+
+            // After unstake, no active position
+            await stakingManager.connect(user1).unstake(0);
+            expect(await stakingManager.hasActivePosition(user1.address)).to.be.false;
+        });
     });
 
     describe("Unstaking", function () {
@@ -313,7 +340,7 @@ describe("StakingManager", function () {
             await stakingManager.connect(user1).stake(ethers.parseEther("100"), REF);
 
             // Compound to accumulate some earnings
-            await time.increase(28800 * 10); // 10 intervals
+            await time.increase(900 * 10); // 10 intervals
             await stakingManager.connect(user1).compound(0);
 
             const balBefore = await kairoToken.balanceOf(user1.address);
@@ -350,22 +377,20 @@ describe("StakingManager", function () {
             await stakingManager.connect(user1).stake(ethers.parseEther("100"), REF);
 
             // Compound enough to harvest
-            await time.increase(28800 * 200); // 200 intervals to accumulate > $10
+            await time.increase(900 * 100); // 100 intervals to accumulate > $10
             await stakingManager.connect(user1).compound(0);
 
-            // Harvest $10
+            // Harvest $10 (applies to FIFO cap)
             await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
 
-            // Now unstake - the return should be 80% of current amount minus harvested ($10)
+            // Now unstake - the return should be 80% of current amount
             const stakeBefore = await stakingManager.getStake(user1.address, 0);
-            const grossReturn = (stakeBefore.amount * 80n) / 100n;
-            const expectedReturn = grossReturn - stakeBefore.harvestedRewards;
 
             const balBefore = await kairoToken.balanceOf(user1.address);
             await stakingManager.connect(user1).unstake(0);
             const balAfter = await kairoToken.balanceOf(user1.address);
 
-            // balAfter - balBefore should correspond to expectedReturn minted via mintTo
+            // balAfter - balBefore should correspond to 80% of stk.amount minted via mintTo
             expect(balAfter).to.be.gt(balBefore);
         });
     });
@@ -374,7 +399,7 @@ describe("StakingManager", function () {
         it("should enforce $10 minimum harvest", async function () {
             const { stakingManager, user1 } = await loadFixture(stakeFixture);
             await stakingManager.connect(user1).stake(ethers.parseEther("100"), REF);
-            await time.increase(28800);
+            await time.increase(900);
             await stakingManager.connect(user1).compound(0);
 
             await expect(
@@ -387,7 +412,7 @@ describe("StakingManager", function () {
             await stakingManager.connect(user1).stake(ethers.parseEther("100"), REF);
 
             // Compound enough intervals to have > $10 available
-            await time.increase(28800 * 200);
+            await time.increase(900 * 100);
             await stakingManager.connect(user1).compound(0);
 
             const stk = await stakingManager.getStake(user1.address, 0);
@@ -405,7 +430,7 @@ describe("StakingManager", function () {
         it("should revert harvest exceeding available amount", async function () {
             const { stakingManager, user1 } = await loadFixture(stakeFixture);
             await stakingManager.connect(user1).stake(ethers.parseEther("100"), REF);
-            await time.increase(28800);
+            await time.increase(900);
             await stakingManager.connect(user1).compound(0);
 
             // totalEarned is only 0.1 USDT
@@ -457,11 +482,11 @@ describe("StakingManager", function () {
         });
 
         it("should allow admin to set DAO wallets", async function () {
-            const { stakingManager, user1, user2, user3, user4, user5 } = await loadFixture(stakeFixture);
-            const newDaoWallets = [user1.address, user2.address, user3.address, user4.address, user5.address];
+            const { stakingManager, user1, user2, user3, user4, user5, dao6 } = await loadFixture(stakeFixture);
+            const newDaoWallets = [user1.address, user2.address, user3.address, user4.address, user5.address, dao6.address];
             await stakingManager.setDaoWallets(newDaoWallets);
             const wallets = await stakingManager.getDaoWallets();
-            for (let i = 0; i < 5; i++) {
+            for (let i = 0; i < 6; i++) {
                 expect(wallets[i]).to.equal(newDaoWallets[i]);
             }
         });

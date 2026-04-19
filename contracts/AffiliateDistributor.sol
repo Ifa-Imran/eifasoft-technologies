@@ -21,12 +21,13 @@ interface ILiquidityPool {
 }
 
 /**
- * @title IStakingManager - Interface for reporting earnings to FIFO 3X cap
+ * @title IStakingManager - Interface for harvest-triggered 3X cap and active position checks
  */
 interface IStakingManager {
-    function addEarnings(address _user, uint256 _usdAmount) external;
+    function applyCappedHarvest(address _user, uint256 _usdAmount) external returns (uint256 applied);
     function getTotalActiveStakeValue(address _user) external view returns (uint256);
     function getRemainingCap(address _user) external view returns (uint256);
+    function hasActivePosition(address _user) external view returns (bool);
 }
 
 /**
@@ -38,14 +39,10 @@ interface IStakingManager {
  *   0 = Direct Dividends (5% of referred stakes)
  *   1 = Team Dividends (multi-level compound profits)
  *   2 = Rank Dividends (periodic salary based on team volume)
- *   3 = Qualifier Weekly (3% global weekly profits, qualify with $50k fresh business/week)
- *   4 = Qualifier Monthly (2% global monthly profits, qualify with $500k fresh business/month)
  *
  * Trigger Model:
- *   All closings (weekly/monthly epochs) are triggered by user actions:
- *   stake, unstake, compound, harvest, claim — whichever happens first.
+ *   All operations are user-triggered.
  *   Rank salary is self-service: users call claimRankSalary() themselves.
- *   Qualifier bonuses use epoch-based pull model: users claim their share.
  */
 contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
     // ============ Roles ============
@@ -61,8 +58,6 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
     mapping(address => uint256) public directDividends;
     mapping(address => uint256) public teamDividends;
     mapping(address => uint256) public rankDividends;
-    mapping(address => uint256) public qualifierWeekly;
-    mapping(address => uint256) public qualifierMonthly;
 
     // ============ Referral Tracking ============
     mapping(address => address) public referrerOf;
@@ -78,47 +73,11 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
     mapping(address => uint256) public userRankLevel;       // 0-10
     mapping(address => uint256) public lastRankClaimTime;
 
-    // ============ Fresh Business Qualifier Tracking ============
-    // Per-user fresh referral staking volume tracked per epoch
-    mapping(address => uint256) public userWeeklyBusiness;         // fresh business in current weekly epoch
-    mapping(address => uint256) public userWeeklyBusinessEpoch;    // which epoch this tracking is for
-    mapping(address => uint256) public lastWeeklyQualifiedEpoch;   // last epoch user qualified in
-    uint256 public currentWeeklyQualifierCount;                    // live count for current epoch
-
-    mapping(address => uint256) public userMonthlyBusiness;        // fresh business in current monthly epoch
-    mapping(address => uint256) public userMonthlyBusinessEpoch;   // which epoch this tracking is for
-    mapping(address => uint256) public lastMonthlyQualifiedEpoch;  // last epoch user qualified in
-    uint256 public currentMonthlyQualifierCount;                   // live count for current epoch
-
-    // ============ Profit Accumulators (fed by StakingManager on compound) ============
-    uint256 public weeklyProfitAccumulator;
-    uint256 public monthlyProfitAccumulator;
-
-    // ============ Weekly Qualifier Epoch ============
-    uint256 public weeklyEpoch;
-    uint256 public weeklyEpochStartTime;
-    uint256 public weeklyEpochPool;                         // 3% of profits snapshot
-    uint256 public weeklyEpochQualifiers;                   // qualifying user count snapshot
-
-    // ============ Monthly Qualifier Epoch ============
-    uint256 public monthlyEpoch;
-    uint256 public monthlyEpochStartTime;
-    uint256 public monthlyEpochPool;                        // 2% of profits snapshot
-    uint256 public monthlyEpochQualifiers;                  // qualifying user count snapshot
-
-    // ============ Qualifier Claim Tracking ============
-    mapping(address => uint256) public lastWeeklyEpochClaimed;
-    mapping(address => uint256) public lastMonthlyEpochClaimed;
-
     // ============ Closing Intervals ============
-    uint256 public constant RANK_INTERVAL = 3 hours;        // TESTING (prod: 1 hour)
-    uint256 public constant WEEKLY_INTERVAL = 3 hours;      // TESTING (prod: 7 days)
-    uint256 public constant MONTHLY_INTERVAL = 5 hours;     // TESTING (prod: 30 days)
+    uint256 public constant RANK_INTERVAL = 1 hours;        // TESTING (prod: 7 days)
 
     // ============ Constants ============
     uint256 public constant MIN_HARVEST = 10e18; // $10 minimum harvest
-    uint256 public constant WEEKLY_QUALIFIER_THRESHOLD = 50_000e18;   // $50,000 fresh business
-    uint256 public constant MONTHLY_QUALIFIER_THRESHOLD = 500_000e18; // $500,000 fresh business
 
     // Team dividend percentages (basis points: 1000 = 10%)
     // L1: 10%, L2-L10: 5% each, L11-L15: 2% each
@@ -161,15 +120,9 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
     event TeamEarned(address indexed upline, address indexed staker, uint256 level, uint256 amount);
     event RankSalaryClaimed(address indexed user, uint256 rankLevel, uint256 salary);
     event RankChanged(address indexed user, uint256 oldRank, uint256 newRank);
-    event WeeklyEpochClosed(uint256 indexed epoch, uint256 pool, uint256 qualifiers);
-    event MonthlyEpochClosed(uint256 indexed epoch, uint256 pool, uint256 qualifiers);
-    event WeeklyQualifierClaimed(address indexed user, uint256 indexed epoch, uint256 amount);
-    event MonthlyQualifierClaimed(address indexed user, uint256 indexed epoch, uint256 amount);
     event Harvested(address indexed user, uint8 incomeType, uint256 usdAmount, uint256 kairoAmount);
     event TeamVolumeAdded(address indexed staker, uint256 amount);
     event TeamVolumeRemoved(address indexed staker, uint256 amount);
-    event ProfitAccumulated(uint256 amount);
-    event FreshBusinessAdded(address indexed referrer, uint256 amount);
 
     // ============ Constructor ============
     constructor(
@@ -188,12 +141,6 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
         systemWallet = _systemWallet;
 
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
-
-        // Initialize epoch start times and counters (start at 1 to avoid default-0 collision)
-        weeklyEpoch = 1;
-        monthlyEpoch = 1;
-        weeklyEpochStartTime = block.timestamp;
-        monthlyEpochStartTime = block.timestamp;
     }
 
     // ============ Public Registration ============
@@ -281,32 +228,26 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
 
     /**
      * @dev Distribute 5% direct dividend to referrer and track fresh business
-     *      for weekly/monthly qualifier (called by StakingManager on stake)
+     *      for weekly/monthly qualifier (called by StakingManager on stake).
+     *      Income accrues freely — 3x cap is enforced at harvest time.
      */
     function distributeDirect(address _referrer, uint256 _stakeAmount) external onlyRole(STAKING_ROLE) {
         require(_referrer != address(0), "AD: Invalid referrer");
-
-        // Always track fresh referral business for qualifier pools
-        _addFreshBusiness(_referrer, _stakeAmount);
 
         // Referrer must have active stake to earn direct income
         if (IStakingManager(stakingManager).getTotalActiveStakeValue(_referrer) == 0) return;
 
         uint256 dividend = (_stakeAmount * 5) / 100;
 
-        // Cap to remaining FIFO space; forfeit if no space
-        uint256 remainingCap = IStakingManager(stakingManager).getRemainingCap(_referrer);
-        if (remainingCap == 0) return;
-        if (dividend > remainingCap) dividend = remainingCap;
-
+        // Accrue freely — no cap check at accrual time
         directDividends[_referrer] += dividend;
-        IStakingManager(stakingManager).addEarnings(_referrer, dividend);
 
         emit DirectEarned(_referrer, dividend);
     }
 
     /**
-     * @dev Distribute team dividends through 15 levels (called by StakingManager on compound)
+     * @dev Distribute team dividends through 15 levels (called by StakingManager on compound).
+     *      Income accrues freely — 3x cap is enforced at harvest time.
      */
     function distributeTeamDividend(address _staker, uint256 _profit) external onlyRole(STAKING_ROLE) {
         address current = _staker;
@@ -320,14 +261,9 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
                 // Must have active stake to earn team income
                 if (IStakingManager(stakingManager).getTotalActiveStakeValue(upline) > 0) {
                     uint256 dividend = (_profit * TEAM_PERCENTAGES[i]) / 10000;
-                    // Cap to remaining FIFO space
-                    uint256 remainingCap = IStakingManager(stakingManager).getRemainingCap(upline);
-                    if (remainingCap > 0) {
-                        if (dividend > remainingCap) dividend = remainingCap;
-                        teamDividends[upline] += dividend;
-                        IStakingManager(stakingManager).addEarnings(upline, dividend);
-                        emit TeamEarned(upline, _staker, i + 1, dividend);
-                    }
+                    // Accrue freely — no cap check at accrual time
+                    teamDividends[upline] += dividend;
+                    emit TeamEarned(upline, _staker, i + 1, dividend);
                 }
             }
             current = upline;
@@ -341,12 +277,39 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
      *      Max: 15 levels at 10 direct sponsors
      */
     function _getUnlockedLevels(address _user) internal view returns (uint256) {
-        uint256 directs = directCount[_user];
+        uint256 directs = _getActiveDirectCount(_user);
         if (directs == 0) return 0;
-        if (directs <= 5) return directs;            // 1-5 directs → 1-5 levels
-        uint256 extra = directs - 5;                 // 6th direct → 1 extra, etc.
+        if (directs <= 5) return directs;            // 1-5 active directs → 1-5 levels
+        uint256 extra = directs - 5;                 // 6th active direct → 1 extra, etc.
         uint256 levels = 5 + (extra * 2);            // each extra unlocks 2 levels
         return levels > 15 ? 15 : levels;            // cap at 15
+    }
+
+    /**
+     * @dev Count the number of direct referrals that have a currently active stake.
+     *      Only active directs count toward unlocking team dividend levels.
+     *      A direct is "active" if they have at least one active stake position
+     *      (includes capped stakes that are still active).
+     * @param _user User whose active directs to count
+     * @return count Number of active direct referrals
+     */
+    function _getActiveDirectCount(address _user) internal view returns (uint256 count) {
+        address[] storage referrals = directReferrals[_user];
+        for (uint256 i = 0; i < referrals.length; i++) {
+            if (IStakingManager(stakingManager).hasActivePosition(referrals[i])) {
+                count++;
+            }
+        }
+    }
+
+    /**
+     * @dev Public view: get the number of active direct referrals for a user.
+     *      Useful for frontend to display real-time level eligibility.
+     * @param _user User address
+     * @return Number of direct referrals with active stakes
+     */
+    function getActiveDirectCount(address _user) external view returns (uint256) {
+        return _getActiveDirectCount(_user);
     }
 
     /**
@@ -392,56 +355,6 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
         emit TeamVolumeRemoved(_staker, _amount);
     }
 
-    // ============ Profit Tracking (STAKING_ROLE - called by StakingManager on compound) ============
-
-    /**
-     * @dev Accumulate compound profits for qualifier pool calculation
-     */
-    function addProfit(uint256 _profit) external onlyRole(STAKING_ROLE) {
-        weeklyProfitAccumulator += _profit;
-        monthlyProfitAccumulator += _profit;
-        emit ProfitAccumulated(_profit);
-    }
-
-    // ============ Epoch Closing (permissionless - triggered by any user action) ============
-
-    /**
-     * @dev Public trigger: anyone can call to close due epochs.
-     *      Also called internally by user-facing functions.
-     */
-    function tryCloseEpochs() public {
-        _tryCloseEpochs();
-    }
-
-    function _tryCloseEpochs() internal {
-        if (block.timestamp >= weeklyEpochStartTime + WEEKLY_INTERVAL) {
-            _closeWeeklyEpoch();
-        }
-        if (block.timestamp >= monthlyEpochStartTime + MONTHLY_INTERVAL) {
-            _closeMonthlyEpoch();
-        }
-    }
-
-    function _closeWeeklyEpoch() internal {
-        weeklyEpochPool = (weeklyProfitAccumulator * 3) / 100;
-        weeklyEpochQualifiers = currentWeeklyQualifierCount;
-        weeklyEpoch++;
-        weeklyEpochStartTime = block.timestamp;
-        weeklyProfitAccumulator = 0;
-        currentWeeklyQualifierCount = 0;
-        emit WeeklyEpochClosed(weeklyEpoch, weeklyEpochPool, weeklyEpochQualifiers);
-    }
-
-    function _closeMonthlyEpoch() internal {
-        monthlyEpochPool = (monthlyProfitAccumulator * 2) / 100;
-        monthlyEpochQualifiers = currentMonthlyQualifierCount;
-        monthlyEpoch++;
-        monthlyEpochStartTime = block.timestamp;
-        monthlyProfitAccumulator = 0;
-        currentMonthlyQualifierCount = 0;
-        emit MonthlyEpochClosed(monthlyEpoch, monthlyEpochPool, monthlyEpochQualifiers);
-    }
-
     // ============ Self-Service Rank Salary (user-triggered, time-gated) ============
 
     /**
@@ -450,15 +363,13 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
      *      Calculates rank using 50% max-leg rule and thresholds.
      *      If rank has changed (promotion or demotion), resets the timer
      *      and does NOT pay — fresh countdown starts from the change moment.
+     *      Rank salary is EXEMPT from 3x cap but requires active position.
      */
     function claimRankSalary() external whenNotPaused {
         require(
-            IStakingManager(stakingManager).getTotalActiveStakeValue(msg.sender) > 0,
+            IStakingManager(stakingManager).hasActivePosition(msg.sender),
             "AD: No active stake"
         );
-
-        // Try close epochs on every user action
-        _tryCloseEpochs();
 
         // Calculate current rank
         (uint256 newRank, uint256 salary) = _determineRankLevel(msg.sender);
@@ -478,14 +389,9 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
             "AD: Rank claim too soon"
         );
 
-        // Add salary to rank dividends, capped by FIFO space
+        // Accrue rank salary freely — EXEMPT from 3x cap
         if (salary > 0) {
-            uint256 remainingCap = IStakingManager(stakingManager).getRemainingCap(msg.sender);
-            if (salary > remainingCap) salary = remainingCap;
-            if (salary > 0) {
-                rankDividends[msg.sender] += salary;
-                IStakingManager(stakingManager).addEarnings(msg.sender, salary);
-            }
+            rankDividends[msg.sender] += salary;
         }
 
         lastRankClaimTime[msg.sender] = block.timestamp;
@@ -507,82 +413,16 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
         }
     }
 
-    // ============ Self-Service Qualifier Claims (epoch-based pull model) ============
-
-    /**
-     * @dev Claim weekly qualifier bonus from the last completed epoch.
-     *      Requires $50,000 fresh referral staking business during the epoch.
-     *      Equal share of 3% profit pool among all qualified members.
-     */
-    function claimWeeklyQualifier() external whenNotPaused {
-        _tryCloseEpochs();
-
-        require(weeklyEpoch > 1, "AD: No epoch completed");
-        require(lastWeeklyEpochClaimed[msg.sender] < weeklyEpoch, "AD: Already claimed this epoch");
-        require(lastWeeklyQualifiedEpoch[msg.sender] == weeklyEpoch - 1, "AD: Not qualified (need $50k fresh business)");
-        require(weeklyEpochPool > 0 && weeklyEpochQualifiers > 0, "AD: No pool or qualifiers");
-        require(
-            IStakingManager(stakingManager).getTotalActiveStakeValue(msg.sender) > 0,
-            "AD: No active stake"
-        );
-
-        uint256 share = weeklyEpochPool / weeklyEpochQualifiers;
-
-        // Cap to remaining FIFO space; forfeit excess
-        uint256 remainingCap = IStakingManager(stakingManager).getRemainingCap(msg.sender);
-        if (share > remainingCap) share = remainingCap;
-
-        if (share > 0) {
-            qualifierWeekly[msg.sender] += share;
-            IStakingManager(stakingManager).addEarnings(msg.sender, share);
-        }
-
-        lastWeeklyEpochClaimed[msg.sender] = weeklyEpoch;
-        emit WeeklyQualifierClaimed(msg.sender, weeklyEpoch, share);
-    }
-
-    /**
-     * @dev Claim monthly qualifier bonus from the last completed epoch.
-     *      Requires $500,000 fresh referral staking business during the epoch.
-     *      Equal share of 2% profit pool among all qualified members.
-     */
-    function claimMonthlyQualifier() external whenNotPaused {
-        _tryCloseEpochs();
-
-        require(monthlyEpoch > 1, "AD: No epoch completed");
-        require(lastMonthlyEpochClaimed[msg.sender] < monthlyEpoch, "AD: Already claimed this epoch");
-        require(lastMonthlyQualifiedEpoch[msg.sender] == monthlyEpoch - 1, "AD: Not qualified (need $500k fresh business)");
-        require(monthlyEpochPool > 0 && monthlyEpochQualifiers > 0, "AD: No pool or qualifiers");
-        require(
-            IStakingManager(stakingManager).getTotalActiveStakeValue(msg.sender) > 0,
-            "AD: No active stake"
-        );
-
-        uint256 share = monthlyEpochPool / monthlyEpochQualifiers;
-
-        // Cap to remaining FIFO space; forfeit excess
-        uint256 remainingCap = IStakingManager(stakingManager).getRemainingCap(msg.sender);
-        if (share > remainingCap) share = remainingCap;
-
-        if (share > 0) {
-            qualifierMonthly[msg.sender] += share;
-            IStakingManager(stakingManager).addEarnings(msg.sender, share);
-        }
-
-        lastMonthlyEpochClaimed[msg.sender] = monthlyEpoch;
-        emit MonthlyQualifierClaimed(msg.sender, monthlyEpoch, share);
-    }
-
     // ============ Harvest Function ============
 
     /**
-     * @dev Harvest accumulated income by minting KAIRO at live price
-     * @param _incomeType 0=Direct, 1=Team, 2=Rank, 3=QualifierWeekly, 4=QualifierMonthly
+     * @dev Harvest accumulated income by minting KAIRO at live price.
+     *      Capped income types (0=Direct, 1=Team) are subject to the 3x
+     *      harvest-triggered cap via StakingManager FIFO.
+     *      Rank Dividends (type 2) are EXEMPT from the 3x cap.
+     * @param _incomeType 0=Direct, 1=Team, 2=Rank
      */
     function harvest(uint8 _incomeType) external nonReentrant whenNotPaused {
-        // Try close epochs on every user action
-        _tryCloseEpochs();
-
         uint256 balance;
 
         if (_incomeType == 0) {
@@ -594,17 +434,32 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
         } else if (_incomeType == 2) {
             balance = rankDividends[msg.sender];
             rankDividends[msg.sender] = 0;
-        } else if (_incomeType == 3) {
-            balance = qualifierWeekly[msg.sender];
-            qualifierWeekly[msg.sender] = 0;
-        } else if (_incomeType == 4) {
-            balance = qualifierMonthly[msg.sender];
-            qualifierMonthly[msg.sender] = 0;
         } else {
             revert("AD: Invalid income type");
         }
 
         require(balance >= MIN_HARVEST, "AD: Below minimum harvest ($10)");
+
+        // Rank Dividends (type 2) are EXEMPT from 3x cap
+        if (_incomeType == 2) {
+            // Rank: requires active position (includes capped stakes) but no cap check
+            require(
+                IStakingManager(stakingManager).hasActivePosition(msg.sender),
+                "AD: No active stake"
+            );
+        } else {
+            // Capped income: apply harvest to FIFO 3x cap
+            uint256 applied = IStakingManager(stakingManager).applyCappedHarvest(msg.sender, balance);
+            require(applied > 0, "AD: No cap space for harvest");
+
+            // Refund unharvestable portion back to balance mapping
+            if (applied < balance) {
+                uint256 excess = balance - applied;
+                if (_incomeType == 0) directDividends[msg.sender] = excess;
+                else if (_incomeType == 1) teamDividends[msg.sender] = excess;
+                balance = applied;
+            }
+        }
 
         uint256 livePrice = liquidityPool.getLivePrice();
         require(livePrice > 0, "AD: Invalid price");
@@ -653,41 +508,6 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
         return (0, 0);
     }
 
-    /**
-     * @dev Track fresh referral staking business for qualifier pools.
-     *      Called when a direct referral stakes. Auto-resets on new epoch.
-     *      Increments qualifier counters when thresholds are crossed.
-     */
-    function _addFreshBusiness(address _referrer, uint256 _amount) internal {
-        // Weekly fresh business tracking
-        uint256 wEpoch = weeklyEpoch;
-        if (userWeeklyBusinessEpoch[_referrer] != wEpoch) {
-            userWeeklyBusiness[_referrer] = 0;
-            userWeeklyBusinessEpoch[_referrer] = wEpoch;
-        }
-        userWeeklyBusiness[_referrer] += _amount;
-        if (lastWeeklyQualifiedEpoch[_referrer] != wEpoch &&
-            userWeeklyBusiness[_referrer] >= WEEKLY_QUALIFIER_THRESHOLD) {
-            lastWeeklyQualifiedEpoch[_referrer] = wEpoch;
-            currentWeeklyQualifierCount++;
-        }
-
-        // Monthly fresh business tracking
-        uint256 mEpoch = monthlyEpoch;
-        if (userMonthlyBusinessEpoch[_referrer] != mEpoch) {
-            userMonthlyBusiness[_referrer] = 0;
-            userMonthlyBusinessEpoch[_referrer] = mEpoch;
-        }
-        userMonthlyBusiness[_referrer] += _amount;
-        if (lastMonthlyQualifiedEpoch[_referrer] != mEpoch &&
-            userMonthlyBusiness[_referrer] >= MONTHLY_QUALIFIER_THRESHOLD) {
-            lastMonthlyQualifiedEpoch[_referrer] = mEpoch;
-            currentMonthlyQualifierCount++;
-        }
-
-        emit FreshBusinessAdded(_referrer, _amount);
-    }
-
     // ============ View Functions ============
 
     /**
@@ -714,40 +534,16 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
     }
 
     /**
-     * @dev Get epoch info for weekly and monthly qualifiers
-     */
-    function getEpochInfo() external view returns (
-        uint256 wEpoch, uint256 wStartTime, uint256 wPool, uint256 wQualifiers,
-        uint256 mEpoch, uint256 mStartTime, uint256 mPool, uint256 mQualifiers,
-        uint256 wAccumulator, uint256 mAccumulator
-    ) {
-        wEpoch = weeklyEpoch;
-        wStartTime = weeklyEpochStartTime;
-        wPool = weeklyEpochPool;
-        wQualifiers = weeklyEpochQualifiers;
-        mEpoch = monthlyEpoch;
-        mStartTime = monthlyEpochStartTime;
-        mPool = monthlyEpochPool;
-        mQualifiers = monthlyEpochQualifiers;
-        wAccumulator = weeklyProfitAccumulator;
-        mAccumulator = monthlyProfitAccumulator;
-    }
-
-    /**
      * @dev Get all income balances for a user
      */
     function getAllIncome(address _user) external view returns (
         uint256 direct,
         uint256 team,
-        uint256 rank,
-        uint256 qWeekly,
-        uint256 qMonthly
+        uint256 rank
     ) {
         direct = directDividends[_user];
         team = teamDividends[_user];
         rank = rankDividends[_user];
-        qWeekly = qualifierWeekly[_user];
-        qMonthly = qualifierMonthly[_user];
     }
 
     /**
@@ -756,9 +552,7 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
     function getTotalHarvestable(address _user) external view returns (uint256 total) {
         total = directDividends[_user]
             + teamDividends[_user]
-            + rankDividends[_user]
-            + qualifierWeekly[_user]
-            + qualifierMonthly[_user];
+            + rankDividends[_user];
     }
 
     function getReferrer(address _user) external view returns (address) {
@@ -788,21 +582,6 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
 
     function getTeamVolume(address _user) external view returns (uint256) {
         return teamVolume[_user];
-    }
-
-    /**
-     * @dev Get fresh business info for a user in current epoch
-     */
-    function getUserFreshBusiness(address _user) external view returns (
-        uint256 weeklyBusiness,
-        uint256 monthlyBusiness,
-        bool weeklyQualified,
-        bool monthlyQualified
-    ) {
-        weeklyBusiness = userWeeklyBusinessEpoch[_user] == weeklyEpoch ? userWeeklyBusiness[_user] : 0;
-        monthlyBusiness = userMonthlyBusinessEpoch[_user] == monthlyEpoch ? userMonthlyBusiness[_user] : 0;
-        weeklyQualified = lastWeeklyQualifiedEpoch[_user] == weeklyEpoch;
-        monthlyQualified = lastMonthlyQualifiedEpoch[_user] == monthlyEpoch;
     }
 
     // ============ Admin Functions (call BEFORE burning admin role) ============

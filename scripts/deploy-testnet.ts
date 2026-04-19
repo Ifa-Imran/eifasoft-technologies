@@ -35,6 +35,7 @@ async function main() {
         process.env.DAO_WALLET_3 || deployer.address,
         process.env.DAO_WALLET_4 || deployer.address,
         process.env.DAO_WALLET_5 || deployer.address,
+        process.env.DAO_WALLET_6 || deployer.address,
     ];
 
     // ============================================================
@@ -90,7 +91,7 @@ async function main() {
     const affiliateAddress = await affiliateDistributor.getAddress();
     console.log("  AffiliateDistributor:", affiliateAddress);
 
-    // 6. StakingManager - constructor(address _kairoToken, address _liquidityPool, address _usdt, address _developmentFundWallet, address[5] _daoWallets, address _admin)
+    // 6. StakingManager - constructor(address _kairoToken, address _liquidityPool, address _usdt, address _developmentFundWallet, address[6] _daoWallets, address _admin)
     console.log("[6/8] Deploying StakingManager...");
     const StakingManager = await ethers.getContractFactory("StakingManager");
     const stakingManager = await StakingManager.deploy(

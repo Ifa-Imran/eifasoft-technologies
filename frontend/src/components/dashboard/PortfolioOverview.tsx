@@ -5,28 +5,44 @@ import { useTokenBalances } from '@/hooks/useTokenBalances';
 import { useUserStakes } from '@/hooks/useUserStakes';
 import { useKairoPrice } from '@/hooks/useKairoPrice';
 import { useGlobalStats } from '@/hooks/useGlobalStats';
+import { useAffiliate } from '@/hooks/useAffiliate';
 import { USDT_DECIMALS } from '@/config/contracts';
 import { formatUnits } from 'viem';
 import { formatPrice, formatCompact } from '@/lib/utils';
 import {
-  CurrencyDollarIcon,
   ArrowTrendingUpIcon,
-  GiftIcon,
   CircleStackIcon,
   BeakerIcon,
   ChartBarIcon,
+  BanknotesIcon,
 } from '@heroicons/react/24/outline';
 
 export function PortfolioOverview() {
   const { kairoFormatted } = useTokenBalances();
-  const { totalStaked, totalHarvestable, activeStakes } = useUserStakes();
+  const { totalStaked, activeStakes, totalHarvestedRewards, totalHarvestable, tierGroups } = useUserStakes();
   const { price } = useKairoPrice();
   const { tvlFormatted, totalSupplyFormatted } = useGlobalStats();
+  const { allIncome, lifetimeHarvested } = useAffiliate();
 
   const kairoUsd = Number(kairoFormatted) * price;
   const stakedUsd = totalStaked ? Number(formatUnits(totalStaked, USDT_DECIMALS)) : 0;
-  const harvestableUsd = totalHarvestable ? Number(formatUnits(totalHarvestable, USDT_DECIMALS)) : 0;
   const totalPortfolioUsd = kairoUsd + stakedUsd;
+
+  // Staking earned = already harvested (contract state) + currently harvestable + pending profit
+  const stakingHarvested = totalHarvestedRewards || 0n;
+  const stakingHarvestable = tierGroups.reduce((sum, tg) => sum + tg.displayHarvestable, 0n);
+  const totalStakingEarned = stakingHarvested + stakingHarvestable;
+
+  // Affiliate earned = current pending income (from getAllIncome) + already harvested (from events)
+  const pendingAffiliate = allIncome
+    ? BigInt(allIncome[0] || 0) + BigInt(allIncome[1] || 0) + BigInt(allIncome[2] || 0)
+    : 0n;
+  const harvestedAffiliate = lifetimeHarvested
+    ? (lifetimeHarvested.direct + lifetimeHarvested.team + lifetimeHarvested.rank)
+    : 0n;
+  const totalAffiliateEarned = pendingAffiliate + harvestedAffiliate;
+
+  const totalEarnedUsd = Number(formatUnits(totalStakingEarned + totalAffiliateEarned, USDT_DECIMALS));
 
   // Pool liquidity = actual USDT balance in pool (from useGlobalStats)
   const poolUsdt = Number(tvlFormatted);
@@ -55,14 +71,7 @@ export function PortfolioOverview() {
       </div>
 
       {/* Stat cards - personal */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard
-          label="KAIRO Balance"
-          value={Number(kairoFormatted).toLocaleString('en-US', { maximumFractionDigits: 2 })}
-          suffix=" KAIRO"
-          icon={<CurrencyDollarIcon className="w-5 h-5" />}
-          gradient="cyan"
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <StatCard
           label="Total Staked"
           value={stakedUsd.toLocaleString('en-US', { maximumFractionDigits: 2 })}
@@ -71,10 +80,10 @@ export function PortfolioOverview() {
           gradient="purple"
         />
         <StatCard
-          label="Harvestable"
-          value={harvestableUsd.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+          label="Total Earned"
+          value={totalEarnedUsd.toLocaleString('en-US', { maximumFractionDigits: 2 })}
           prefix="$"
-          icon={<GiftIcon className="w-5 h-5" />}
+          icon={<BanknotesIcon className="w-5 h-5" />}
           gradient="gold"
         />
       </div>

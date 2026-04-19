@@ -74,33 +74,6 @@ export function useP2P() {
     },
   });
 
-  // Zip order data with IDs
-  const activeBuyOrders: P2PBuyOrder[] = useMemo(() => {
-    const orders = (rawBuyOrders as any[]) || [];
-    const ids = (buyOrderIds as bigint[]) || [];
-    return orders.map((o: any, i: number) => ({
-      id: ids[i] ?? BigInt(i),
-      creator: o.creator,
-      usdtAmount: BigInt(o.usdtAmount || 0),
-      usdtRemaining: BigInt(o.usdtRemaining || 0),
-      active: o.active,
-      createdAt: BigInt(o.createdAt || 0),
-    }));
-  }, [rawBuyOrders, buyOrderIds]);
-
-  const activeSellOrders: P2PSellOrder[] = useMemo(() => {
-    const orders = (rawSellOrders as any[]) || [];
-    const ids = (sellOrderIds as bigint[]) || [];
-    return orders.map((o: any, i: number) => ({
-      id: ids[i] ?? BigInt(i),
-      creator: o.creator,
-      kairoAmount: BigInt(o.kairoAmount || 0),
-      kairoRemaining: BigInt(o.kairoRemaining || 0),
-      active: o.active,
-      createdAt: BigInt(o.createdAt || 0),
-    }));
-  }, [rawSellOrders, sellOrderIds]);
-
   const { data: currentPrice } = useReadContract({
     address: contracts.atomicP2p,
     abi: AtomicP2pABI,
@@ -110,6 +83,45 @@ export function useP2P() {
       refetchInterval: 5000,
     },
   });
+
+  // Dust threshold: hide orders with remaining value < 1 USDT
+  const DUST_THRESHOLD = BigInt(10 ** 18); // 1 USDT (18 decimals)
+
+  // Zip order data with IDs, filter out dust
+  const activeBuyOrders: P2PBuyOrder[] = useMemo(() => {
+    const orders = (rawBuyOrders as any[]) || [];
+    const ids = (buyOrderIds as bigint[]) || [];
+    return orders
+      .map((o: any, i: number) => ({
+        id: ids[i] ?? BigInt(i),
+        creator: o.creator,
+        usdtAmount: BigInt(o.usdtAmount || 0),
+        usdtRemaining: BigInt(o.usdtRemaining || 0),
+        active: o.active,
+        createdAt: BigInt(o.createdAt || 0),
+      }))
+      .filter((o) => o.usdtRemaining >= DUST_THRESHOLD);
+  }, [rawBuyOrders, buyOrderIds]);
+
+  const activeSellOrders: P2PSellOrder[] = useMemo(() => {
+    const orders = (rawSellOrders as any[]) || [];
+    const ids = (sellOrderIds as bigint[]) || [];
+    const price = (currentPrice as bigint) ?? BigInt(0);
+    return orders
+      .map((o: any, i: number) => ({
+        id: ids[i] ?? BigInt(i),
+        creator: o.creator,
+        kairoAmount: BigInt(o.kairoAmount || 0),
+        kairoRemaining: BigInt(o.kairoRemaining || 0),
+        active: o.active,
+        createdAt: BigInt(o.createdAt || 0),
+      }))
+      .filter((o) => {
+        if (price === BigInt(0)) return o.kairoRemaining > BigInt(0);
+        const usdtValue = o.kairoRemaining * price / BigInt(10 ** 18);
+        return usdtValue >= DUST_THRESHOLD;
+      });
+  }, [rawSellOrders, sellOrderIds, currentPrice]);
 
   const { writeContract: writeCreateBuy, isPending: createBuyPending, data: createBuyHash } = useWriteContract();
   const { writeContract: writeCreateSell, isPending: createSellPending, data: createSellHash } = useWriteContract();
