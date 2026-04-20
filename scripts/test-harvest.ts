@@ -1,8 +1,8 @@
 import { ethers } from "hardhat";
 
 async function main() {
-  const SM_ADDR = "0x90bce7aCB3429BEF9cE52E9594A90DE69DAad191";
-  const AD_ADDR = "0x27CAc5ffcaDCdB2f7DafaE58Dfd1dEb1C51087CB";
+  const SM_ADDR = "0x9d48b6C43fC858767b451De5Efa2ed1089bf3d1a";
+  const AD_ADDR = "0xc1e192AaCd196AE277f45c35Df98674e098CB393";
   const L1_KEY = "edea0b8af9080af0e04a95a59e68b5236fb9ebd911833bda712ea709a0348a38";
   
   const provider = ethers.provider;

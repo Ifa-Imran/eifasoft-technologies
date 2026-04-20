@@ -15,11 +15,11 @@ async function waitTx(tx: any) {
   return receipt;
 }
 
-// ---- existing deployed addresses (opBNB testnet v17) ----
-const KAIRO_TOKEN = "0x18f56e007cEe5497dA95f04F50E49cE8ddd0010F";
-const LIQUIDITY_POOL = "0x8e98133a9f471257F98c1BC083Eb8FfB94ed76F0";
-const STAKING_MANAGER = "0x90bce7aCB3429BEF9cE52E9594A90DE69DAad191";
-const USDT = "0x3811CE79dc18806cdC60b092d818CBc88B0a72AB";
+// ---- existing deployed addresses (opBNB testnet v18) ----
+const KAIRO_TOKEN = "0x7Fee741907649f5a8E105B0e9a70d1dF4B5a5C60";
+const LIQUIDITY_POOL = "0x62865d26dFf25F1527C9aA962f3BE2828e9cc3Ef";
+const STAKING_MANAGER = "0x9d48b6C43fC858767b451De5Efa2ed1089bf3d1a";
+const USDT = "0xcFF16786A3d7f372Fa93D72aF9b27c91e884cEA5";
 const SYSTEM_WALLET = "0x624D0985D844Cd1DF132723a9d849FE1A34cAf9D";
 
 async function main() {
