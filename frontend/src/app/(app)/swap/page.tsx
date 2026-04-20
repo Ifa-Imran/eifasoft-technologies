@@ -85,10 +85,16 @@ export default function SwapPage() {
 
       <div className="max-w-lg mx-auto space-y-4">
         {/* Pool Liquidity Info */}
-        <GlassCard padding="p-3" variant="gold">
-          <p className="text-[10px] uppercase tracking-wider text-surface-400">Pool Liquidity (USDT)</p>
-          <p className="text-lg font-mono font-bold text-surface-900">${formatCompact(poolUsdt, 2)}</p>
-        </GlassCard>
+        <div className="grid grid-cols-2 gap-3">
+          <GlassCard padding="p-3" variant="gold">
+            <p className="text-[10px] uppercase tracking-wider text-surface-400">Pool USDT</p>
+            <p className="text-lg font-mono font-bold text-surface-900">${formatCompact(poolUsdt, 2)}</p>
+          </GlassCard>
+          <GlassCard padding="p-3">
+            <p className="text-[10px] uppercase tracking-wider text-surface-400">Pool KAIRO</p>
+            <p className="text-lg font-mono font-bold text-primary-700">{formatCompact(poolKairo, 2)}</p>
+          </GlassCard>
+        </div>
 
         <GlassCard variant="gradient">
           <div className="mb-6 text-center">
@@ -105,7 +111,12 @@ export default function SwapPage() {
               <div className="flex justify-between mb-2">
                 <span className="text-xs text-surface-500">You Pay</span>
                 <button
-                  onClick={() => setKairoAmount(Number(kairoFormatted).toFixed(6))}
+                  onClick={() => {
+                    const bal = Number(kairoFormatted);
+                    const dust = 0.001;
+                    const maxVal = bal > dust ? (bal - dust).toFixed(6) : '0';
+                    setKairoAmount(maxVal);
+                  }}
                   className="text-xs text-primary-600 hover:text-primary-700 font-medium"
                 >
                   MAX: {Number(kairoFormatted).toFixed(2)}
@@ -153,11 +164,11 @@ export default function SwapPage() {
                   <span className="flex items-center gap-1">
                     <FireIcon className="w-3 h-3 text-danger-400" /> Fee ({feePercent}%)
                   </span>
-                  <span className="font-mono">${formatCompact(fee, 4)}</span>
+                  <span className="font-mono">${formatCompact(fee, 2)}</span>
                 </div>
                 <div className="flex justify-between text-surface-500">
                   <span>Min Output ({slippage}% slippage)</span>
-                  <span className="font-mono">${formatCompact(minOutput, 4)}</span>
+                  <span className="font-mono">${formatCompact(minOutput, 2)}</span>
                 </div>
                 {priceImpact > 0.01 && (
                   <div className={`flex justify-between ${priceImpact > 5 ? 'text-danger-500 font-semibold' : 'text-surface-500'}`}>

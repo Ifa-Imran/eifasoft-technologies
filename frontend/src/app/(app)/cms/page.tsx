@@ -24,7 +24,7 @@ import {
 export default function CMSPage() {
   const { isConnected } = useAccount();
   const [amount, setAmount] = useState('1');
-  const { totalSubscriptions, userSubscriptionCount, remainingSubscriptions, availableFormatted, loyaltyFormatted, leadershipFormatted, maxClaimableFormatted, claimableFormatted, maxClaimable, subscribe, claimRewards, isPending } = useCMS();
+  const { totalSubscriptions, userSubscriptionCount, remainingSubscriptions, availableFormatted, loyaltyFormatted, leadershipFormatted, maxClaimableFormatted, claimableFormatted, maxClaimable, claimDeadline, isClaimDeadlinePassed, excessToBeDeletedFormatted, cmsDirectCount, hasAlreadyClaimed, levelDetails, subscribe, claimRewards, isPending } = useCMS();
   const { usdtFormatted } = useTokenBalances();
   const { storedReferrer, hasOnChainReferrer } = useRegistration();
   const { totalStaked } = useUserStakes();
@@ -90,7 +90,7 @@ export default function CMSPage() {
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-surface-900">Subscription Progress</h3>
-                  <p className="text-sm text-surface-500">{soldPercent.toFixed(1)}% claimed</p>
+                  <p className="text-sm text-surface-500">{soldPercent.toFixed(2)}% claimed</p>
                 </div>
               </div>
               <div className="text-right">
@@ -227,6 +227,48 @@ export default function CMSPage() {
               </div>
             </div>
 
+            {/* CMS Direct Count & Subscriptions Owned */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 rounded-xl bg-gradient-to-br from-primary-50 to-primary-100/60 border border-primary-200/50 text-center">
+                <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Your Subscriptions</p>
+                <p className="text-lg font-mono font-bold text-primary-700">{userSubscriptionCount}</p>
+              </div>
+              <div className="p-3 rounded-xl bg-gradient-to-br from-success-50 to-success-100/60 border border-success-200/50 text-center">
+                <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">CMS Referrals</p>
+                <p className="text-lg font-mono font-bold text-success-700">{cmsDirectCount}</p>
+              </div>
+            </div>
+
+            {/* Excess to Be Deleted Warning */}
+            {Number(excessToBeDeletedFormatted) > 0 && (
+              <div className="p-3 rounded-xl bg-gradient-to-r from-warn-50 to-warn-100 border border-warn-300 flex items-center gap-2">
+                <FireIcon className="w-5 h-5 text-warn-600 flex-shrink-0" />
+                <div>
+                  <p className="text-xs font-semibold text-warn-700">Excess Rewards Warning</p>
+                  <p className="text-[10px] text-warn-600">
+                    {Number(excessToBeDeletedFormatted).toFixed(2)} KAIRO will be deleted on claim (exceeds your stake cap)
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Claim Deadline Info */}
+            {claimDeadline > 0 && (
+              <div className={`p-3 rounded-xl border text-xs ${isClaimDeadlinePassed ? 'bg-danger-50 border-danger-200 text-danger-600' : 'bg-surface-50 border-surface-200 text-surface-500'}`}>
+                <span className="font-semibold">Claim Deadline:</span>{' '}
+                {new Date(claimDeadline * 1000).toLocaleDateString()} {new Date(claimDeadline * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {isClaimDeadlinePassed && <span className="ml-2 font-bold text-danger-700">(Expired)</span>}
+              </div>
+            )}
+
+            {/* Already Claimed Badge */}
+            {hasAlreadyClaimed && (
+              <div className="p-3 rounded-xl bg-success-50 border border-success-200 flex items-center gap-2">
+                <CheckCircleIcon className="w-5 h-5 text-success-600" />
+                <span className="text-sm font-semibold text-success-700">CMS Rewards Already Claimed</span>
+              </div>
+            )}
+
             {/* Claimable Status - stake-gated */}
             <div className={`p-4 rounded-xl border-2 ${
               totalStaked > 0n
@@ -286,13 +328,117 @@ export default function CMSPage() {
               loading={isPending}
               variant="secondary"
               className="w-full"
-              disabled={Number(availableFormatted) <= 0 || totalStaked <= 0n}
+              disabled={Number(availableFormatted) <= 0 || totalStaked <= 0n || hasAlreadyClaimed}
             >
-              {totalStaked <= 0n ? 'Requires Active Stake to Claim' : 'Claim CMS Rewards'}
+              {hasAlreadyClaimed ? 'Already Claimed' : totalStaked <= 0n ? 'Requires Active Stake to Claim' : 'Claim CMS Rewards'}
             </Button>
           </div>
         </GlassCard>
       </div>
+
+      {/* CMS Reward Structure - Level Breakdown */}
+      <GlassCard>
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-400 to-accent-300 flex items-center justify-center shadow-md shadow-accent-300/30">
+            <SparklesIcon className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-surface-900">Leadership Reward Structure</h3>
+            <p className="text-xs text-surface-500">Earn KAIRO for every subscription in your 5-level network</p>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b-2 border-surface-200">
+                <th className="text-left py-2.5 px-3 text-xs uppercase tracking-wider text-surface-400 font-semibold">Level</th>
+                <th className="text-center py-2.5 px-3 text-xs uppercase tracking-wider text-surface-400 font-semibold">Rate / Sub</th>
+                <th className="text-center py-2.5 px-3 text-xs uppercase tracking-wider text-surface-400 font-semibold">Req. Directs</th>
+                <th className="text-center py-2.5 px-3 text-xs uppercase tracking-wider text-surface-400 font-semibold">Activations</th>
+                <th className="text-center py-2.5 px-3 text-xs uppercase tracking-wider text-surface-400 font-semibold">Earned</th>
+                <th className="text-center py-2.5 px-3 text-xs uppercase tracking-wider text-surface-400 font-semibold">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { level: 1, reward: 1, directs: 0 },
+                { level: 2, reward: 0.5, directs: 2 },
+                { level: 3, reward: 0.5, directs: 3 },
+                { level: 4, reward: 0.25, directs: 4 },
+                { level: 5, reward: 0.25, directs: 5 },
+              ].map((row, i) => {
+                const unlocked = cmsDirectCount >= row.directs;
+                const levelSubs = levelDetails ? Number(levelDetails[0][i] || 0) : 0;
+                const levelEarned = levelDetails ? Number(formatUnits(BigInt(levelDetails[1][i] || 0), 18)) : 0;
+                return (
+                  <tr key={row.level} className={`border-b border-surface-100 ${unlocked ? '' : 'opacity-50'}`}>
+                    <td className="py-3 px-3 font-medium text-surface-700">Level {row.level}</td>
+                    <td className="py-3 px-3 text-center font-mono font-semibold text-accent-700">{row.reward} KAIRO</td>
+                    <td className="py-3 px-3 text-center font-mono text-surface-600">{row.directs}</td>
+                    <td className="py-3 px-3 text-center">
+                      <span className="font-mono font-bold text-primary-700 text-base">{levelSubs}</span>
+                      <span className="text-[10px] text-surface-400 ml-1">subs</span>
+                    </td>
+                    <td className="py-3 px-3 text-center">
+                      <span className="font-mono font-bold text-secondary-700">{levelEarned.toFixed(2)}</span>
+                      <span className="text-[10px] text-surface-400 ml-1">KAIRO</span>
+                    </td>
+                    <td className="py-3 px-3 text-center">
+                      {unlocked ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-success-50 border border-success-200 text-success-700 text-xs font-semibold">
+                          <CheckCircleIcon className="w-3 h-3" /> Unlocked
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-100 border border-surface-200 text-surface-500 text-xs font-semibold">
+                          <LockClosedIcon className="w-3 h-3" /> Need {row.directs - cmsDirectCount} more
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+              {/* Totals row */}
+              <tr className="border-t-2 border-surface-300 bg-surface-50/50">
+                <td className="py-3 px-3 font-bold text-surface-800" colSpan={3}>Total</td>
+                <td className="py-3 px-3 text-center">
+                  <span className="font-mono font-bold text-primary-800 text-base">
+                    {levelDetails ? Array.from({ length: 5 }, (_, i) => Number(levelDetails[0][i] || 0)).reduce((a, b) => a + b, 0) : 0}
+                  </span>
+                  <span className="text-[10px] text-surface-400 ml-1">subs</span>
+                </td>
+                <td className="py-3 px-3 text-center">
+                  <span className="font-mono font-bold text-secondary-800">{Number(leadershipFormatted).toFixed(2)}</span>
+                  <span className="text-[10px] text-surface-400 ml-1">KAIRO</span>
+                </td>
+                <td></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Summary stats */}
+        <div className="grid grid-cols-3 gap-3 mt-5">
+          <div className="p-3 rounded-xl bg-gradient-to-br from-primary-50 to-primary-100/60 border border-primary-200/50 text-center">
+            <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Your CMS Subs</p>
+            <p className="text-xl font-mono font-bold text-primary-700">{userSubscriptionCount}</p>
+          </div>
+          <div className="p-3 rounded-xl bg-gradient-to-br from-success-50 to-success-100/60 border border-success-200/50 text-center">
+            <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">CMS Referrals</p>
+            <p className="text-xl font-mono font-bold text-success-700">{cmsDirectCount}</p>
+          </div>
+          <div className="p-3 rounded-xl bg-gradient-to-br from-secondary-50 to-secondary-100/60 border border-secondary-200/50 text-center">
+            <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Total Leadership</p>
+            <p className="text-xl font-mono font-bold text-secondary-700">{Number(leadershipFormatted).toFixed(2)}</p>
+            <p className="text-[10px] text-surface-400">KAIRO</p>
+          </div>
+        </div>
+
+        <div className="mt-4 p-3 rounded-xl bg-gradient-to-r from-surface-50 to-accent-50/30 border border-surface-200 text-xs text-surface-600">
+          <p className="font-semibold text-surface-700 mb-1">How it works:</p>
+          <p>When someone in your network buys CMS subscriptions, you earn KAIRO based on their level relative to you. Activations show how many subs were purchased at each level. Earned shows the KAIRO credited (only if that level is unlocked).</p>
+        </div>
+      </GlassCard>
     </div>
   );
 }

@@ -22,9 +22,9 @@ export const StakingManagerABI = [
         "type": "address"
       },
       {
-        "internalType": "address[5]",
+        "internalType": "address[6]",
         "name": "_daoWallets",
-        "type": "address[5]"
+        "type": "address[6]"
       },
       {
         "internalType": "address",
@@ -109,17 +109,17 @@ export const StakingManagerABI = [
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "stakeId",
+        "name": "requested",
         "type": "uint256"
       },
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "totalEarned",
+        "name": "applied",
         "type": "uint256"
       }
     ],
-    "name": "CapReached",
+    "name": "CappedHarvestApplied",
     "type": "event"
   },
   {
@@ -158,9 +158,9 @@ export const StakingManagerABI = [
     "inputs": [
       {
         "indexed": false,
-        "internalType": "address[5]",
+        "internalType": "address[6]",
         "name": "wallets",
-        "type": "address[5]"
+        "type": "address[6]"
       }
     ],
     "name": "DaoWalletsSet",
@@ -177,25 +177,6 @@ export const StakingManagerABI = [
       }
     ],
     "name": "DevelopmentFundWalletSet",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "user",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "amount",
-        "type": "uint256"
-      }
-    ],
-    "name": "EarningsApplied",
     "type": "event"
   },
   {
@@ -309,6 +290,31 @@ export const StakingManagerABI = [
       }
     ],
     "name": "RoleRevoked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "stakeId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "totalHarvested",
+        "type": "uint256"
+      }
+    ],
+    "name": "StakeCapped",
     "type": "event"
   },
   {
@@ -498,6 +504,19 @@ export const StakingManagerABI = [
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "affiliateDistributor",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -510,22 +529,15 @@ export const StakingManagerABI = [
         "type": "uint256"
       }
     ],
-    "name": "addEarnings",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "affiliateDistributor",
+    "name": "applyCappedHarvest",
     "outputs": [
       {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
+        "internalType": "uint256",
+        "name": "applied",
+        "type": "uint256"
       }
     ],
-    "stateMutability": "view",
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -621,7 +633,7 @@ export const StakingManagerABI = [
     "outputs": [
       {
         "internalType": "uint256",
-        "name": "earned",
+        "name": "harvested",
         "type": "uint256"
       },
       {
@@ -638,9 +650,9 @@ export const StakingManagerABI = [
     "name": "getDaoWallets",
     "outputs": [
       {
-        "internalType": "address[5]",
+        "internalType": "address[6]",
         "name": "",
-        "type": "address[5]"
+        "type": "address[6]"
       }
     ],
     "stateMutability": "view",
@@ -927,6 +939,25 @@ export const StakingManagerABI = [
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "name": "hasActivePosition",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "bytes32",
         "name": "role",
         "type": "bytes32"
@@ -1059,9 +1090,9 @@ export const StakingManagerABI = [
   {
     "inputs": [
       {
-        "internalType": "address[5]",
+        "internalType": "address[6]",
         "name": "_daoWallets",
-        "type": "address[5]"
+        "type": "address[6]"
       }
     ],
     "name": "setDaoWallets",

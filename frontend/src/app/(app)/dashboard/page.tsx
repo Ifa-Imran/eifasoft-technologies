@@ -1,29 +1,44 @@
 'use client';
 
-import { useAccount } from 'wagmi';
-import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { GlassCard, StatCard, Button } from '@/components/ui';
-import { useTokenBalances } from '@/hooks/useTokenBalances';
-import { useUserStakes } from '@/hooks/useUserStakes';
-import { useKairoPrice } from '@/hooks/useKairoPrice';
-import { useAffiliate } from '@/hooks/useAffiliate';
-import { formatUsdt, formatKairo, shortenAddress } from '@/lib/utils';
+import { Button } from '@/components/ui';
 import { PortfolioOverview } from '@/components/dashboard/PortfolioOverview';
 import { ActiveStakesTable } from '@/components/dashboard/ActiveStakesTable';
 import { IncomeSummary } from '@/components/dashboard/IncomeSummary';
 import { ReferralWidget } from '@/components/dashboard/ReferralWidget';
-import { contracts, USDT_DECIMALS } from '@/config/contracts';
+import { contracts } from '@/config/contracts';
 import { MockUSDTABI } from '@/config/abis/MockUSDT';
-import { parseUnits } from 'viem';
-import { useToast } from '@/components/ui/Toast';
+import { useToast } from '@/components/ui';
+import { useEffect } from 'react';
 import Link from 'next/link';
 
 export default function DashboardPage() {
-  const { isConnected, address } = useAccount();
-  const { writeContract: writeMint, isPending: mintPending, data: mintHash } = useWriteContract();
-  const { isSuccess: mintSuccess } = useWaitForTransactionReceipt({ hash: mintHash });
+  const { isConnected } = useAccount();
   const { toast } = useToast();
+
+  const { writeContract: mintUsdt, data: mintHash, isPending: mintPending } = useWriteContract();
+
+  const { isSuccess: mintSuccess, isError: mintError } = useWaitForTransactionReceipt({
+    hash: mintHash,
+  });
+
+  useEffect(() => {
+    if (mintSuccess) {
+      toast({ type: 'success', title: 'Successfully minted 10,000 USDT!' });
+    }
+    if (mintError) {
+      toast({ type: 'error', title: 'Failed to mint USDT' });
+    }
+  }, [mintSuccess, mintError, toast]);
+
+  const handleMintUsdt = () => {
+    mintUsdt({
+      address: contracts.usdt,
+      abi: MockUSDTABI,
+      functionName: 'faucet',
+    });
+  };
 
   if (!isConnected) {
     return (
@@ -37,35 +52,24 @@ export default function DashboardPage() {
     );
   }
 
-  const handleMintUsdt = () => {
-    if (!address) return;
-    writeMint({
-      address: contracts.usdt,
-      abi: MockUSDTABI,
-      functionName: 'mint',
-      args: [address, parseUnits('100000', USDT_DECIMALS)],
-    });
-    toast({ type: 'pending', title: 'Minting 100,000 Test USDT...' });
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-orbitron font-bold gradient-text">Dashboard</h1>
         <div className="flex items-center gap-3">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleMintUsdt}
+            disabled={mintPending}
+          >
+            {mintPending ? 'Minting...' : 'Mint 10K USDT'}
+          </Button>
           <Link href="/cms">
             <Button variant="primary" size="sm">
               Buy CMS
             </Button>
           </Link>
-          <Button
-            onClick={handleMintUsdt}
-            loading={mintPending}
-            variant="secondary"
-            size="sm"
-          >
-            Mint 100K Test USDT
-          </Button>
         </div>
       </div>
 

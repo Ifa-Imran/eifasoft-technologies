@@ -89,6 +89,75 @@ export function useCMS() {
     },
   });
 
+  // Claim deadline timestamp (unix seconds)
+  const { data: claimDeadline } = useReadContract({
+    address: contracts.cms,
+    abi: CoreMembershipSubscriptionABI,
+    functionName: 'CLAIM_DEADLINE',
+    query: {
+      enabled: contracts.cms !== '0x',
+    },
+  });
+
+  // Claim deadline passed?
+  const { data: claimDeadlinePassed } = useReadContract({
+    address: contracts.cms,
+    abi: CoreMembershipSubscriptionABI,
+    functionName: 'isClaimDeadlinePassed',
+    query: {
+      enabled: contracts.cms !== '0x',
+      refetchInterval: 30000,
+    },
+  });
+
+  // Excess rewards that would be deleted on claim (risk indicator)
+  const { data: excessToBeDeleted } = useReadContract({
+    address: contracts.cms,
+    abi: CoreMembershipSubscriptionABI,
+    functionName: 'getExcessToBeDeleted',
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address && contracts.cms !== '0x',
+      refetchInterval: 15000,
+    },
+  });
+
+  // CMS-specific direct referral count
+  const { data: cmsDirects } = useReadContract({
+    address: contracts.cms,
+    abi: CoreMembershipSubscriptionABI,
+    functionName: 'cmsDirectCount',
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address && contracts.cms !== '0x',
+      refetchInterval: 30000,
+    },
+  });
+
+  // Has user already claimed?
+  const { data: hasAlreadyClaimed } = useReadContract({
+    address: contracts.cms,
+    abi: CoreMembershipSubscriptionABI,
+    functionName: 'hasClaimed',
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address && contracts.cms !== '0x',
+      refetchInterval: 15000,
+    },
+  });
+
+  // Per-level leadership details (subs + rewards per level)
+  const { data: levelDetails, queryKey: levelDetailsKey } = useReadContract({
+    address: contracts.cms,
+    abi: CoreMembershipSubscriptionABI,
+    functionName: 'getLevelDetails',
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address && contracts.cms !== '0x',
+      refetchInterval: 15000,
+    },
+  });
+
   const { writeContract: writeSubscribe, isPending: subscribePending, data: subscribeHash } = useWriteContract();
   const { writeContract: writeClaim, isPending: claimPending, data: claimHash } = useWriteContract();
 
@@ -103,6 +172,7 @@ export function useCMS() {
       queryClient.invalidateQueries({ queryKey: userSubCountKey });
       queryClient.invalidateQueries({ queryKey: remainingKey });
       queryClient.invalidateQueries({ queryKey: claimableKey });
+      queryClient.invalidateQueries({ queryKey: levelDetailsKey });
     }
   }, [subscribeSuccess]);
   useEffect(() => { if (subscribeError) toast({ type: 'error', title: 'Subscription failed' }); }, [subscribeError]);
@@ -141,6 +211,12 @@ export function useCMS() {
     remainingSubscriptions: Number(remaining || 0),
     isSubscriptionEnded: subscriptionEnded === true,
     subscribeDeadline: subscribeDeadline ? Number(subscribeDeadline) : 0,
+    claimDeadline: claimDeadline ? Number(claimDeadline) : 0,
+    isClaimDeadlinePassed: claimDeadlinePassed === true,
+    excessToBeDeleted: excessToBeDeleted as bigint | undefined,
+    excessToBeDeletedFormatted: excessToBeDeleted ? formatUnits(excessToBeDeleted as bigint, KAIRO_DECIMALS) : '0',
+    cmsDirectCount: cmsDirects != null ? Number(cmsDirects) : 0,
+    hasAlreadyClaimed: hasAlreadyClaimed === true,
     claimableRewards: claimable as any,
     maxClaimable: maxClaimable as bigint | undefined,
     // Total available rewards from subscriptions (loyalty + leadership)
@@ -151,6 +227,8 @@ export function useCMS() {
     maxClaimableFormatted: maxClaimable ? formatUnits(maxClaimable as bigint, KAIRO_DECIMALS) : '0',
     // Legacy alias
     claimableFormatted: claimable ? formatUnits((claimable as readonly bigint[])[2] ?? BigInt(0), KAIRO_DECIMALS) : '0',
+    // Per-level details: [subs[5], rewards[5]]
+    levelDetails: levelDetails as readonly [readonly bigint[], readonly bigint[]] | undefined,
     subscribe,
     claimRewards,
     isLoading: countLoading,

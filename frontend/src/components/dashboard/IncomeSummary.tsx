@@ -41,7 +41,7 @@ export function IncomeSummary() {
             </div>
             <div className="flex items-center gap-3">
               <span className={`font-mono text-base font-bold ${type.textColor}`}>
-                ${incomes[i].toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                ${incomes[i].toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
               <Button
                 size="sm"
@@ -60,24 +60,24 @@ export function IncomeSummary() {
         <div className="flex justify-between items-center mb-3">
           <span className="text-base font-semibold text-surface-900">Pending Harvest</span>
           <span className="font-mono font-bold gradient-text text-2xl">
-            ${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            ${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
         </div>
         {lifetimeHarvested && lifetimeHarvested.total > 0n && (
           <div className="p-3 rounded-xl bg-gradient-to-r from-success-50 to-accent-50 border border-success-200/60">
             <div className="flex justify-between items-center mb-2">
               <span className="text-xs font-semibold text-surface-700">Affiliate Harvested</span>
-              <span className="font-mono font-bold text-success-700 text-base">{lifetimeHarvested.totalFormatted}</span>
+              <span className="font-mono font-bold text-success-700 text-base">${Number(lifetimeHarvested.totalFormatted).toFixed(2)}</span>
             </div>
             <div className="grid grid-cols-2 gap-1 text-[10px]">
               {lifetimeHarvested.direct > 0n && (
-                <div className="flex justify-between"><span className="text-surface-500">Direct</span><span className="font-mono text-surface-600">${Number(formatUnits(lifetimeHarvested.direct, USDT_DECIMALS)).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span></div>
+                <div className="flex justify-between"><span className="text-surface-500">Direct</span><span className="font-mono text-surface-600">${Number(formatUnits(lifetimeHarvested.direct, USDT_DECIMALS)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
               )}
               {lifetimeHarvested.team > 0n && (
-                <div className="flex justify-between"><span className="text-surface-500">Team</span><span className="font-mono text-surface-600">${Number(formatUnits(lifetimeHarvested.team, USDT_DECIMALS)).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span></div>
+                <div className="flex justify-between"><span className="text-surface-500">Team</span><span className="font-mono text-surface-600">${Number(formatUnits(lifetimeHarvested.team, USDT_DECIMALS)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
               )}
               {lifetimeHarvested.rank > 0n && (
-                <div className="flex justify-between"><span className="text-surface-500">Rank</span><span className="font-mono text-surface-600">${Number(formatUnits(lifetimeHarvested.rank, USDT_DECIMALS)).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span></div>
+                <div className="flex justify-between"><span className="text-surface-500">Rank</span><span className="font-mono text-surface-600">${Number(formatUnits(lifetimeHarvested.rank, USDT_DECIMALS)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
               )}
             </div>
           </div>
@@ -88,12 +88,12 @@ export function IncomeSummary() {
             <div className="flex justify-between items-center mb-2">
               <span className="text-xs font-semibold text-surface-700">Staking Earnings</span>
               <span className="font-mono font-bold text-primary-700 text-base">
-                ${Number(formatUnits(totalHarvestedRewards + tierGroups.reduce((s, tg) => s + tg.displayHarvestable, 0n), USDT_DECIMALS)).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                ${Number(formatUnits(totalHarvestedRewards + tierGroups.reduce((s, tg) => s + tg.displayHarvestable, 0n), USDT_DECIMALS)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="grid grid-cols-2 gap-1 text-[10px]">
-              <div className="flex justify-between"><span className="text-surface-500">Harvested</span><span className="font-mono text-surface-600">${Number(formatUnits(totalHarvestedRewards, USDT_DECIMALS)).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span></div>
-              <div className="flex justify-between"><span className="text-surface-500">Harvestable</span><span className="font-mono text-surface-600">${Number(formatUnits(tierGroups.reduce((s, tg) => s + tg.displayHarvestable, 0n), USDT_DECIMALS)).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span></div>
+              <div className="flex justify-between"><span className="text-surface-500">Harvested</span><span className="font-mono text-surface-600">${Number(formatUnits(totalHarvestedRewards, USDT_DECIMALS)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+              <div className="flex justify-between"><span className="text-surface-500">Harvestable</span><span className="font-mono text-surface-600">${Number(formatUnits(tierGroups.reduce((s, tg) => s + tg.displayHarvestable, 0n), USDT_DECIMALS)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
             </div>
           </div>
         )}

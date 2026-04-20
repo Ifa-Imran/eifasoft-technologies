@@ -42,7 +42,7 @@ interface IStakingManager {
  *
  * Trigger Model:
  *   All operations are user-triggered.
- *   Rank salary is self-service: users call claimRankSalary() themselves.
+ *   Rank salary auto-accumulates every RANK_INTERVAL. Users just harvest.
  */
 contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
     // ============ Roles ============
@@ -322,8 +322,10 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
     // ============ Team Volume (STAKING_ROLE - called by StakingManager) ============
 
     /**
-     * @dev Add stake volume to all ancestors' team volume (called on stake)
-     * Propagates to ALL ancestors (unlimited levels) for accurate rank calculation
+     * @dev Add stake volume to all ancestors' team volume (called on stake).
+     * Propagates to ALL ancestors (unlimited levels) for accurate rank calculation.
+     * Auto-syncs rank for each upline so salary timer starts immediately when
+     * a user first qualifies for a rank — no manual checkRankChange() needed.
      */
     function addTeamVolume(address _staker, uint256 _amount) external onlyRole(STAKING_ROLE) {
         address current = _staker;
@@ -331,14 +333,16 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
             address upline = referrerOf[current];
             if (upline == address(0) || upline == current) break; // stop at genesis sentinel
             teamVolume[upline] += _amount;
+            _accrueAndSyncRank(upline);
             current = upline;
         }
         emit TeamVolumeAdded(_staker, _amount);
     }
 
     /**
-     * @dev Remove stake volume from all ancestors' team volume (called on unstake/auto-close)
-     * Propagates to ALL ancestors (unlimited levels) to match addTeamVolume
+     * @dev Remove stake volume from all ancestors' team volume (called on unstake/auto-close).
+     * Propagates to ALL ancestors (unlimited levels) to match addTeamVolume.
+     * Auto-syncs rank for each upline so demotions are handled immediately.
      */
     function removeTeamVolume(address _staker, uint256 _amount) external onlyRole(STAKING_ROLE) {
         address current = _staker;
@@ -350,67 +354,80 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
             } else {
                 teamVolume[upline] = 0;
             }
+            _accrueAndSyncRank(upline);
             current = upline;
         }
         emit TeamVolumeRemoved(_staker, _amount);
     }
 
-    // ============ Self-Service Rank Salary (user-triggered, time-gated) ============
+    // ============ Auto-Accruing Rank Salary ============
 
     /**
-     * @dev Claim rank salary based on on-chain team volume.
-     *      Time-gated: can only claim once per RANK_INTERVAL.
-     *      Calculates rank using 50% max-leg rule and thresholds.
-     *      If rank has changed (promotion or demotion), resets the timer
-     *      and does NOT pay — fresh countdown starts from the change moment.
-     *      Rank salary is EXEMPT from 3x cap but requires active position.
+     * @dev View: calculate pending (unclaimed) rank salary based on elapsed time.
+     *      Salary auto-accumulates every RANK_INTERVAL without user action.
+     *      Uses stored rank (not live rank) so salary accrues at the confirmed rate.
      */
-    function claimRankSalary() external whenNotPaused {
-        require(
-            IStakingManager(stakingManager).hasActivePosition(msg.sender),
-            "AD: No active stake"
-        );
+    function _pendingRankSalary(address _user) internal view returns (uint256) {
+        uint256 storedRank = userRankLevel[_user];
+        if (storedRank == 0) return 0;
 
-        // Calculate current rank
-        (uint256 newRank, uint256 salary) = _determineRankLevel(msg.sender);
-        uint256 storedRank = userRankLevel[msg.sender];
+        uint256 lastClaimed = lastRankClaimTime[_user];
+        if (lastClaimed == 0) return 0;
 
-        // Rank changed (promotion or demotion) — reset timer, do NOT pay
-        if (newRank != storedRank) {
-            userRankLevel[msg.sender] = newRank;
-            lastRankClaimTime[msg.sender] = block.timestamp;
-            emit RankChanged(msg.sender, storedRank, newRank);
-            return;
-        }
+        uint256 elapsed = block.timestamp - lastClaimed;
+        uint256 periods = elapsed / RANK_INTERVAL;
+        if (periods == 0) return 0;
 
-        // Same rank — enforce time gate
-        require(
-            block.timestamp >= lastRankClaimTime[msg.sender] + RANK_INTERVAL,
-            "AD: Rank claim too soon"
-        );
-
-        // Accrue rank salary freely — EXEMPT from 3x cap
-        if (salary > 0) {
-            rankDividends[msg.sender] += salary;
-        }
-
-        lastRankClaimTime[msg.sender] = block.timestamp;
-        emit RankSalaryClaimed(msg.sender, newRank, salary);
+        uint256 salary = RANK_SALARIES[storedRank - 1];
+        return periods * salary;
     }
 
     /**
-     * @dev Public function to check and update a user's rank.
-     *      If rank has changed, resets the salary payout timer.
-     *      Can be called by anyone (user themselves, another user, or a backend).
+     * @dev Public view: get pending rank salary for display in frontend
      */
-    function checkRankChange(address _user) external {
-        (uint256 newRank, ) = _determineRankLevel(_user);
+    function pendingRankSalary(address _user) external view returns (uint256) {
+        return _pendingRankSalary(_user);
+    }
+
+    /**
+     * @dev Internal: accrue any pending rank salary to rankDividends,
+     *      then check for rank changes. Advances timer by full periods
+     *      to preserve partial period progress.
+     */
+    function _accrueAndSyncRank(address _user) internal {
         uint256 storedRank = userRankLevel[_user];
+
+        // Accrue pending salary at stored rank rate
+        if (storedRank > 0 && lastRankClaimTime[_user] > 0) {
+            uint256 elapsed = block.timestamp - lastRankClaimTime[_user];
+            uint256 periods = elapsed / RANK_INTERVAL;
+            if (periods > 0) {
+                uint256 salary = RANK_SALARIES[storedRank - 1];
+                uint256 pending = periods * salary;
+                rankDividends[_user] += pending;
+                // Advance timer by full periods (preserves partial period)
+                lastRankClaimTime[_user] += periods * RANK_INTERVAL;
+                emit RankSalaryClaimed(_user, storedRank, pending);
+            }
+        }
+
+        // Check for rank change (promotion or demotion)
+        (uint256 newRank, ) = _determineRankLevel(_user);
         if (newRank != storedRank) {
             userRankLevel[_user] = newRank;
+            // Reset timer on rank change — fresh countdown starts
             lastRankClaimTime[_user] = block.timestamp;
             emit RankChanged(_user, storedRank, newRank);
         }
+    }
+
+    /**
+     * @dev Public function to sync rank and accrue any pending salary.
+     *      Can be called by anyone. Accrues salary at old rank rate first,
+     *      then updates rank if changed. No separate "claim" step needed.
+     */
+    function checkRankChange(address _user) external {
+        _accrueAndSyncRank(_user);
     }
 
     // ============ Harvest Function ============
@@ -423,6 +440,9 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
      * @param _incomeType 0=Direct, 1=Team, 2=Rank
      */
     function harvest(uint8 _incomeType) external nonReentrant whenNotPaused {
+        // Always auto-accrue and sync rank on any harvest — keeps rank up-to-date
+        _accrueAndSyncRank(msg.sender);
+
         uint256 balance;
 
         if (_incomeType == 0) {
@@ -518,23 +538,29 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
     }
 
     /**
-     * @dev Get full rank info for a user
+     * @dev Get full rank info for a user.
+     *      pendingSalary = auto-accumulated salary not yet accrued to rankDividends.
+     *      totalHarvestable = rankDividends + pendingSalary (what user gets on harvest).
      */
     function getUserRankInfo(address _user) external view returns (
         uint256 storedRank,
         uint256 liveRank,
         uint256 salary,
         uint256 lastClaimed,
-        uint256 nextClaimTime
+        uint256 nextClaimTime,
+        uint256 pendingSalary,
+        uint256 totalRankHarvestable
     ) {
         storedRank = userRankLevel[_user];
         (liveRank, salary) = _determineRankLevel(_user);
         lastClaimed = lastRankClaimTime[_user];
         nextClaimTime = lastClaimed + RANK_INTERVAL;
+        pendingSalary = _pendingRankSalary(_user);
+        totalRankHarvestable = rankDividends[_user] + pendingSalary;
     }
 
     /**
-     * @dev Get all income balances for a user
+     * @dev Get all income balances for a user (includes pending auto-accrued rank salary)
      */
     function getAllIncome(address _user) external view returns (
         uint256 direct,
@@ -543,16 +569,17 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
     ) {
         direct = directDividends[_user];
         team = teamDividends[_user];
-        rank = rankDividends[_user];
+        rank = rankDividends[_user] + _pendingRankSalary(_user);
     }
 
     /**
-     * @dev Get total harvestable amount across all income types
+     * @dev Get total harvestable amount across all income types (includes pending rank salary)
      */
     function getTotalHarvestable(address _user) external view returns (uint256 total) {
         total = directDividends[_user]
             + teamDividends[_user]
-            + rankDividends[_user];
+            + rankDividends[_user]
+            + _pendingRankSalary(_user);
     }
 
     function getReferrer(address _user) external view returns (address) {

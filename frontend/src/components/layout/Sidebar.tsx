@@ -86,7 +86,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
       {!collapsed && (
         <div className="p-4">
           <div className="p-3 rounded-xl bg-gradient-to-br from-primary-100 to-secondary-100 border-2 border-primary-200/60">
-            <p className="text-xs text-surface-600 font-medium">opBNB Testnet</p>
+            <p className="text-xs text-surface-600 font-medium">opBNB Network</p>
             <div className="flex items-center gap-1.5 mt-1">
               <div className="w-2 h-2 rounded-full bg-success-500 animate-pulse" />
               <span className="text-xs text-success-600 font-medium">Connected</span>

@@ -21,121 +21,151 @@ function getTier(amount: number) {
   return STAKING_TIERS[0];
 }
 
-const DURATION_OPTIONS = [1, 2, 3, 5, 6, 8] as const;
-const DAILY_RATE = 0.001; // 0.1% per compound
+// Compounding frequencies per tier
+const COMPOUND_TIERS = [
+  { name: 'Bronze', min: 10, max: 499, testInterval: 15, prodInterval: 480 },    // 15m test, 8h prod
+  { name: 'Silver', min: 500, max: 1999, testInterval: 10, prodInterval: 360 },   // 10m test, 6h prod
+  { name: 'Gold', min: 2000, max: Infinity, testInterval: 5, prodInterval: 240 }, // 5m test, 4h prod
+] as const;
+
+function getCompoundTier(amount: number) {
+  if (amount >= 2000) return COMPOUND_TIERS[2];
+  if (amount >= 500) return COMPOUND_TIERS[1];
+  return COMPOUND_TIERS[0];
+}
+
+const DURATION_OPTIONS_TEST = [1, 2, 4, 6, 8, 12, 16, 20, 24] as const;
+const DURATION_OPTIONS_PROD = [1, 3, 6, 9, 12, 15, 18, 21, 24] as const;
+const DAILY_RATE = 0.0015; // 0.15% per compound
 
 function CompoundingCalculator() {
   const [principal, setPrincipal] = useState('1000');
-  const [months, setMonths] = useState(3);
+  const [duration, setDuration] = useState(6);
+  const [mode, setMode] = useState<'test' | 'prod'>('test');
+
+  const durationOptions = mode === 'test' ? DURATION_OPTIONS_TEST : DURATION_OPTIONS_PROD;
+  const durationLabel = mode === 'test' ? 'hour' : 'month';
+  const durationSuffix = mode === 'test' ? 'h' : 'm';
 
   const result = useMemo(() => {
     const P = Number(principal) || 0;
-    if (P <= 0) return { finalAmount: 0, profit: 0, roi: 0 };
+    if (P <= 0) return { profit: 0, tierName: '', intervalLabel: '', totalCompounds: 0 };
 
-    const tier = getTier(P);
-    // Compounds per day = 86400 / compoundInterval
-    const compoundsPerDay = 86400 / tier.compoundInterval;
-    const r = DAILY_RATE; // rate per compound
-    const n = compoundsPerDay; // compounds per day
-    const t = months * 30; // total days
+    const tier = getCompoundTier(P);
+    const intervalMinutes = mode === 'test' ? tier.testInterval : tier.prodInterval;
+    const compoundsPerDay = (24 * 60) / intervalMinutes;
+    const r = DAILY_RATE;
 
-    // A = P(1 + r/n)^(nt) — here r is per-compound, n=1 per compound, total compounds = compoundsPerDay * days
-    const totalCompounds = compoundsPerDay * t;
+    // Duration in days
+    const days = mode === 'test' ? duration / 24 : duration * 30;
+
+    const totalCompounds = compoundsPerDay * days;
     const A = P * Math.pow(1 + r, totalCompounds);
-    const cap = P * 3; // 3X cap
-    const capped = Math.min(A, cap);
+    const profit = A - P;
+
+    const intervalLabel = intervalMinutes >= 60
+      ? `${intervalMinutes / 60}h`
+      : `${intervalMinutes}m`;
 
     return {
-      finalAmount: capped,
-      profit: capped - P,
-      roi: P > 0 ? ((capped - P) / P) * 100 : 0,
+      profit,
       tierName: tier.name,
-      compoundsPerDay,
-      totalCompounds,
-      hitsCap: A >= cap,
+      intervalLabel,
+      totalCompounds: Math.floor(totalCompounds),
     };
-  }, [principal, months]);
+  }, [principal, duration, mode]);
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="text-xs font-semibold text-surface-600 mb-1.5 block">Principal (USDT)</label>
-          <input
-            type="number"
-            value={principal}
-            onChange={(e) => setPrincipal(e.target.value)}
-            className="w-full px-3 py-2.5 rounded-xl border-2 border-surface-200 bg-white/70 font-mono text-surface-900 focus:border-primary-400 focus:outline-none transition-colors"
-            placeholder="Enter stake amount..."
-            min={10}
-          />
-        </div>
-        <div>
-          <label className="text-xs font-semibold text-surface-600 mb-1.5 block">Duration: {months} month{months > 1 ? 's' : ''}</label>
-          <input
-            type="range"
-            min={1}
-            max={8}
-            step={1}
-            value={months}
-            onChange={(e) => setMonths(Number(e.target.value))}
-            className="w-full h-2 rounded-full appearance-none cursor-pointer accent-primary-500 bg-gradient-to-r from-primary-200 to-secondary-200"
-          />
-          <div className="flex justify-between mt-1">
-            {DURATION_OPTIONS.map((m) => (
-              <button
-                key={m}
-                onClick={() => setMonths(m)}
-                className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono transition-colors ${
-                  months === m
-                    ? 'bg-primary-500 text-white font-bold'
-                    : 'text-surface-400 hover:text-primary-600'
-                }`}
-              >
-                {m}m
-              </button>
-            ))}
-          </div>
+      {/* Mode Toggle */}
+      <div className="flex rounded-xl border-2 border-surface-200 overflow-hidden">
+        <button
+          onClick={() => { setMode('test'); setDuration(6); }}
+          className={`flex-1 py-2 text-xs font-semibold transition-colors ${
+            mode === 'test' ? 'bg-primary-500 text-white' : 'bg-white text-surface-500 hover:bg-surface-50'
+          }`}
+        >
+          Testing
+        </button>
+        <button
+          onClick={() => { setMode('prod'); setDuration(6); }}
+          className={`flex-1 py-2 text-xs font-semibold transition-colors ${
+            mode === 'prod' ? 'bg-primary-500 text-white' : 'bg-white text-surface-500 hover:bg-surface-50'
+          }`}
+        >
+          Production
+        </button>
+      </div>
+
+      <div>
+        <label className="text-xs font-semibold text-surface-600 mb-1.5 block">Stake Amount (USDT)</label>
+        <input
+          type="number"
+          value={principal}
+          onChange={(e) => setPrincipal(e.target.value)}
+          className="w-full px-3 py-2.5 rounded-xl border-2 border-surface-200 bg-white/70 font-mono text-surface-900 focus:border-primary-400 focus:outline-none transition-colors"
+          placeholder="Enter stake amount..."
+          min={10}
+        />
+      </div>
+
+      <div>
+        <label className="text-xs font-semibold text-surface-600 mb-1.5 block">
+          Duration: {duration} {durationLabel}{duration > 1 ? 's' : ''}
+        </label>
+        <input
+          type="range"
+          min={1}
+          max={24}
+          step={1}
+          value={duration}
+          onChange={(e) => setDuration(Number(e.target.value))}
+          className="w-full h-2 rounded-full appearance-none cursor-pointer accent-primary-500 bg-gradient-to-r from-primary-200 to-secondary-200"
+        />
+        <div className="flex justify-between mt-2">
+          {durationOptions.map((d) => (
+            <button
+              key={d}
+              onClick={() => setDuration(d)}
+              className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono transition-colors ${
+                duration === d
+                  ? 'bg-primary-500 text-white font-bold'
+                  : 'text-surface-400 hover:text-primary-600'
+              }`}
+            >
+              {d}{durationSuffix}
+            </button>
+          ))}
         </div>
       </div>
 
       {Number(principal) >= 10 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="p-3 rounded-xl bg-gradient-to-br from-primary-50 to-primary-100/60 border-2 border-primary-200/50 text-center">
-            <p className="font-mono font-bold text-primary-700 text-lg">
-              ${result.finalAmount.toLocaleString('en-US', { maximumFractionDigits: 2 })}
-            </p>
-            <p className="text-[10px] text-surface-400 mt-0.5">Final Amount</p>
-          </div>
-          <div className="p-3 rounded-xl bg-gradient-to-br from-success-50 to-success-100/60 border-2 border-success-200/50 text-center">
-            <p className="font-mono font-bold text-success-700 text-lg">
+        <div className="space-y-3">
+          <div className="p-4 rounded-xl bg-gradient-to-br from-success-50 to-success-100/60 border-2 border-success-200/50 text-center">
+            <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Projected Profit</p>
+            <p className="font-mono font-bold text-success-700 text-3xl">
               ${result.profit.toLocaleString('en-US', { maximumFractionDigits: 2 })}
             </p>
-            <p className="text-[10px] text-surface-400 mt-0.5">Projected Profit</p>
           </div>
-          <div className="p-3 rounded-xl bg-gradient-to-br from-accent-50 to-accent-100/60 border-2 border-accent-200/50 text-center">
-            <p className="font-mono font-bold text-accent-700 text-lg">
-              {result.roi.toFixed(1)}%
-            </p>
-            <p className="text-[10px] text-surface-400 mt-0.5">ROI</p>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="p-2 rounded-lg bg-surface-50 border border-surface-200">
+              <p className="text-[10px] uppercase text-surface-400">Tier</p>
+              <p className="text-sm font-bold text-surface-800">{result.tierName}</p>
+            </div>
+            <div className="p-2 rounded-lg bg-surface-50 border border-surface-200">
+              <p className="text-[10px] uppercase text-surface-400">Frequency</p>
+              <p className="text-sm font-bold text-surface-800">{result.intervalLabel}</p>
+            </div>
+            <div className="p-2 rounded-lg bg-surface-50 border border-surface-200">
+              <p className="text-[10px] uppercase text-surface-400">Compounds</p>
+              <p className="text-sm font-bold text-surface-800">{result.totalCompounds}x</p>
+            </div>
           </div>
-          <div className="p-3 rounded-xl bg-gradient-to-br from-secondary-50 to-secondary-100/60 border-2 border-secondary-200/50 text-center">
-            <p className="font-mono font-bold text-secondary-700 text-lg">
-              {result.tierName}
-            </p>
-            <p className="text-[10px] text-surface-400 mt-0.5">Tier ({result.compoundsPerDay}x/day)</p>
-          </div>
-        </div>
-      )}
-
-      {result.hitsCap && (
-        <div className="text-xs text-center text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-2">
-          3X cap reached — projected earnings capped at ${(Number(principal) * 3).toLocaleString()} (3x principal).
         </div>
       )}
 
       <p className="text-[10px] text-surface-400 text-center">
-        Formula: A = P(1 + r)<sup>nt</sup> &middot; 0.1% per compound &middot; Capped at 3X principal
+        0.1% per compound &middot; Tier &amp; frequency auto-detected from amount
       </p>
     </div>
   );
@@ -262,7 +292,7 @@ function StakePageInner() {
             >
               <div className="text-center">
                 <Badge tier={tierBadge} size="md">{t.name}</Badge>
-                <p className="text-sm text-surface-400 mt-3">${t.minAmount.toLocaleString()} – ${t.maxAmount.toLocaleString()}</p>
+                <p className="text-sm text-surface-400 mt-3">${t.minAmount.toLocaleString()}{t.maxAmount === Infinity ? '+' : ` – $${t.maxAmount.toLocaleString()}`}</p>
                 <p className="text-2xl font-mono font-bold text-surface-900 mt-1">{t.compoundInterval / 60}m</p>
                 <p className="text-sm text-surface-500">closing interval</p>
               </div>
@@ -283,7 +313,7 @@ function StakePageInner() {
               placeholder="Enter amount..."
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              helperText={`Balance: ${Number(usdtFormatted).toFixed(2)} USDT | Min: 10 | Max: 2,000 USDT`}
+              helperText={`Balance: ${Number(usdtFormatted).toFixed(2)} USDT | Min: 10 USDT | No Max Limit`}
             />
 
             {numAmount >= 10 && (

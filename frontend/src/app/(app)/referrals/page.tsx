@@ -16,14 +16,12 @@ import {
   LockClosedIcon,
   ScaleIcon,
   ExclamationTriangleIcon,
-  ClockIcon,
   ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
-import { useState, useEffect } from 'react';
 
 export default function RankDividendPage() {
   const { isConnected, address } = useAccount();
-  const { allIncome, rankInfo, directReferrals, teamVolume, unlockedLevels, legVolumes, largestLegVolume, claimRankSalary, harvestIncome, checkRankChange, storedRank, liveRank, rankSalary, nextRankClaim, isRankChangePending, salaryHistory, harvestHistory, historyLoading, totalHarvestedSalary, isLoading, isPending } = useAffiliate();
+  const { allIncome, rankInfo, directReferrals, teamVolume, unlockedLevels, legVolumes, largestLegVolume, harvestIncome, checkRankChange, storedRank, liveRank, rankSalary, nextRankClaim, isRankChangePending, pendingRankSalary: pendingRankSalaryBn, totalRankHarvestable, salaryHistory, harvestHistory, historyLoading, totalHarvestedSalary, teamAnalytics, activeDirects, isLoading, isPending } = useAffiliate();
 
   if (!isConnected) {
     return (
@@ -37,17 +35,10 @@ export default function RankDividendPage() {
   const currentRank = liveRank;
   const rankName = RANK_NAMES[currentRank] || 'None';
 
-  // Countdown timer to next salary payout
-  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
-  useEffect(() => {
-    const t = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
-    return () => clearInterval(t);
-  }, []);
-  const timeLeft = nextRankClaim > now ? nextRankClaim - now : 0;
-  const hrs = Math.floor(timeLeft / 3600);
-  const mins = Math.floor((timeLeft % 3600) / 60);
-  const secs = timeLeft % 60;
-  const countdownStr = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  // Harvestable rank salary (auto-accrues every period, includes pending)
+  const harvestableRank = totalRankHarvestable || (allIncome ? BigInt(allIncome[2] || 0) : 0n);
+  const harvestableRankUsd = Number(formatUnits(harvestableRank, USDT_DECIMALS));
+
   const referralsList = (directReferrals as any[]) || [];
   const teamVolumeUsd = teamVolume ? Number(formatUnits(teamVolume, USDT_DECIMALS)) : 0;
   const largestLegUsd = largestLegVolume ? Number(formatUnits(largestLegVolume, USDT_DECIMALS)) : 0;
@@ -122,9 +113,9 @@ export default function RankDividendPage() {
             </div>
             <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Harvestable Salary</p>
             <p className="text-2xl font-mono font-bold text-success-700">
-              ${allIncome ? Number(formatUnits(BigInt(allIncome[2] || 0), USDT_DECIMALS)).toFixed(2) : '0.00'}
+              ${harvestableRankUsd.toFixed(2)}
             </p>
-            <p className="text-[10px] text-surface-400">pending harvest</p>
+            <p className="text-[10px] text-surface-400">auto-accumulates every period</p>
           </div>
 
           {/* Harvested Salary */}
@@ -150,33 +141,27 @@ export default function RankDividendPage() {
           className="mb-4"
         />
 
-        {/* Next Payout Timer */}
+        {/* Salary Info & Harvest Button */}
         {currentRank > 0 && (
           <div className="flex items-center justify-between p-3 rounded-xl bg-white/50 border border-surface-200 mb-4">
             <div className="flex items-center gap-2">
-              <ClockIcon className="w-5 h-5 text-secondary-500" />
-              <span className="text-sm text-surface-600">Next Payout</span>
+              <CurrencyDollarIcon className="w-5 h-5 text-accent-500" />
+              <span className="text-sm text-surface-600">Earning <span className="font-semibold text-accent-700">${rankSalary ? Number(formatUnits(rankSalary, USDT_DECIMALS)).toFixed(2) : '0'}</span> / period</span>
             </div>
-            <p className={`text-lg font-mono font-bold ${timeLeft > 0 ? 'text-secondary-700' : 'text-success-600 animate-pulse-soft'}`}>
-              {timeLeft > 0 ? countdownStr : 'Ready!'}
-            </p>
+            <p className="text-xs text-surface-400">Auto-accumulates every hour (test) / 7 days (prod)</p>
           </div>
         )}
 
-        {/* Harvest / Claim Buttons */}
-        <div className="grid grid-cols-2 gap-3">
-          <Button onClick={claimRankSalary} loading={isPending} disabled={timeLeft > 0 && !isRankChangePending}>
-            {isRankChangePending ? 'Update Rank' : timeLeft > 0 ? `Claim in ${countdownStr}` : 'Claim Rank Salary'}
-          </Button>
+        {/* Harvest Button */}
+        <div className="grid grid-cols-1 gap-3">
           <Button
-            variant="secondary"
             onClick={() => harvestIncome(2)}
             loading={isPending}
-            disabled={!allIncome || BigInt(allIncome[2] || 0) === 0n}
+            disabled={harvestableRank === 0n}
             icon={<ArrowDownTrayIcon className="w-4 h-4" />}
           >
-            {allIncome && BigInt(allIncome[2] || 0) > 0n
-              ? `Harvest $${Number(formatUnits(BigInt(allIncome[2] || 0), USDT_DECIMALS)).toFixed(2)}`
+            {harvestableRank > 0n
+              ? `Harvest $${harvestableRankUsd.toFixed(2)}`
               : 'Nothing to Harvest'}
           </Button>
         </div>
@@ -193,7 +178,7 @@ export default function RankDividendPage() {
           </div>
           <div className="text-center p-5 rounded-2xl bg-gradient-to-br from-primary-50/60 to-white/60 border-2 border-primary-200/50 mb-4">
             <p className="text-3xl font-mono font-bold text-surface-900">
-              ${formatCompact(teamVolumeUsd, 0)}
+              ${formatCompact(teamVolumeUsd, 2)}
             </p>
             <p className="text-sm text-surface-500 mt-1">Total Team Volume</p>
           </div>
@@ -203,22 +188,26 @@ export default function RankDividendPage() {
               <div className="flex justify-between text-sm">
                 <span className="text-surface-500">Next: {RANK_NAMES[currentRank + 1]}</span>
                 <span className="font-mono font-semibold text-primary-600">
-                  ${formatCompact(nextThreshold, 0)}
+                  ${formatCompact(nextThreshold, 2)}
                 </span>
               </div>
-              <ProgressBar value={progressToNext} label={`${progressToNext.toFixed(1)}% achieved`} variant="cyan" size="lg" />
+              <ProgressBar value={progressToNext} label={`${progressToNext.toFixed(2)}% achieved`} variant="cyan" size="lg" />
               <p className="text-xs text-surface-400 mt-1">
                 {adjustedVolume >= nextThreshold
                   ? 'Target met!'
-                  : `Need $${formatCompact(nextThreshold - adjustedVolume, 0)} more (adjusted)`}
+                  : `Need $${formatCompact(nextThreshold - adjustedVolume, 2)} more (adjusted)`}
               </p>
             </div>
           )}
 
-          <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className="mt-4 grid grid-cols-3 gap-2">
             <div className="p-3 rounded-xl bg-gradient-to-r from-primary-100 to-primary-50 border border-primary-200/50 text-center">
               <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Direct Referrals</p>
               <p className="text-lg font-mono font-bold text-primary-700">{referralsList.length}</p>
+            </div>
+            <div className="p-3 rounded-xl bg-gradient-to-r from-success-100 to-success-50 border border-success-200/50 text-center">
+              <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Active Directs</p>
+              <p className="text-lg font-mono font-bold text-success-700">{activeDirects}</p>
             </div>
             <div className="p-3 rounded-xl bg-gradient-to-r from-secondary-100 to-secondary-50 border border-secondary-200/50 text-center">
               <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Unlocked Levels</p>
@@ -238,8 +227,6 @@ export default function RankDividendPage() {
               { label: 'Direct', color: 'bg-primary-500', text: 'text-primary-600' },
               { label: 'Team', color: 'bg-secondary-500', text: 'text-secondary-600' },
               { label: 'Rank', color: 'bg-accent-500', text: 'text-accent-600' },
-              { label: 'Weekly', color: 'bg-success-500', text: 'text-success-600' },
-              { label: 'Monthly', color: 'bg-warn-500', text: 'text-warn-600' },
             ].map((item, i) => {
               const income = allIncome ? Number(formatUnits(BigInt(allIncome[i] || 0), USDT_DECIMALS)) : 0;
               return (
@@ -276,19 +263,19 @@ export default function RankDividendPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <div className="p-3 rounded-xl bg-gradient-to-br from-primary-50 to-primary-100/60 border border-primary-200/50 text-center">
             <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Total Volume</p>
-            <p className="text-lg font-mono font-bold text-primary-700">${formatCompact(teamVolumeUsd, 0)}</p>
+            <p className="text-lg font-mono font-bold text-primary-700">${formatCompact(teamVolumeUsd, 2)}</p>
           </div>
           <div className="p-3 rounded-xl bg-gradient-to-br from-warn-50 to-warn-100/60 border border-warn-200/50 text-center">
             <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Largest Leg</p>
-            <p className="text-lg font-mono font-bold text-warn-700">${formatCompact(largestLegUsd, 0)}</p>
+            <p className="text-lg font-mono font-bold text-warn-700">${formatCompact(largestLegUsd, 2)}</p>
           </div>
           <div className="p-3 rounded-xl bg-gradient-to-br from-secondary-50 to-secondary-100/60 border border-secondary-200/50 text-center">
             <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Other Legs</p>
-            <p className="text-lg font-mono font-bold text-secondary-700">${formatCompact(otherLegsVolume, 0)}</p>
+            <p className="text-lg font-mono font-bold text-secondary-700">${formatCompact(otherLegsVolume, 2)}</p>
           </div>
           <div className={`p-3 rounded-xl border text-center ${isLegCapped ? 'bg-gradient-to-br from-warn-50 to-warn-100/60 border-warn-200/50' : 'bg-gradient-to-br from-success-50 to-success-100/60 border-success-200/50'}`}>
             <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Qualifying Volume</p>
-            <p className={`text-lg font-mono font-bold ${isLegCapped ? 'text-warn-700' : 'text-success-700'}`}>${formatCompact(adjustedVolume, 0)}</p>
+            <p className={`text-lg font-mono font-bold ${isLegCapped ? 'text-warn-700' : 'text-success-700'}`}>${formatCompact(adjustedVolume, 2)}</p>
           </div>
         </div>
 
@@ -297,7 +284,7 @@ export default function RankDividendPage() {
           <div className="space-y-2">
             <div className="flex justify-between text-xs text-surface-500">
               <span>Largest leg contribution</span>
-              <span className="font-mono">{((largestLegUsd / teamVolumeUsd) * 100).toFixed(1)}% of total</span>
+              <span className="font-mono">{((largestLegUsd / teamVolumeUsd) * 100).toFixed(2)}% of total</span>
             </div>
             <div className="w-full h-3 rounded-full bg-surface-100 overflow-hidden flex">
               <div
@@ -321,8 +308,8 @@ export default function RankDividendPage() {
             </div>
             {isLegCapped && (
               <p className="text-xs text-warn-600 mt-1 p-2 rounded-lg bg-warn-50 border border-warn-200">
-                Your largest leg ({((largestLegUsd / teamVolumeUsd) * 100).toFixed(1)}%) exceeds the 50% limit.
-                ${formatCompact(largestLegUsd - maxLeg, 0)} excluded from qualifying volume.
+                Your largest leg ({((largestLegUsd / teamVolumeUsd) * 100).toFixed(2)}%) exceeds the 50% limit.
+                ${formatCompact(largestLegUsd - maxLeg, 2)} excluded from qualifying volume.
               </p>
             )}
           </div>
@@ -378,10 +365,10 @@ export default function RankDividendPage() {
                       </div>
                     </td>
                     <td className="py-3 px-3 text-right font-mono font-semibold text-surface-700">
-                      ${formatCompact(threshold, 0)}
+                      ${formatCompact(threshold, 2)}
                     </td>
                     <td className="py-3 px-3 text-right font-mono font-bold text-accent-600">
-                      ${RANK_SALARIES_USD[i].toLocaleString()}
+                      ${RANK_SALARIES_USD[i].toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td className="py-3 px-3">
                       <div className="w-full max-w-[120px] mx-auto">
@@ -392,7 +379,7 @@ export default function RankDividendPage() {
                           showValue={false}
                         />
                         <p className="text-[10px] text-center text-surface-400 mt-0.5">
-                          {adjustedProgressPct >= 100 ? '100%' : `${adjustedProgressPct.toFixed(1)}%`}
+                          {adjustedProgressPct >= 100 ? '100%' : `${adjustedProgressPct.toFixed(2)}%`}
                         </p>
                       </div>
                     </td>

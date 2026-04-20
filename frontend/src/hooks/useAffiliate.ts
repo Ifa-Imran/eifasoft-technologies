@@ -43,8 +43,6 @@ export interface TeamAnalytics {
   activeTeamStakes: number;
   directBusiness: bigint;
   directBusinessFormatted: string;
-  totalTeamBusiness: bigint;
-  totalTeamBusinessFormatted: string;
 }
 
 export interface LifetimeHarvested {
@@ -75,32 +73,49 @@ export function useAffiliate() {
     (async () => {
       setHistoryLoading(true);
       try {
-        // Fetch RankSalaryClaimed events
-        const claimLogs = await publicClient.getLogs({
-          address: contracts.affiliateDistributor,
-          event: parseAbiItem('event RankSalaryClaimed(address indexed user, uint256 rankLevel, uint256 salary)'),
-          args: { user: address },
-          fromBlock: 0n,
-          toBlock: 'latest',
-        });
+        // Use a safe fromBlock range (some RPCs reject fromBlock:0n)
+        let safeFrom = 0n;
+        try {
+          const latestBlock = await publicClient.getBlockNumber();
+          safeFrom = latestBlock > 500_000n ? latestBlock - 500_000n : 0n;
+        } catch {}
 
-        // Fetch ALL Harvested events from AffiliateDistributor (all income types)
-        const allHarvestLogs = await publicClient.getLogs({
-          address: contracts.affiliateDistributor,
-          event: parseAbiItem('event Harvested(address indexed user, uint8 incomeType, uint256 usdAmount, uint256 kairoAmount)'),
-          args: { user: address },
-          fromBlock: 0n,
-          toBlock: 'latest',
-        });
+        // Fetch events - each wrapped individually so one failure doesn't block others
+        let claimLogs: any[] = [];
+        let allHarvestLogs: any[] = [];
+        let stakingHarvestLogs: any[] = [];
 
-        // Fetch staking Harvested events from StakingManager
-        const stakingHarvestLogs = contracts.stakingManager !== '0x' ? await publicClient.getLogs({
-          address: contracts.stakingManager,
-          event: parseAbiItem('event Harvested(address indexed user, uint256 stakeId, uint256 amount)'),
-          args: { user: address },
-          fromBlock: 0n,
-          toBlock: 'latest',
-        }) : [];
+        try {
+          claimLogs = await publicClient.getLogs({
+            address: contracts.affiliateDistributor,
+            event: parseAbiItem('event RankSalaryClaimed(address indexed user, uint256 rankLevel, uint256 salary)'),
+            args: { user: address },
+            fromBlock: safeFrom,
+            toBlock: 'latest',
+          });
+        } catch (e) { console.warn('Failed to fetch RankSalaryClaimed logs:', e); }
+
+        try {
+          allHarvestLogs = await publicClient.getLogs({
+            address: contracts.affiliateDistributor,
+            event: parseAbiItem('event Harvested(address indexed user, uint8 incomeType, uint256 usdAmount, uint256 kairoAmount)'),
+            args: { user: address },
+            fromBlock: safeFrom,
+            toBlock: 'latest',
+          });
+        } catch (e) { console.warn('Failed to fetch Harvested logs:', e); }
+
+        try {
+          if (contracts.stakingManager !== '0x') {
+            stakingHarvestLogs = await publicClient.getLogs({
+              address: contracts.stakingManager,
+              event: parseAbiItem('event Harvested(address indexed user, uint256 stakeId, uint256 amount)'),
+              args: { user: address },
+              fromBlock: safeFrom,
+              toBlock: 'latest',
+            });
+          }
+        } catch (e) { console.warn('Failed to fetch staking Harvested logs:', e); }
 
         if (cancelled) return;
 
@@ -185,7 +200,12 @@ export function useAffiliate() {
       setTeamLevelLoading(true);
       try {
         const contractAddr = contracts.affiliateDistributor;
-        if (!contractAddr || contractAddr === '0x') return;
+        if (!contractAddr || contractAddr === '0x') {
+          console.warn('[BFS] affiliateDistributor address not set');
+          return;
+        }
+
+        console.log('[BFS] Starting BFS for', address);
 
         // BFS to get per-level members and their teamVolume
         const levelMembers: Map<number, Set<string>> = new Map();
@@ -207,28 +227,32 @@ export function useAffiliate() {
             args: [address],
           }) as string[];
           currentLevel = directs || [];
-        } catch { currentLevel = []; }
+          console.log('[BFS] Direct referrals:', currentLevel.length);
+        } catch (e) { console.error('[BFS] getDirectReferrals failed:', e); currentLevel = []; }
 
         for (let lvl = 1; currentLevel.length > 0; lvl++) {
           if (lvl <= 15) {
             const membersSet = levelMembers.get(lvl)!;
             for (const addr of currentLevel) membersSet.add(addr.toLowerCase());
 
-            // Batch read teamVolume for each member at this level (only for dividend levels)
-            const volCalls = currentLevel.map(addr => ({
-              address: contractAddr,
-              abi: AffiliateDistributorABI,
-              functionName: 'teamVolume' as const,
-              args: [addr as `0x${string}`],
-            }));
-            try {
-              const results = await publicClient.multicall({ contracts: volCalls });
-              let totalVol = 0n;
-              for (const r of results) {
-                if (r.status === 'success' && r.result) totalVol += BigInt(r.result as any);
-              }
-              levelBusiness.set(lvl, totalVol);
-            } catch {}
+            // Batch read getTotalActiveStakeValue for each member at this level (personal stake = their business)
+            const stakingAddr = contracts.stakingManager;
+            if (stakingAddr && stakingAddr !== '0x') {
+              const volCalls = currentLevel.map(addr => ({
+                address: stakingAddr,
+                abi: StakingManagerABI,
+                functionName: 'getTotalActiveStakeValue' as const,
+                args: [addr as `0x${string}`],
+              }));
+              try {
+                const results = await publicClient.multicall({ contracts: volCalls });
+                let totalVol = 0n;
+                for (const r of results) {
+                  if (r.status === 'success' && r.result) totalVol += BigInt(r.result as any);
+                }
+                levelBusiness.set(lvl, totalVol);
+              } catch {}
+            }
           } else {
             // Beyond level 15: just count members
             for (const addr of currentLevel) deepMembers.push(addr.toLowerCase());
@@ -255,36 +279,42 @@ export function useAffiliate() {
             } catch {}
           }
           currentLevel = nextLevel;
-          if (cancelled) return;
+          if (cancelled) { console.warn('[BFS] Cancelled at level', lvl); return; }
         }
 
+        console.log('[BFS] BFS complete. Level 1 members:', levelMembers.get(1)?.size);
         // Fetch TeamEarned events for this user (indexed as upline)
-        const teamEarnedLogs = await publicClient.getLogs({
-          address: contractAddr,
-          event: parseAbiItem('event TeamEarned(address indexed upline, address indexed staker, uint256 level, uint256 amount)'),
-          args: { upline: address },
-          fromBlock: 0n,
-          toBlock: 'latest',
-        });
-
-        // Aggregate per-level earnings
+        // Wrapped in try/catch: some RPCs reject fromBlock:0n log queries
         const levelEarned: Map<number, bigint> = new Map();
         const levelTxCount: Map<number, number> = new Map();
         for (let i = 1; i <= 15; i++) {
           levelEarned.set(i, 0n);
           levelTxCount.set(i, 0);
         }
-        for (const log of teamEarnedLogs) {
-          const args = log.args as any;
-          const lvl = Number(args.level);
-          const amt = BigInt(args.amount || 0);
-          if (lvl >= 1 && lvl <= 15) {
-            levelEarned.set(lvl, (levelEarned.get(lvl) || 0n) + amt);
-            levelTxCount.set(lvl, (levelTxCount.get(lvl) || 0) + 1);
+        try {
+          const latestBlock = await publicClient.getBlockNumber();
+          const safeFrom = latestBlock > 500_000n ? latestBlock - 500_000n : 0n;
+          const teamEarnedLogs = await publicClient.getLogs({
+            address: contractAddr,
+            event: parseAbiItem('event TeamEarned(address indexed upline, address indexed staker, uint256 level, uint256 amount)'),
+            args: { upline: address },
+            fromBlock: safeFrom,
+            toBlock: 'latest',
+          });
+          for (const log of teamEarnedLogs) {
+            const args = log.args as any;
+            const lvl = Number(args.level);
+            const amt = BigInt(args.amount || 0);
+            if (lvl >= 1 && lvl <= 15) {
+              levelEarned.set(lvl, (levelEarned.get(lvl) || 0n) + amt);
+              levelTxCount.set(lvl, (levelTxCount.get(lvl) || 0) + 1);
+            }
           }
+        } catch (logErr) {
+          console.warn('Failed to fetch TeamEarned logs (non-fatal):', logErr);
         }
 
-        if (cancelled) return;
+        if (cancelled) { console.warn('[BFS] Cancelled before analytics'); return; }
 
         const stats: TeamLevelStats[] = [];
         for (let i = 1; i <= 15; i++) {
@@ -304,6 +334,7 @@ export function useAffiliate() {
 
         // ── Team Analytics: active directs, direct business, team size, active team stakes ──
         const directAddrs = levelMembers.get(1) ? [...levelMembers.get(1)!] : [];
+        console.log('[BFS] Analytics - directAddrs:', directAddrs.length, 'addresses');
         const allTeamAddrs: string[] = [];
         for (let i = 1; i <= 15; i++) {
           const s = levelMembers.get(i);
@@ -314,12 +345,12 @@ export function useAffiliate() {
         const totalTeamSize = allTeamAddrs.length;
 
         // Batch check getTotalActiveStakeValue for direct referrals
-        const stakingAddr = contracts.stakingManager;
+        const stakingAddrForAnalytics = contracts.stakingManager;
         let directActive = 0;
         let directBusiness = 0n;
-        if (directAddrs.length > 0 && stakingAddr && stakingAddr !== '0x') {
+        if (directAddrs.length > 0 && stakingAddrForAnalytics && stakingAddrForAnalytics !== '0x') {
           const stakeCalls = directAddrs.map(addr => ({
-            address: stakingAddr,
+            address: stakingAddrForAnalytics,
             abi: StakingManagerABI,
             functionName: 'getTotalActiveStakeValue' as const,
             args: [addr as `0x${string}`],
@@ -332,17 +363,17 @@ export function useAffiliate() {
                 if (val > 0n) { directActive++; directBusiness += val; }
               }
             }
-          } catch {}
+          } catch (mcErr) { console.error('[BFS] Direct stake multicall FAILED:', mcErr); }
         }
 
         // Batch check getTotalActiveStakeValue for ALL team members (chunked)
         let activeTeamStakes = 0;
-        if (allTeamAddrs.length > 0 && stakingAddr && stakingAddr !== '0x') {
+        if (allTeamAddrs.length > 0 && stakingAddrForAnalytics && stakingAddrForAnalytics !== '0x') {
           const CHUNK = 200;
           for (let c = 0; c < allTeamAddrs.length; c += CHUNK) {
             const chunk = allTeamAddrs.slice(c, c + CHUNK);
             const calls = chunk.map(addr => ({
-              address: stakingAddr,
+              address: stakingAddrForAnalytics,
               abi: StakingManagerABI,
               functionName: 'getTotalActiveStakeValue' as const,
               args: [addr as `0x${string}`],
@@ -352,14 +383,13 @@ export function useAffiliate() {
               for (const r of results) {
                 if (r.status === 'success' && BigInt(r.result as any) > 0n) activeTeamStakes++;
               }
-            } catch {}
+            } catch (mcErr) { console.error('[BFS] Team stake multicall FAILED:', mcErr); }
           }
         }
 
-        if (cancelled) return;
+        if (cancelled) { console.warn('[BFS] Cancelled before setTeamAnalytics'); return; }
 
-        // Total team business = user's teamVolume (already fetched via contract read)
-        // We pass it as-is; the page will use the teamVolume from the hook
+        console.log('[BFS] FINAL:', { directActive, directBusiness: directBusiness.toString(), activeTeamStakes, totalTeamSize });
         setTeamAnalytics({
           directTotal: directAddrs.length,
           directActive,
@@ -367,8 +397,6 @@ export function useAffiliate() {
           activeTeamStakes,
           directBusiness,
           directBusinessFormatted: `$${Number(formatUnits(directBusiness, USDT_DECIMALS)).toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
-          totalTeamBusiness: 0n, // will use teamVolume from the main hook
-          totalTeamBusinessFormatted: '',
         });
       } catch (err) {
         console.error('Failed to fetch team level data:', err);
@@ -443,30 +471,28 @@ export function useAffiliate() {
     },
   });
 
+  const { data: totalHarvestable } = useReadContract({
+    address: contracts.affiliateDistributor,
+    abi: AffiliateDistributorABI,
+    functionName: 'getTotalHarvestable',
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address && contracts.affiliateDistributor !== '0x',
+      refetchInterval: 15000,
+    },
+  });
+
   // Write operations
-  const { writeContract: writeClaimRank, isPending: claimRankPending, data: claimRankHash } = useWriteContract();
   const { writeContract: writeHarvest, isPending: harvestPending, data: harvestHash } = useWriteContract();
   const { writeContract: writeCheckRank, isPending: checkRankPending, data: checkRankHash } = useWriteContract();
 
-  const { isSuccess: rankSuccess, isError: rankError } = useWaitForTransactionReceipt({ hash: claimRankHash });
   const { isSuccess: harvestSuccess, isError: harvestError } = useWaitForTransactionReceipt({ hash: harvestHash });
   const { isSuccess: checkRankSuccess, isError: checkRankError } = useWaitForTransactionReceipt({ hash: checkRankHash });
 
-  useEffect(() => { if (rankSuccess) toast({ type: 'success', title: 'Rank salary harvested!' }); }, [rankSuccess]);
-  useEffect(() => { if (rankError) toast({ type: 'error', title: 'Rank salary harvest failed' }); }, [rankError]);
   useEffect(() => { if (harvestSuccess) toast({ type: 'success', title: 'Income harvested!' }); }, [harvestSuccess]);
   useEffect(() => { if (harvestError) toast({ type: 'error', title: 'Harvest failed' }); }, [harvestError]);
   useEffect(() => { if (checkRankSuccess) toast({ type: 'success', title: 'Rank updated!' }); }, [checkRankSuccess]);
   useEffect(() => { if (checkRankError) toast({ type: 'error', title: 'Rank check failed' }); }, [checkRankError]);
-
-  const claimRankSalary = () => {
-    writeClaimRank({
-      address: contracts.affiliateDistributor,
-      abi: AffiliateDistributorABI,
-      functionName: 'claimRankSalary',
-    });
-    toast({ type: 'pending', title: 'Harvesting rank salary...' });
-  };
 
   const harvestIncome = (incomeType: number) => {
     writeHarvest({
@@ -530,21 +556,22 @@ export function useAffiliate() {
   return {
     allIncome: allIncome as any,
     rankInfo: rankInfo as any,
-    // Parsed rank info fields (getUserRankInfo returns: storedRank, liveRank, salary, lastClaimed, nextClaimTime)
+    // Parsed rank info fields (getUserRankInfo returns: storedRank, liveRank, salary, lastClaimed, nextClaimTime, pendingSalary, totalRankHarvestable)
     storedRank: rankInfo ? Number((rankInfo as any)[0] || 0) : 0,
     liveRank: rankInfo ? Number((rankInfo as any)[1] || 0) : 0,
     rankSalary: rankInfo ? BigInt((rankInfo as any)[2] || 0) : 0n,
     lastRankClaim: rankInfo ? Number((rankInfo as any)[3] || 0) : 0,
     nextRankClaim: rankInfo ? Number((rankInfo as any)[4] || 0) : 0,
+    pendingRankSalary: rankInfo ? BigInt((rankInfo as any)[5] || 0) : 0n,
+    totalRankHarvestable: rankInfo ? BigInt((rankInfo as any)[6] || 0) : 0n,
     isRankChangePending: rankInfo ? Number((rankInfo as any)[0] || 0) !== Number((rankInfo as any)[1] || 0) : false,
     directReferrals: directReferrals as any,
-    freshBusiness: null,
     upline: upline as string | undefined,
     teamVolume: teamVolume as bigint | undefined,
     unlockedLevels: unlockedLevels != null ? Number(unlockedLevels) : 0,
     legVolumes,
     largestLegVolume,
-    claimRankSalary,
+    claimRankSalary: () => {}, // deprecated: rank salary now auto-accrues
     harvestIncome,
     checkRankChange,
     salaryHistory,
@@ -554,8 +581,10 @@ export function useAffiliate() {
     teamLevelLoading,
     teamAnalytics,
     lifetimeHarvested,
+    totalHarvestable: totalHarvestable as bigint | undefined,
+    activeDirects: teamAnalytics?.directActive || 0,
     totalHarvestedSalary: harvestHistory.reduce((sum, h) => sum + h.amount, 0n),
     isLoading: incomeLoading || rankLoading,
-    isPending: claimRankPending || harvestPending || checkRankPending,
+    isPending: harvestPending || checkRankPending,
   };
 }

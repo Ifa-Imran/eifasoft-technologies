@@ -80,12 +80,10 @@ export function formatCompact(value: number, decimals: number = 2): string {
  */
 export function formatPrice(value: number): string {
   const abs = Math.abs(value);
-  if (abs === 0) return '0.0000';
+  if (abs === 0) return '0.00';
   if (abs >= 1e12) return `${(value / 1e12).toFixed(2)}T`;
   if (abs >= 1e9) return `${(value / 1e9).toFixed(2)}B`;
   if (abs >= 1e6) return `${(value / 1e6).toFixed(2)}M`;
-  if (abs >= 1000) return value.toLocaleString('en-US', { maximumFractionDigits: 2 });
-  if (abs >= 1) return value.toFixed(4);
-  if (abs >= 0.0001) return value.toFixed(6);
-  return value.toExponential(2);
+  if (abs >= 1000) return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return value.toFixed(2);
 }

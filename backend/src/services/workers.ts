@@ -69,6 +69,8 @@ function createCompoundWorker(): Worker {
 
             try {
                 // Query active stakes for this tier that are due for compounding
+                // TESTING intervals: Tier0=900s(15m), Tier1=600s(10m), Tier2=300s(5m)
+                // PRODUCTION intervals: Tier0=28800s(8h), Tier1=21600s(6h), Tier2=14400s(4h)
                 const result = await query(
                     `SELECT s.user_address, s.stake_id_on_chain
                      FROM stakes s
@@ -77,10 +79,10 @@ function createCompoundWorker(): Worker {
                        AND s.cap_reached = FALSE
                        AND s.last_compound < NOW() - INTERVAL '1 second' *
                            CASE
-                               WHEN $1 = 0 THEN 28800
-                               WHEN $1 = 1 THEN 21600
-                               WHEN $1 = 2 THEN 14400
-                               ELSE 28800
+                               WHEN $1 = 0 THEN 900
+                               WHEN $1 = 1 THEN 600
+                               WHEN $1 = 2 THEN 300
+                               ELSE 900
                            END
                      ORDER BY s.last_compound ASC`,
                     [tier]

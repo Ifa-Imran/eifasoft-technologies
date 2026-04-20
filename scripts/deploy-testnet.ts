@@ -274,10 +274,11 @@ async function main() {
     }
 
     // ============================================================
-    // PHASE 5: Burn ALL deployer roles (irreversible)
+    // PHASE 5: Burn ALL deployer admin roles (keep COMPOUNDER_ROLE)
     // ============================================================
-    console.log("--- PHASE 5: Burn ALL Deployer Roles ---");
+    console.log("--- PHASE 5: Burn ALL Deployer Admin Roles ---");
     console.log("  WARNING: This is irreversible. Deployer will lose all admin control.");
+    console.log("  NOTE: COMPOUNDER_ROLE is kept for auto-compound daemon.");
     console.log("");
 
     const DEFAULT_ADMIN_ROLE = await kairoToken.DEFAULT_ADMIN_ROLE();
@@ -287,13 +288,11 @@ async function main() {
     await waitTx(tx);
     console.log("  [BURNED] KAIROToken DEFAULT_ADMIN_ROLE");
 
-    // 2. StakingManager — renounce COMPOUNDER_ROLE + DEFAULT_ADMIN_ROLE
-    tx = await stakingManager.renounceRole(COMPOUNDER_ROLE, deployer.address);
-    await waitTx(tx);
-    console.log("  [BURNED] StakingManager COMPOUNDER_ROLE");
+    // 2. StakingManager — renounce DEFAULT_ADMIN_ROLE (keep COMPOUNDER_ROLE for daemon)
     tx = await stakingManager.renounceRole(DEFAULT_ADMIN_ROLE, deployer.address);
     await waitTx(tx);
     console.log("  [BURNED] StakingManager DEFAULT_ADMIN_ROLE");
+    console.log("  [KEPT]   StakingManager COMPOUNDER_ROLE (for auto-compound daemon)");
 
     // 3. AffiliateDistributor — renounce STAKING_ROLE (genesis setup) + DEFAULT_ADMIN_ROLE
     tx = await affiliateDistributor.renounceRole(STAKING_ROLE, deployer.address);
@@ -323,7 +322,7 @@ async function main() {
     console.log("  [BURNED] AtomicP2p DEFAULT_ADMIN_ROLE");
 
     console.log("");
-    console.log("  ALL DEPLOYER ROLES BURNED. Private key is now safe to reveal.");
+    console.log("  ALL DEPLOYER ADMIN ROLES BURNED. COMPOUNDER_ROLE retained.");
     console.log("");
 
     // ============================================================

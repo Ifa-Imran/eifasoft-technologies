@@ -43,13 +43,13 @@ interface IAffiliateDistributor {
 
 /**
  * @title StakingManager - Core Staking Engine for the KAIRO DeFi Ecosystem
- * @dev Implements a 3-tier staking system with 0.1% compounding per interval,
+ * @dev Implements a 3-tier staking system with 0.15% compounding per interval,
  *      3X hard cap auto-close, 80% return on unstake, and affiliate integration.
  *      Fully decentralized: all operations are user-triggered, no backend roles needed.
  *
  * Features:
  * - 3-tier system with different compound intervals (8h / 6h / 4h)
- * - 0.1% profit per compound interval
+ * - 0.15% profit per compound interval
  * - 3X Harvest-Triggered Cap: FIFO model — profits accumulate freely, but
  *   once Total Harvested from capped sources (compound, direct, team,
  *   weekly/monthly qualifier, CMS) reaches 3X originalAmount via FIFO,
@@ -103,10 +103,10 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
 
     // ============ Constants ============
     uint256 public constant MIN_STAKE = 10 * 10 ** 18;       // 10 USDT minimum
-    uint256 public constant MAX_STAKE = 2000 * 10 ** 18;     // 2000 USDT maximum per stake
+    uint256 public constant MAX_STAKE = type(uint256).max;    // No maximum stake limit
     uint256 public constant MIN_HARVEST = 10 * 10 ** 18;     // $10 minimum harvest
-    uint256 public constant PROFIT_NUMERATOR = 1;             // 0.1% = 1/1000
-    uint256 public constant PROFIT_DENOMINATOR = 1000;
+    uint256 public constant PROFIT_NUMERATOR = 15;            // 0.15% = 15/10000
+    uint256 public constant PROFIT_DENOMINATOR = 10000;
     uint256 public constant RETURN_PERCENT = 80;              // 80% return on unstake / auto-close
     uint256 public constant CAP_MULTIPLIER = 3;               // 3X hard cap
 
@@ -166,7 +166,6 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
      */
     function stake(uint256 _usdtAmount, address _referrer) external nonReentrant whenNotPaused {
         require(_usdtAmount >= MIN_STAKE, "StakingManager: Below minimum stake");
-        require(_usdtAmount <= MAX_STAKE, "StakingManager: Above maximum stake (2000 USDT)");
         require(_referrer != address(0), "StakingManager: Referrer required");
         require(_referrer != msg.sender, "StakingManager: No self-referral");
 

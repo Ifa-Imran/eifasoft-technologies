@@ -25,7 +25,7 @@ const TEAM_PERCENTAGES = [
 // Map level to display percentage
 function levelPercent(level: number): string {
   const bp = TEAM_PERCENTAGES[level] || 0;
-  return `${(bp / 100).toFixed(bp % 100 === 0 ? 0 : 1)}%`;
+  return `${(bp / 100).toFixed(2)}%`;
 }
 
 // Calculate how many directs needed for a given level (mirrors contract _getUnlockedLevels)
@@ -45,6 +45,8 @@ export default function TeamDividendPage() {
     harvestIncome,
     teamLevelStats,
     teamLevelLoading,
+    teamAnalytics,
+    activeDirects,
     isLoading,
     isPending,
   } = useAffiliate();
@@ -79,7 +81,7 @@ export default function TeamDividendPage() {
       </div>
 
       {/* Overview Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <GlassCard padding="p-4">
           <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Unlocked Levels</p>
           <p className="text-2xl font-mono font-bold text-primary-700">{unlockedLevels} <span className="text-sm text-surface-400">/ 15</span></p>
@@ -89,13 +91,20 @@ export default function TeamDividendPage() {
           <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Direct Referrals</p>
           <p className="text-2xl font-mono font-bold text-secondary-700">{referralsList.length}</p>
           <p className="text-xs text-surface-400 mt-1">
-            {referralsList.length < 10 ? `${directsNeededForLevel(unlockedLevels + 1) - referralsList.length} more for next level` : 'Max levels unlocked'}
+            {activeDirects} active / {referralsList.length < 10 ? `${directsNeededForLevel(unlockedLevels + 1) - referralsList.length} more for next level` : 'Max levels unlocked'}
           </p>
         </GlassCard>
         <GlassCard padding="p-4">
+          <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Direct Business</p>
+          <p className="text-2xl font-mono font-bold text-primary-700">
+            {teamLevelLoading ? '...' : (teamAnalytics?.directBusinessFormatted || '$0')}
+          </p>
+          <p className="text-xs text-surface-400 mt-1">Referral stakes</p>
+        </GlassCard>
+        <GlassCard padding="p-4">
           <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Team Volume</p>
-          <p className="text-2xl font-mono font-bold text-surface-900">${formatCompact(teamVolumeUsd, 0)}</p>
-          <p className="text-xs text-surface-400 mt-1">Total downstream volume</p>
+          <p className="text-2xl font-mono font-bold text-surface-900">${formatCompact(teamVolumeUsd, 2)}</p>
+          <p className="text-xs text-surface-400 mt-1">Total downline volume</p>
         </GlassCard>
         <GlassCard padding="p-4">
           <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Team Dividend</p>
@@ -133,7 +142,6 @@ export default function TeamDividendPage() {
                 <th className="text-center py-3 px-2 text-surface-500 font-medium">Members</th>
                 <th className="text-right py-3 px-2 text-surface-500 font-medium">Team Business</th>
                 <th className="text-right py-3 px-2 text-surface-500 font-medium">Earned</th>
-                <th className="text-center py-3 px-2 text-surface-500 font-medium">Compounds</th>
                 <th className="text-center py-3 px-2 text-surface-500 font-medium">Status</th>
               </tr>
             </thead>
@@ -204,13 +212,6 @@ export default function TeamDividendPage() {
                       )}
                     </td>
                     <td className="py-3 px-2 text-center">
-                      {teamLevelLoading ? (
-                        <span className="text-surface-300 animate-pulse">...</span>
-                      ) : (
-                        <span className="font-mono text-xs text-surface-500">{stats?.txCount || 0}</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-2 text-center">
                       {isActive ? (
                         <span className="inline-flex items-center gap-1 text-success-600 text-xs font-semibold">
                           <LockOpenIcon className="w-3.5 h-3.5" /> Active
@@ -237,13 +238,10 @@ export default function TeamDividendPage() {
                   {teamLevelLoading ? '...' : teamLevelStats.reduce((sum, s) => sum + s.members, 0)}
                 </td>
                 <td className="py-3 px-2 text-right font-mono font-bold text-surface-800">
-                  {teamLevelLoading ? '...' : `$${teamLevelStats.reduce((sum, s) => sum + Number(formatUnits(s.totalBusiness, USDT_DECIMALS)), 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+                  {teamLevelLoading ? '...' : `$${teamLevelStats.reduce((sum, s) => sum + Number(formatUnits(s.totalBusiness, USDT_DECIMALS)), 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
                 </td>
                 <td className="py-3 px-2 text-right font-mono font-bold text-accent-700">
                   {teamLevelLoading ? '...' : `$${teamLevelStats.reduce((sum, s) => sum + Number(formatUnits(s.totalEarned, USDT_DECIMALS)), 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
-                </td>
-                <td className="py-3 px-2 text-center font-mono font-bold text-surface-800">
-                  {teamLevelLoading ? '...' : teamLevelStats.reduce((sum, s) => sum + s.txCount, 0)}
                 </td>
                 <td></td>
               </tr>
@@ -332,7 +330,7 @@ export default function TeamDividendPage() {
                         {shortenAddress(leg.address)}
                       </td>
                       <td className="py-3 px-3 text-right font-mono font-semibold text-surface-700">
-                        ${formatCompact(leg.volumeUsd, 0)}
+                        ${formatCompact(leg.volumeUsd, 2)}
                       </td>
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-2">
@@ -342,7 +340,7 @@ export default function TeamDividendPage() {
                               style={{ width: `${Math.min(share, 100)}%` }}
                             />
                           </div>
-                          <span className="text-xs font-mono text-surface-500 w-12 text-right">{share.toFixed(1)}%</span>
+                          <span className="text-xs font-mono text-surface-500 w-12 text-right">{share.toFixed(2)}%</span>
                         </div>
                       </td>
                     </tr>

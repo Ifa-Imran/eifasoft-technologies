@@ -21,7 +21,7 @@ export function ReferralWidget() {
   const currentRank = rankInfo ? Number(rankInfo[0] || 0) : 0;
   const rankName = RANK_NAMES[currentRank] || 'None';
   const referralCount = ((directReferrals as any[]) || []).length;
-  const totalTeamBiz = teamVolume ? Number(formatUnits(teamVolume as bigint, USDT_DECIMALS)) : 0;
+  const teamVolumeUsd = teamVolume ? Number(formatUnits(teamVolume as bigint, USDT_DECIMALS)) : 0;
 
   const copyLink = async () => {
     try {
@@ -100,14 +100,14 @@ export function ReferralWidget() {
           <p className="text-lg font-mono font-bold text-primary-700">
             {teamLevelLoading ? <span className="animate-pulse text-surface-300">...</span> : (teamAnalytics?.directBusinessFormatted || '$0')}
           </p>
-          <p className="text-[10px] text-surface-400">referral volume</p>
+          <p className="text-[10px] text-surface-400">referral stakes</p>
         </div>
         <div className="p-3 rounded-lg bg-surface-50 border border-surface-200 text-center">
           <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-0.5">Team Business</p>
           <p className="text-lg font-mono font-bold text-accent-700">
-            ${formatCompact(totalTeamBiz, 0)}
+            ${formatCompact(teamVolumeUsd, 2)}
           </p>
-          <p className="text-[10px] text-surface-400">total volume</p>
+          <p className="text-[10px] text-surface-400">total downline volume</p>
         </div>
       </div>
 

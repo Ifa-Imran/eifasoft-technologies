@@ -69,7 +69,7 @@ function calcPendingProfit(
   let currentAmount = amount;
   let totalProfit = 0n;
   for (let i = 0; i < intervals; i++) {
-    const profit = currentAmount / 1000n; // 0.1% per interval
+    const profit = (currentAmount * 15n) / 10000n; // 0.15% per interval
     currentAmount += profit;
     totalProfit += profit;
   }
@@ -190,12 +190,12 @@ export function useUserStakes() {
         displayHarvestable,
         displayTotalEarned,
         harvestable,
-        originalAmountFormatted: formatUnits(totalOriginalAmount, USDT_DECIMALS),
-        totalEarnedFormatted: formatUnits(displayTotalEarned, USDT_DECIMALS),
-        harvestableFormatted: formatUnits(harvestable, USDT_DECIMALS),
-        displayHarvestableFormatted: formatUnits(displayHarvestable, USDT_DECIMALS),
-        totalHarvestedFormatted: formatUnits(totalHarvestedRewards, USDT_DECIMALS),
-        pendingProfitFormatted: formatUnits(pendingProfit, USDT_DECIMALS),
+        originalAmountFormatted: Number(formatUnits(totalOriginalAmount, USDT_DECIMALS)).toFixed(2),
+        totalEarnedFormatted: Number(formatUnits(displayTotalEarned, USDT_DECIMALS)).toFixed(2),
+        harvestableFormatted: Number(formatUnits(harvestable, USDT_DECIMALS)).toFixed(2),
+        displayHarvestableFormatted: Number(formatUnits(displayHarvestable, USDT_DECIMALS)).toFixed(2),
+        totalHarvestedFormatted: Number(formatUnits(totalHarvestedRewards, USDT_DECIMALS)).toFixed(2),
+        pendingProfitFormatted: Number(formatUnits(pendingProfit, USDT_DECIMALS)).toFixed(2),
         stakes: tierStakes,
         stakeCount: tierStakes.length,
       };

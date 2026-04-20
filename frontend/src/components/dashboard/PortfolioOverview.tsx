@@ -15,18 +15,27 @@ import {
   BeakerIcon,
   ChartBarIcon,
   BanknotesIcon,
+  ShieldCheckIcon,
+  UserGroupIcon,
+  CurrencyDollarIcon,
 } from '@heroicons/react/24/outline';
 
 export function PortfolioOverview() {
   const { kairoFormatted } = useTokenBalances();
-  const { totalStaked, activeStakes, totalHarvestedRewards, totalHarvestable, tierGroups } = useUserStakes();
+  const { totalStaked, activeStakes, totalHarvestedRewards, tierGroups } = useUserStakes();
   const { price } = useKairoPrice();
   const { tvlFormatted, totalSupplyFormatted } = useGlobalStats();
-  const { allIncome, lifetimeHarvested } = useAffiliate();
+  const { allIncome, lifetimeHarvested, totalHarvestable, activeDirects, teamAnalytics } = useAffiliate();
 
   const kairoUsd = Number(kairoFormatted) * price;
   const stakedUsd = totalStaked ? Number(formatUnits(totalStaked, USDT_DECIMALS)) : 0;
   const totalPortfolioUsd = kairoUsd + stakedUsd;
+
+  // Remaining capping: sum across all tier groups
+  const totalHardCap = tierGroups.reduce((sum, tg) => sum + tg.totalHardCap, 0n);
+  const totalCapEarned = tierGroups.reduce((sum, tg) => sum + tg.totalCapEarned, 0n);
+  const remainingCap = totalHardCap > totalCapEarned ? totalHardCap - totalCapEarned : 0n;
+  const remainingCapUsd = Number(formatUnits(remainingCap, USDT_DECIMALS));
 
   // Staking earned = already harvested (contract state) + currently harvestable + pending profit
   const stakingHarvested = totalHarvestedRewards || 0n;
@@ -71,20 +80,27 @@ export function PortfolioOverview() {
       </div>
 
       {/* Stat cards - personal */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
           label="Total Staked"
-          value={stakedUsd.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+          value={stakedUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           prefix="$"
           icon={<ArrowTrendingUpIcon className="w-5 h-5" />}
           gradient="purple"
         />
         <StatCard
           label="Total Earned"
-          value={totalEarnedUsd.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+          value={totalEarnedUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           prefix="$"
           icon={<BanknotesIcon className="w-5 h-5" />}
           gradient="gold"
+        />
+        <StatCard
+          label="Remaining Capping"
+          value={remainingCapUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          prefix="$"
+          icon={<ShieldCheckIcon className="w-5 h-5" />}
+          gradient="cyan"
         />
       </div>
 
@@ -106,10 +122,35 @@ export function PortfolioOverview() {
         />
         <StatCard
           label="Total Circulation"
-          value={formatCompact(totalCirculation, 0)}
+          value={formatCompact(totalCirculation, 2)}
           suffix=" KAIRO"
           icon={<CircleStackIcon className="w-5 h-5" />}
           gradient="gold"
+        />
+      </div>
+
+      {/* Harvestable & Team */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <StatCard
+          label="Harvestable (Affiliate)"
+          value={totalHarvestable ? Number(formatUnits(totalHarvestable, USDT_DECIMALS)).toLocaleString('en-US', { maximumFractionDigits: 2 }) : '0.00'}
+          prefix="$"
+          icon={<CurrencyDollarIcon className="w-5 h-5" />}
+          gradient="gold"
+        />
+        <StatCard
+          label="Active Directs"
+          value={String(activeDirects)}
+          suffix={` / ${teamAnalytics?.directTotal || 0}`}
+          icon={<UserGroupIcon className="w-5 h-5" />}
+          gradient="cyan"
+        />
+        <StatCard
+          label="Team Size"
+          value={String(teamAnalytics?.totalTeamSize || 0)}
+          suffix=" members"
+          icon={<UserGroupIcon className="w-5 h-5" />}
+          gradient="purple"
         />
       </div>
     </div>

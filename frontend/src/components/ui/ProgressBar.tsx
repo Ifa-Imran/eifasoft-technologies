@@ -89,7 +89,7 @@ export function ProgressBar({
         </svg>
         {showValue && (
           <span className="absolute text-sm font-mono font-bold text-surface-900">
-            {percent.toFixed(0)}%
+            {percent.toFixed(2)}%
           </span>
         )}
       </div>
@@ -103,7 +103,7 @@ export function ProgressBar({
           {label && <span className="text-sm text-surface-500">{label}</span>}
           {showValue && (
             <span className="text-sm font-mono text-surface-600">
-              {percent.toFixed(1)}%
+              {percent.toFixed(2)}%
             </span>
           )}
         </div>

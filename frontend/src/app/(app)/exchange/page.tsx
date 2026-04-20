@@ -8,6 +8,7 @@ import { useP2P, P2PBuyOrder, P2PSellOrder } from '@/hooks/useP2P';
 import { useApproval } from '@/hooks/useApproval';
 import { useTokenBalances } from '@/hooks/useTokenBalances';
 import { useKairoPrice } from '@/hooks/useKairoPrice';
+import { useGlobalStats } from '@/hooks/useGlobalStats';
 import { contracts, USDT_DECIMALS, KAIRO_DECIMALS } from '@/config/contracts';
 import { parseUnits, formatUnits } from 'viem';
 import {
@@ -27,6 +28,7 @@ export default function ExchangePage() {
   const { activeBuyOrders, activeSellOrders, currentPrice, createBuyOrder, createSellOrder, cancelBuyOrder, cancelSellOrder, sellToOrder, buyFromOrder, isPending } = useP2P();
   const { kairoFormatted, usdtFormatted } = useTokenBalances();
   const { price: livePrice } = useKairoPrice();
+  const { orderBookStats, p2pLiquidity } = useGlobalStats();
   const usdtApproval = useApproval(contracts.usdt, contracts.atomicP2p);
   const kairoApproval = useApproval(contracts.kairoToken, contracts.atomicP2p);
   const pendingOrderRef = useRef<'buy' | 'sell' | null>(null);
@@ -97,7 +99,10 @@ export default function ExchangePage() {
   // Market stats
   const totalBuyVolume = activeBuyOrders.reduce((sum: number, o) => sum + Number(formatUnits(o.usdtRemaining, USDT_DECIMALS)), 0);
   const totalSellVolume = activeSellOrders.reduce((sum: number, o) => sum + Number(formatUnits(o.kairoRemaining, KAIRO_DECIMALS)), 0);
-  const spread = 0; // Spread not meaningful without limit prices
+  const p2pFilledTrades = orderBookStats ? Number(orderBookStats[2] || 0) : 0;
+  const p2pTotalVolume = orderBookStats ? Number(formatUnits(BigInt(orderBookStats[3] || 0), USDT_DECIMALS)) : 0;
+  const p2pLockedUsdt = p2pLiquidity ? Number(formatUnits(BigInt(p2pLiquidity[0] || 0), USDT_DECIMALS)) : 0;
+  const p2pLockedKairo = p2pLiquidity ? Number(formatUnits(BigInt(p2pLiquidity[1] || 0), KAIRO_DECIMALS)) : 0;
 
   // My orders
   const myBuyOrders = activeBuyOrders.filter((o) => o.creator?.toLowerCase() === address?.toLowerCase());
@@ -139,7 +144,7 @@ export default function ExchangePage() {
             <div className="w-2.5 h-2.5 rounded-full bg-success-500 animate-pulse" />
             <div>
               <p className="text-[10px] uppercase tracking-wider text-surface-400">DEX Price</p>
-              <p className="font-mono font-bold text-surface-900">${priceVal.toFixed(4)}</p>
+              <p className="font-mono font-bold text-surface-900">${priceVal.toFixed(2)}</p>
             </div>
           </div>
         )}
@@ -150,20 +155,22 @@ export default function ExchangePage() {
         <GlassCard padding="p-4" variant="cyan">
           <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Buy Orders</p>
           <p className="text-xl font-mono font-bold text-surface-900">{activeBuyOrders.length}</p>
-          <p className="text-xs text-surface-500">${totalBuyVolume.toLocaleString('en-US', { maximumFractionDigits: 0 })} USDT</p>
+          <p className="text-xs text-surface-500">${totalBuyVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT</p>
         </GlassCard>
         <GlassCard padding="p-4" variant="purple">
           <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Sell Orders</p>
           <p className="text-xl font-mono font-bold text-surface-900">{activeSellOrders.length}</p>
-          <p className="text-xs text-surface-500">{totalSellVolume.toLocaleString('en-US', { maximumFractionDigits: 0 })} KAIRO</p>
+          <p className="text-xs text-surface-500">{totalSellVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KAIRO</p>
         </GlassCard>
         <GlassCard padding="p-4">
-          <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">DEX Price</p>
-          <p className="text-xl font-mono font-bold text-success-600">${priceVal > 0 ? priceVal.toFixed(4) : '--'}</p>
+          <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Filled Trades</p>
+          <p className="text-xl font-mono font-bold text-primary-600">{p2pFilledTrades}</p>
+          <p className="text-xs text-surface-500">${p2pTotalVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} vol</p>
         </GlassCard>
         <GlassCard padding="p-4">
-          <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Spread</p>
-          <p className="text-xl font-mono font-bold text-surface-900">{spread > 0 ? spread.toFixed(2) + '%' : '--'}</p>
+          <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Locked Liquidity</p>
+          <p className="text-xl font-mono font-bold text-accent-600">${p2pLockedUsdt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+          <p className="text-xs text-surface-500">{p2pLockedKairo.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KAIRO</p>
         </GlassCard>
       </div>
 
@@ -306,20 +313,40 @@ export default function ExchangePage() {
               </button>
             </div>
 
-            <Input
-              label={orderType === 'buy' ? 'USDT Amount' : 'KAIRO Amount'}
-              type="number"
-              placeholder="Enter amount..."
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              helperText={orderType === 'buy' ? `Balance: ${Number(usdtFormatted).toFixed(2)} USDT` : `Balance: ${Number(kairoFormatted).toFixed(2)} KAIRO`}
-            />
+            <div>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="text-sm font-medium text-surface-600">
+                  {orderType === 'buy' ? 'USDT Amount' : 'KAIRO Amount'}
+                </label>
+                <button
+                  onClick={() => {
+                    const bal = orderType === 'buy' ? Number(usdtFormatted) : Number(kairoFormatted);
+                    const dust = orderType === 'buy' ? 0.01 : 0.001;
+                    const maxVal = bal > dust ? (bal - dust).toFixed(6) : '0';
+                    setAmount(maxVal);
+                  }}
+                  className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                >
+                  MAX: {orderType === 'buy' ? Number(usdtFormatted).toFixed(2) : Number(kairoFormatted).toFixed(2)}
+                </button>
+              </div>
+              <input
+                type="number"
+                placeholder="Enter amount..."
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="input-field w-full"
+              />
+              <p className="mt-1 text-xs text-surface-400">
+                {orderType === 'buy' ? `Balance: ${Number(usdtFormatted).toFixed(2)} USDT` : `Balance: ${Number(kairoFormatted).toFixed(2)} KAIRO`}
+              </p>
+            </div>
 
             {numAmount > 0 && (
               <div className="mt-4 p-4 rounded-xl bg-white/60 border border-surface-200 space-y-2 text-xs">
                 <div className="flex justify-between text-surface-500">
                   <span>DEX Reference Price</span>
-                  <span className="font-mono">${priceVal.toFixed(4)}</span>
+                  <span className="font-mono">${priceVal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-surface-500">
                   <span>Trading Fee</span>
@@ -329,8 +356,8 @@ export default function ExchangePage() {
                   <span>Estimated {orderType === 'buy' ? 'KAIRO' : 'USDT'}</span>
                   <span className="font-mono">
                     {orderType === 'buy'
-                      ? (priceVal > 0 ? (numAmount * 0.97 / priceVal).toFixed(4) + ' KAIRO' : '--')
-                      : '$' + (numAmount * priceVal * 0.97).toFixed(2)}
+                      ? (priceVal > 0 ? (numAmount * 0.95 / priceVal).toFixed(2) + ' KAIRO' : '--')
+                      : '$' + (numAmount * priceVal * 0.95).toFixed(2)}
                   </span>
                 </div>
               </div>

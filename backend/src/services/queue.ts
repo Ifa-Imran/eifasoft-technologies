@@ -26,7 +26,8 @@ function getRedisConnection(): IORedis {
 
 /**
  * Compounding queue - triggers compound for stakes based on tier intervals
- * Tier 0: every 8 hours, Tier 1: every 6 hours, Tier 2: every 4 hours
+ * TESTING: Tier 0: every 15m, Tier 1: every 10m, Tier 2: every 5m
+ * PRODUCTION: Tier 0: every 8h, Tier 1: every 6h, Tier 2: every 4h
  */
 export const compoundingQueue = new Queue('compounding', {
     connection: getRedisConnection(),
@@ -59,24 +60,24 @@ export const rankUpdateQueue = new Queue('rank-update', {
 export async function initQueues(): Promise<void> {
     console.log('Initializing BullMQ queues...');
 
-    // Compound Tier 0 every 8 hours
+    // Compound Tier 0 every 15 minutes (TESTING - prod: 8 hours)
     await compoundingQueue.upsertJobScheduler(
         'compound-tier-0',
-        { every: 8 * 60 * 60 * 1000 },
+        { every: 15 * 60 * 1000 },  // TESTING: 15m (prod: 8 * 60 * 60 * 1000)
         { data: { tier: 0 }, name: 'compound-tier-0' }
     );
 
-    // Compound Tier 1 every 6 hours
+    // Compound Tier 1 every 10 minutes (TESTING - prod: 6 hours)
     await compoundingQueue.upsertJobScheduler(
         'compound-tier-1',
-        { every: 6 * 60 * 60 * 1000 },
+        { every: 10 * 60 * 1000 },  // TESTING: 10m (prod: 6 * 60 * 60 * 1000)
         { data: { tier: 1 }, name: 'compound-tier-1' }
     );
 
-    // Compound Tier 2 every 4 hours
+    // Compound Tier 2 every 5 minutes (TESTING - prod: 4 hours)
     await compoundingQueue.upsertJobScheduler(
         'compound-tier-2',
-        { every: 4 * 60 * 60 * 1000 },
+        { every: 5 * 60 * 1000 },   // TESTING: 5m (prod: 4 * 60 * 60 * 1000)
         { data: { tier: 2 }, name: 'compound-tier-2' }
     );
 

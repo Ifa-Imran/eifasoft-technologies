@@ -12,12 +12,12 @@ async function main() {
   const [deployer] = await ethers.getSigners();
   console.log("Deployer:", deployer.address);
 
-  // Existing contract addresses (v4)
-  const KAIRO_TOKEN     = "0xeD973313E21FF7d6C16a973E981BF35C2DC59733";
-  const USDT            = "0xB035a4196D29dAD51dB2e0ce6B0d8c9e02A821F5";
-  const LIQUIDITY_POOL  = "0x75AF9151044934892EB256760183d3FD453C4B3B";
-  const STAKING_MANAGER = "0x964DADB4cFD90BC01A1a64387a5B24b748F34bC1";
-  const AFFILIATE       = "0xd55d08a001497e1F4033B765046b0Ea5FeDA0472";
+  // Existing contract addresses (v17)
+  const KAIRO_TOKEN     = "0x18f56e007cEe5497dA95f04F50E49cE8ddd0010F";
+  const USDT            = "0x3811CE79dc18806cdC60b092d818CBc88B0a72AB";
+  const LIQUIDITY_POOL  = "0x8e98133a9f471257F98c1BC083Eb8FfB94ed76F0";
+  const STAKING_MANAGER = "0x90bce7aCB3429BEF9cE52E9594A90DE69DAad191";
+  const AFFILIATE       = "0x27CAc5ffcaDCdB2f7DafaE58Dfd1dEb1C51087CB";
   const SYSTEM_WALLET   = "0x624D0985D844Cd1DF132723a9d849FE1A34cAf9D";
 
   // 1. Deploy new CMS

@@ -80,6 +80,10 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
     mapping(address => address) public referrerOf;             // Direct referrer for CMS
     mapping(address => uint256) public cmsDirectCount;         // Count of directs with active CMS subscription
 
+    // Per-level leadership tracking (5 levels)
+    mapping(address => uint256[5]) public levelSubscriptions;  // Subs bought at each level in user's network
+    mapping(address => uint256[5]) public levelRewardsEarned;  // KAIRO earned from each level
+
     // External contracts
     IKAIROToken public kairoToken;
     IERC20 public usdt;
@@ -172,9 +176,13 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
         for (uint256 i = 0; i < 5; i++) {
             if (currentReferrer == address(0)) break;
 
+            // Track subscriptions at this level regardless of eligibility
+            levelSubscriptions[currentReferrer][i] += _amount;
+
             if (subscriptionCount[currentReferrer] > 0 && cmsDirectCount[currentReferrer] >= LEVEL_DIRECTS[i]) {
                 uint256 leadershipReward = REF_REWARDS[i] * _amount;
                 leadershipRewards[currentReferrer] += leadershipReward;
+                levelRewardsEarned[currentReferrer][i] += leadershipReward;
             }
 
             // Walk up regardless of eligibility (reward skips ineligible, doesn't stop)
@@ -365,6 +373,20 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
             return (false, "Nothing to claim");
         }
         return (true, "Eligible");
+    }
+
+    /**
+     * @dev Get per-level leadership details for a user
+     * @param _user User address
+     * @return subs Array of subscription counts at each level (5 levels)
+     * @return rewards Array of KAIRO rewards earned from each level (5 levels)
+     */
+    function getLevelDetails(address _user) external view returns (
+        uint256[5] memory subs,
+        uint256[5] memory rewards
+    ) {
+        subs = levelSubscriptions[_user];
+        rewards = levelRewardsEarned[_user];
     }
 
     // ============ Admin Functions ============
