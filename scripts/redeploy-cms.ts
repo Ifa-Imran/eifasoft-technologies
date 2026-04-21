@@ -12,19 +12,29 @@ async function main() {
   const [deployer] = await ethers.getSigners();
   console.log("Deployer:", deployer.address);
 
-  // Existing contract addresses (v18)
-  const KAIRO_TOKEN     = "0x7Fee741907649f5a8E105B0e9a70d1dF4B5a5C60";
-  const USDT            = "0xcFF16786A3d7f372Fa93D72aF9b27c91e884cEA5";
-  const LIQUIDITY_POOL  = "0x62865d26dFf25F1527C9aA962f3BE2828e9cc3Ef";
-  const STAKING_MANAGER = "0x9d48b6C43fC858767b451De5Efa2ed1089bf3d1a";
-  const AFFILIATE       = "0xc1e192AaCd196AE277f45c35Df98674e098CB393";
+  // Existing contract addresses (v19)
+  const KAIRO_TOKEN     = "0x7dF1602A21F7995e9A25D4772EDdF74d7dBD43Bd";
+  const USDT            = "0x60F3FD181DbeC9e201e383355Fde953899c0e489";
+  const LIQUIDITY_POOL  = "0xb734654Dc144F0a68281F10B0aDF911814678558";
+  const STAKING_MANAGER = "0x35F95D1cC8933596d7B3fcc4328D1E1d39Def8F5";
+  const AFFILIATE       = "0x69Fe3f1c1D347412dAf7835C2eA490d12b964d69";
   const SYSTEM_WALLET   = "0x624D0985D844Cd1DF132723a9d849FE1A34cAf9D";
 
   // 1. Deploy new CMS
   console.log("\n1. Deploying new CoreMembershipSubscription...");
   const CMS = await ethers.getContractFactory("CoreMembershipSubscription");
+
+  // Testing deadlines: 3 hours subscribe, 6 hours claim from current block
+  const latestBlock = await ethers.provider.getBlock("latest");
+  const now = latestBlock!.timestamp;
+  const SUBSCRIBE_DEADLINE = now + 3 * 60 * 60;  // +3 hours
+  const CLAIM_DEADLINE = now + 6 * 60 * 60;      // +6 hours
+  console.log("   Subscribe deadline:", new Date(SUBSCRIBE_DEADLINE * 1000).toUTCString());
+  console.log("   Claim deadline:", new Date(CLAIM_DEADLINE * 1000).toUTCString());
+
   const cms = await CMS.deploy(
-    KAIRO_TOKEN, USDT, LIQUIDITY_POOL, STAKING_MANAGER, AFFILIATE, SYSTEM_WALLET, deployer.address
+    KAIRO_TOKEN, USDT, LIQUIDITY_POOL, STAKING_MANAGER, AFFILIATE, SYSTEM_WALLET, deployer.address,
+    SUBSCRIBE_DEADLINE, CLAIM_DEADLINE
   );
   await cms.waitForDeployment();
   const cmsAddress = await cms.getAddress();

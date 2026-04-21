@@ -50,11 +50,14 @@ interface IAffiliateDistributor {
  * Features:
  * - 3-tier system with different compound intervals (8h / 6h / 4h)
  * - 0.15% profit per compound interval
- * - 3X Harvest-Triggered Cap: FIFO model — profits accumulate freely, but
- *   once Total Harvested from capped sources (compound, direct, team,
- *   weekly/monthly qualifier, CMS) reaches 3X originalAmount via FIFO,
- *   the stake is "capped" (stops compounding but stays active for rank).
- *   Rank Dividends are EXEMPT from the 3x cap.
+ * - 3X Harvest-Triggered Cap: FIFO model — profits accumulate freely, and
+ *   compounding continues regardless of accrued earnings. Cap is only
+ *   enforced when income (excluding Rank Dividends) is harvested.
+ *   Once total harvested from capped sources reaches 3X originalAmount
+ *   via FIFO, the stake is deactivated (active=false). Deactivated
+ *   stakes lose ALL eligibility: compounding, direct, team, rank, CMS.
+ *   Rank Dividends do NOT count toward the 3X cap counter but require
+ *   an active (non-capped) stake to be received.
  * - 80% return on unstake with harvested rewards deduction
  * - Fund distribution: 90% LP, 5% to 5 DAO wallets (1% each), 5% to development fund wallet
  * - Affiliate direct dividends (5%) and team dividends on compound
@@ -262,9 +265,10 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
         Stake storage stk = userStakes[_user][_stakeId];
         require(stk.active, "StakingManager: Stake not active");
 
-        // Capped stakes cannot compound (3x harvested)
-        uint256 cap = CAP_MULTIPLIER * stk.originalAmount;
-        require(stk.totalEarned < cap, "StakingManager: Stake is capped");
+        // No cap check here — compounding continues freely.
+        // Cap is only enforced at harvest time. Once harvested amount
+        // reaches 3X, the stake is deactivated (active=false) and
+        // compounding stops naturally via the active check above.
 
         Tier memory tier = tiers[stk.tier];
 
@@ -303,15 +307,21 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
 
     /**
      * @dev Mark a stake as capped when 3X harvest cap is reached.
-     *      The stake remains active (for rank dividend eligibility) but
-     *      can no longer compound or receive capped harvests.
+     *      The stake is fully deactivated — no more compounding, no rank
+     *      eligibility, no income of any kind until a new stake is created.
+     *      Team volume is NOT removed (only removed on unstake).
      * @param _user Stake owner
      * @param _stakeId Index of the stake
      */
     function _markStakeCapped(address _user, uint256 _stakeId) internal {
         Stake storage stk = userStakes[_user][_stakeId];
-        // Stake stays active (active == true) for rank dividend eligibility.
-        // Compounding is blocked by the cap check in _compound.
+        stk.active = false;
+        // Safely remove from totalActiveStakeValue
+        if (totalActiveStakeValue[_user] >= stk.amount) {
+            totalActiveStakeValue[_user] -= stk.amount;
+        } else {
+            totalActiveStakeValue[_user] = 0;
+        }
         emit StakeCapped(_user, _stakeId, stk.totalEarned);
     }
 
@@ -348,7 +358,9 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
 
     /**
      * @dev Harvest accumulated compound rewards from a stake.
-     *      Staking/compound harvests are CAPPED income — applied to FIFO 3x cap.
+     *      Staking/compound harvests are tracked against the FIFO 3x cap.
+     *      The full amount is always paid out (no clamping). If total
+     *      harvested reaches 3X originalAmount, the stake is deactivated.
      * @param _stakeId Index of the stake
      * @param _amount USD amount to harvest (18 decimals)
      */
@@ -363,30 +375,41 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
         uint256 available = stk.compoundEarned - stk.harvestedRewards;
         require(_amount <= available, "StakingManager: Insufficient harvestable amount");
 
-        // Apply harvest to FIFO 3x cap (capped income)
-        uint256 applied = _applyHarvestToFIFO(msg.sender, _amount);
-        require(applied > 0, "StakingManager: No cap space for harvest");
+        // Track harvest in FIFO (may deactivate stakes, including this one)
+        _applyHarvestToFIFO(msg.sender, _amount);
 
-        // Track harvested amount and reduce compounding base (use applied amount)
-        stk.harvestedRewards += applied;
-        stk.amount -= applied;
-        totalActiveStakeValue[msg.sender] -= applied;
+        // Update source stake
+        stk.harvestedRewards += _amount;
 
-        // Mint KAIRO to user at live rate
-        kairoToken.mintTo(msg.sender, applied);
+        if (stk.active) {
+            // Stake survived FIFO — reduce normally
+            stk.amount -= _amount;
+            totalActiveStakeValue[msg.sender] -= _amount;
+        } else {
+            // Stake was capped by FIFO — totalActiveStakeValue already adjusted
+            if (stk.amount >= _amount) {
+                stk.amount -= _amount;
+            } else {
+                stk.amount = 0;
+            }
+        }
 
-        emit Harvested(msg.sender, _stakeId, applied);
+        // Mint KAIRO — full amount, no clamping
+        kairoToken.mintTo(msg.sender, _amount);
+
+        emit Harvested(msg.sender, _stakeId, _amount);
     }
 
     // ============ External Capped Harvest (called by AffiliateDistributor & CMS at harvest time) ============
 
     /**
-     * @dev Apply a capped harvest to the FIFO 3X cap system.
+     * @dev Apply a capped harvest to the FIFO 3X cap tracking system.
      *      Called by AffiliateDistributor and CMS when capped income is HARVESTED.
-     *      Returns the actual amount applied (may be less if cap is reached).
+     *      Always returns the full requested amount — no clamping.
+     *      FIFO tracking may deactivate stakes that reach 3X.
      * @param _user User whose harvest is being applied
      * @param _usdAmount USD value of the harvest request (18 decimals)
-     * @return applied Actual USD amount applied to FIFO (may be < _usdAmount)
+     * @return applied Always equals _usdAmount (full amount, no clamping)
      */
     function applyCappedHarvest(address _user, uint256 _usdAmount) external returns (uint256 applied) {
         require(
@@ -394,13 +417,15 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
             "StakingManager: Unauthorized"
         );
         if (_usdAmount == 0) return 0;
-        applied = _applyHarvestToFIFO(_user, _usdAmount);
+        _applyHarvestToFIFO(_user, _usdAmount);
+        applied = _usdAmount; // Always return full amount — no clamping
         emit CappedHarvestApplied(_user, _usdAmount, applied);
     }
 
     /**
-     * @dev Check if a user has any active stake position (includes capped stakes).
-     *      Used by AffiliateDistributor to gate rank dividend harvests.
+     * @dev Check if a user has any active stake position.
+     *      Capped stakes are inactive (active=false) and excluded.
+     *      Used by AffiliateDistributor to gate all income types.
      * @param _user User address
      * @return True if user has at least one active stake (active == true)
      */
@@ -562,12 +587,12 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
 
     /**
      * @dev Apply harvested capped income to active stakes using FIFO order (oldest first).
-     *      When a stake's totalEarned (total capped harvested) reaches 3X originalAmount,
-     *      the stake is marked as "capped" — it stops compounding but remains active
-     *      for rank dividend eligibility. Returns the actual amount applied.
+     *      When a stake's totalEarned reaches 3X originalAmount, the stake is
+     *      deactivated (active=false). Any harvest amount beyond total FIFO space
+     *      is not tracked but is still paid out by the caller.
      * @param _user Stake owner
      * @param _amount Requested harvest amount (USD, 18 decimals)
-     * @return applied Actual amount applied to FIFO
+     * @return applied Amount actually tracked in FIFO (may be < _amount if cap space exhausted)
      */
     function _applyHarvestToFIFO(address _user, uint256 _amount) internal returns (uint256 applied) {
         uint256 remaining = _amount;

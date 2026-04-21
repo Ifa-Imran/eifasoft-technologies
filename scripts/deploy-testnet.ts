@@ -112,9 +112,19 @@ async function main() {
     // 7. CoreMembershipSubscription
     console.log("[7/8] Deploying CoreMembershipSubscription...");
     const CMS = await ethers.getContractFactory("CoreMembershipSubscription");
+
+    // Testing deadlines: 3 hours to subscribe, 6 hours to claim from current block
+    const latestBlock = await ethers.provider.getBlock("latest");
+    const now = latestBlock!.timestamp;
+    const SUBSCRIBE_DEADLINE = now + 3 * 60 * 60;  // +3 hours
+    const CLAIM_DEADLINE = now + 6 * 60 * 60;      // +6 hours
+    console.log("  Subscribe deadline:", new Date(SUBSCRIBE_DEADLINE * 1000).toUTCString());
+    console.log("  Claim deadline:", new Date(CLAIM_DEADLINE * 1000).toUTCString());
+
     const cms = await CMS.deploy(
         kairoAddress, usdtAddress, liquidityPoolAddress,
-        stakingAddress, affiliateAddress, systemWallet, deployer.address
+        stakingAddress, affiliateAddress, systemWallet, deployer.address,
+        SUBSCRIBE_DEADLINE, CLAIM_DEADLINE
     );
     await cms.waitForDeployment();
     await sleep(DELAY);

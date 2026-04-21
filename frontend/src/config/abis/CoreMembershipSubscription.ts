@@ -35,6 +35,16 @@ export const CoreMembershipSubscriptionABI = [
         "internalType": "address",
         "name": "_admin",
         "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_subscribeDeadline",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_claimDeadline",
+        "type": "uint256"
       }
     ],
     "stateMutability": "nonpayable",
@@ -137,6 +147,31 @@ export const CoreMembershipSubscriptionABI = [
       }
     ],
     "name": "RewardsClaimed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "loyaltyFlushed",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "leadershipFlushed",
+        "type": "uint256"
+      }
+    ],
+    "name": "RewardsFlushed",
     "type": "event"
   },
   {
@@ -429,6 +464,19 @@ export const CoreMembershipSubscriptionABI = [
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address[]",
+        "name": "_users",
+        "type": "address[]"
+      }
+    ],
+    "name": "flushExpiredRewards",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {

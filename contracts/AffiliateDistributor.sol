@@ -434,9 +434,11 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
 
     /**
      * @dev Harvest accumulated income by minting KAIRO at live price.
-     *      Capped income types (0=Direct, 1=Team) are subject to the 3x
-     *      harvest-triggered cap via StakingManager FIFO.
-     *      Rank Dividends (type 2) are EXEMPT from the 3x cap.
+     *      Capped income types (0=Direct, 1=Team) are tracked against the 3x
+     *      harvest-triggered cap via StakingManager FIFO. Full amount is always
+     *      paid out (no clamping). FIFO tracking may deactivate stakes at 3X.
+     *      Rank Dividends (type 2) are exempt from cap tracking but require
+     *      an active (non-capped) stake. All types require active position.
      * @param _incomeType 0=Direct, 1=Team, 2=Rank
      */
     function harvest(uint8 _incomeType) external nonReentrant whenNotPaused {
@@ -460,25 +462,17 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
 
         require(balance >= MIN_HARVEST, "AD: Below minimum harvest ($10)");
 
-        // Rank Dividends (type 2) are EXEMPT from 3x cap
-        if (_incomeType == 2) {
-            // Rank: requires active position (includes capped stakes) but no cap check
-            require(
-                IStakingManager(stakingManager).hasActivePosition(msg.sender),
-                "AD: No active stake"
-            );
-        } else {
-            // Capped income: apply harvest to FIFO 3x cap
-            uint256 applied = IStakingManager(stakingManager).applyCappedHarvest(msg.sender, balance);
-            require(applied > 0, "AD: No cap space for harvest");
+        // All income types require an active (non-capped) stake
+        require(
+            IStakingManager(stakingManager).hasActivePosition(msg.sender),
+            "AD: No active stake"
+        );
 
-            // Refund unharvestable portion back to balance mapping
-            if (applied < balance) {
-                uint256 excess = balance - applied;
-                if (_incomeType == 0) directDividends[msg.sender] = excess;
-                else if (_incomeType == 1) teamDividends[msg.sender] = excess;
-                balance = applied;
-            }
+        // Capped income (Direct/Team): track in FIFO — full amount always paid
+        // Rank Dividends: exempt from cap tracking (not counted toward 3X)
+        if (_incomeType != 2) {
+            IStakingManager(stakingManager).applyCappedHarvest(msg.sender, balance);
+            // No refund logic — full balance is paid out
         }
 
         uint256 livePrice = liquidityPool.getLivePrice();

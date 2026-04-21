@@ -124,10 +124,19 @@ async function main() {
     // Step 7: Deploy CoreMembershipSubscription (CMS)
     // Constructor: (address _kairoToken, address _usdt, address _liquidityPool,
     //               address _stakingManager, address _affiliateDistributor,
-    //               address _systemWallet, address _admin)
+    //               address _systemWallet, address _admin,
+    //               uint256 _subscribeDeadline, uint256 _claimDeadline)
+    // Production: May 6, 2026 00:00 UTC / June 1, 2026 00:00 UTC
     // ============================================================
     console.log("Step 7: Deploying CoreMembershipSubscription...");
     const CMS = await ethers.getContractFactory("CoreMembershipSubscription");
+
+    // Production deadlines (fixed calendar dates, UTC midnight)
+    const SUBSCRIBE_DEADLINE = Math.floor(new Date("2026-05-06T00:00:00Z").getTime() / 1000);
+    const CLAIM_DEADLINE = Math.floor(new Date("2026-06-01T00:00:00Z").getTime() / 1000);
+    console.log("  Subscribe deadline:", new Date(SUBSCRIBE_DEADLINE * 1000).toUTCString());
+    console.log("  Claim deadline:", new Date(CLAIM_DEADLINE * 1000).toUTCString());
+
     const cms = await CMS.deploy(
         kairoAddress,
         usdtAddress,
@@ -135,7 +144,9 @@ async function main() {
         stakingAddress,
         affiliateAddress,
         systemWallet,
-        deployer.address
+        deployer.address,
+        SUBSCRIBE_DEADLINE,
+        CLAIM_DEADLINE
     );
     await cms.waitForDeployment();
     const cmsAddress = await cms.getAddress();

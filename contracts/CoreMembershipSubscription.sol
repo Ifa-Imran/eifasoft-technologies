@@ -67,7 +67,9 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
     // Level 1: 0 directs, Level 2: 2, Level 3: 3, Level 4: 4, Level 5: 5
     uint256[5] public LEVEL_DIRECTS = [0, 2, 3, 4, 5];
 
-    // ============ Deadlines (Testing: 3h subscribe, 6h claim from deploy) ============
+    // ============ Deadlines (set via constructor) ============
+    // Testing: deploy + 3h subscribe, deploy + 6h claim
+    // Production: May 6, 2026 00:00 UTC subscribe, June 1, 2026 00:00 UTC claim
     uint256 public immutable SUBSCRIBE_DEADLINE;
     uint256 public immutable CLAIM_DEADLINE;
 
@@ -96,8 +98,15 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
     event SubscriptionPurchased(address indexed buyer, uint256 amount, address indexed referrer);
     event RewardsClaimed(address indexed user, uint256 userAmount, uint256 burnedAmount, uint256 excessDeleted);
     event DeadlineExtended(uint256 oldDeadline, uint256 newDeadline);
+    event RewardsFlushed(address indexed user, uint256 loyaltyFlushed, uint256 leadershipFlushed);
 
     // ============ Constructor ============
+    /**
+     * @param _subscribeDeadline Unix timestamp after which subscriptions are blocked
+     *        Testing: block.timestamp + 3 hours | Production: May 6, 2026 00:00 UTC
+     * @param _claimDeadline Unix timestamp after which claims are blocked & tokens can be flushed
+     *        Testing: block.timestamp + 6 hours | Production: June 1, 2026 00:00 UTC
+     */
     constructor(
         address _kairoToken,
         address _usdt,
@@ -105,7 +114,9 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
         address _stakingManager,
         address _affiliateDistributor,
         address _systemWallet,
-        address _admin
+        address _admin,
+        uint256 _subscribeDeadline,
+        uint256 _claimDeadline
     ) {
         require(_kairoToken != address(0), "CMS: Invalid KAIRO token");
         require(_usdt != address(0), "CMS: Invalid USDT");
@@ -114,6 +125,8 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
         require(_affiliateDistributor != address(0), "CMS: Invalid AffiliateDistributor");
         require(_systemWallet != address(0), "CMS: Invalid system wallet");
         require(_admin != address(0), "CMS: Invalid admin");
+        require(_subscribeDeadline > block.timestamp, "CMS: Subscribe deadline must be future");
+        require(_claimDeadline > _subscribeDeadline, "CMS: Claim deadline must be after subscribe");
 
         kairoToken = IKAIROToken(_kairoToken);
         usdt = IERC20(_usdt);
@@ -124,9 +137,8 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
 
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
 
-        // Testing deadlines: 3 hours to subscribe, 6 hours to claim
-        SUBSCRIBE_DEADLINE = block.timestamp + 3 hours;
-        CLAIM_DEADLINE = block.timestamp + 6 hours;
+        SUBSCRIBE_DEADLINE = _subscribeDeadline;
+        CLAIM_DEADLINE = _claimDeadline;
     }
 
     // ============ Core Functions ============
@@ -229,16 +241,13 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
             totalClaimable = maxClaimableKairo;
         }
 
-        // Apply 3x harvest-triggered cap (CMS claims are capped income)
-        // Convert KAIRO claimable to USD value for FIFO cap check
+        // Apply 3x harvest tracking (CMS claims are capped income)
+        // Convert KAIRO claimable to USD value for FIFO cap tracking
+        // Full amount is always paid — no clamping. FIFO may deactivate stakes.
         uint256 claimUsdValue = (totalClaimable * livePrice) / 1e18;
         if (claimUsdValue > 0) {
-            uint256 applied = stakingManager.applyCappedHarvest(msg.sender, claimUsdValue);
-            if (applied < claimUsdValue) {
-                // Reduce totalClaimable proportionally to what FIFO allowed
-                totalClaimable = (applied * 1e18) / livePrice;
-                excessDeleted = (loyaltyRewards[msg.sender] + leadershipRewards[msg.sender]) - totalClaimable;
-            }
+            stakingManager.applyCappedHarvest(msg.sender, claimUsdValue);
+            // No reduction — full amount paid
         }
 
         // Mint 90% to user, 10% is not minted (deflationary burn)
@@ -390,6 +399,26 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
     }
 
     // ============ Admin Functions ============
+
+    /**
+     * @dev Flush unclaimed rewards to zero after claim deadline has passed.
+     *      Called by admin for users who did not claim in time.
+     *      Both loyalty reward tokens and leadership reward tokens are zeroed out.
+     * @param _users Array of user addresses to flush
+     */
+    function flushExpiredRewards(address[] calldata _users) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(block.timestamp > CLAIM_DEADLINE, "CMS: Claim period not ended yet");
+        for (uint256 i = 0; i < _users.length; i++) {
+            address user = _users[i];
+            uint256 loyalty = loyaltyRewards[user];
+            uint256 leadership = leadershipRewards[user];
+            if (loyalty > 0 || leadership > 0) {
+                loyaltyRewards[user] = 0;
+                leadershipRewards[user] = 0;
+                emit RewardsFlushed(user, loyalty, leadership);
+            }
+        }
+    }
 
     /**
      * @dev Extend the CMS deadline (must be greater than current deadline)

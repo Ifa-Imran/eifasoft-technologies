@@ -51,6 +51,13 @@ export async function deployFullEcosystemFixture() {
 
     // Step 7: Deploy CoreMembershipSubscription
     const CMS = await ethers.getContractFactory("CoreMembershipSubscription");
+
+    // Testing deadlines: 3 hours subscribe, 6 hours claim from current block
+    const latestBlock = await ethers.provider.getBlock("latest");
+    const nowTs = latestBlock!.timestamp;
+    const SUBSCRIBE_DEADLINE = nowTs + 3 * 60 * 60;
+    const CLAIM_DEADLINE = nowTs + 6 * 60 * 60;
+
     const cms = await CMS.deploy(
         await kairoToken.getAddress(),
         await usdt.getAddress(),
@@ -58,7 +65,9 @@ export async function deployFullEcosystemFixture() {
         await stakingManager.getAddress(),
         await affiliateDistributor.getAddress(),
         systemWallet.address,
-        owner.address
+        owner.address,
+        SUBSCRIBE_DEADLINE,
+        CLAIM_DEADLINE
     );
     await cms.waitForDeployment();
 
@@ -107,7 +116,7 @@ export async function deployFullEcosystemFixture() {
     const INITIAL_LIQUIDITY = ethers.parseEther("10000");
     await usdt.transfer(await liquidityPool.getAddress(), INITIAL_LIQUIDITY);
 
-    // CMS deadlines are immutable (3h subscribe, 6h claim from deploy) — no extension needed for tests
+    // CMS deadlines passed via constructor (3h subscribe, 6h claim from deploy)
 
     // Step 11: Mint test USDT to users (10,000 each)
     const userAmount = ethers.parseEther("100000");
