@@ -240,18 +240,20 @@ function StakePageInner() {
 
       {cmsActive && (
         <GlassCard variant="gradient">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-400 to-accent-300 flex items-center justify-center shadow-md shadow-accent-300/30">
-              <ClockIcon className="w-5 h-5 text-white" />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-sm font-semibold text-surface-900">CMS Phase Active</h3>
-              <p className="text-xs text-surface-500">
-                Staking opens after all {remainingSubscriptions.toLocaleString()} remaining CMS subscriptions are sold or the deadline passes.
-              </p>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex items-center gap-3 flex-1">
+              <div className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-accent-400 to-accent-300 flex items-center justify-center shadow-md shadow-accent-300/30">
+                <ClockIcon className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-semibold text-surface-900">CMS Phase Active</h3>
+                <p className="text-xs text-surface-500">
+                  Staking opens after all {remainingSubscriptions.toLocaleString()} remaining CMS subscriptions are sold or the deadline passes.
+                </p>
+              </div>
             </div>
             {cmsTimeLeft > 0 && (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center justify-center gap-1.5">
                 {cmsDays > 0 && (
                   <div className="text-center px-2 py-1.5 rounded-lg bg-white/70 border border-accent-200">
                     <p className="text-lg font-mono font-bold text-accent-700">{cmsDays}</p>
