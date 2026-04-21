@@ -6,7 +6,7 @@ import { useAccount } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useRegistration } from '@/hooks/useRegistration';
 import { HeroSection } from '@/components/landing/HeroSection';
-import { StatsBar } from '@/components/landing/StatsBar';
+
 import { FeatureGrid } from '@/components/landing/FeatureGrid';
 import { GlassCard } from '@/components/ui';
 
@@ -45,7 +45,6 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-surface-50">
       <HeroSection />
-      <StatsBar />
       <FeatureGrid />
 
       {/* Connect Wallet CTA */}

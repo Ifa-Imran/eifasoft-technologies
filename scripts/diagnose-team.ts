@@ -3,8 +3,8 @@
  */
 import { ethers } from "hardhat";
 
-const STAKING_MANAGER = "0x35F95D1cC8933596d7B3fcc4328D1E1d39Def8F5";
-const AFFILIATE_DISTRIBUTOR = "0x69Fe3f1c1D347412dAf7835C2eA490d12b964d69";
+const STAKING_MANAGER = "0xD53Dc5285aC6514bec61d7421247a0E04144394c";
+const AFFILIATE_DISTRIBUTOR = "0x022FE670C8870081f9Ff661dd6818339C08B2295";
 
 async function main() {
   const [deployer] = await ethers.getSigners();

@@ -138,10 +138,84 @@ function createCompoundWorker(): Worker {
     );
 }
 
+// ============ Compound All Stakes (runs before rank closing) ============
+
+/**
+ * Compound ALL active stakes across every tier during closing.
+ * No interval filter — we attempt every active stake and let the
+ * on-chain require(intervals > 0) handle timing naturally.
+ * "No intervals passed" reverts are silently skipped.
+ */
+async function compoundAllStakes(): Promise<void> {
+    console.log('[Closing] Compounding all active stakes before rank update...');
+
+    const stakingManager = getStakingManager(true);
+    if (!stakingManager) {
+        console.warn('[Closing] Contracts not configured, skipping compound-all');
+        return;
+    }
+
+    let totalSuccess = 0;
+    let totalSkipped = 0;
+    let totalFail = 0;
+
+    try {
+        // Query ALL active, non-capped stakes regardless of last_compound time
+        const result = await query(
+            `SELECT s.user_address, s.stake_id_on_chain, s.tier
+             FROM stakes s
+             WHERE s.is_active = TRUE
+               AND s.cap_reached = FALSE
+             ORDER BY s.tier ASC, s.last_compound ASC`
+        );
+
+        console.log(`[Closing] Found ${result.rows.length} active stakes to attempt compounding`);
+
+        for (const row of result.rows) {
+            try {
+                // estimateGas acts as a dry-run; if it reverts (not due, inactive, etc.) we skip
+                let gasEstimate: bigint;
+                try {
+                    gasEstimate = await stakingManager.compoundFor.estimateGas(
+                        row.user_address,
+                        row.stake_id_on_chain
+                    );
+                } catch {
+                    // Revert at estimation = not ready to compound, skip silently
+                    totalSkipped++;
+                    continue;
+                }
+
+                const tx = await stakingManager.compoundFor(
+                    row.user_address,
+                    row.stake_id_on_chain,
+                    { gasLimit: (gasEstimate * BigInt(150)) / BigInt(100) }
+                );
+                await tx.wait();
+                totalSuccess++;
+                console.log(`[Closing] Compounded: user=${row.user_address}, stakeId=${row.stake_id_on_chain}`);
+            } catch (err: any) {
+                totalFail++;
+                console.error(
+                    `[Closing] Compound tx failed: user=${row.user_address}, stakeId=${row.stake_id_on_chain}:`,
+                    err.message || err
+                );
+            }
+        }
+    } catch (err) {
+        console.error('[Closing] Error querying stakes for compounding:', err);
+    }
+
+    console.log(`[Closing] Compound-all complete: ${totalSuccess} compounded, ${totalSkipped} skipped (not due), ${totalFail} failed`);
+}
+
 // ============ Rank Update Core Logic ============
 
 export async function runRankUpdate(): Promise<void> {
     console.log('[Closing] Rank update starting...');
+
+    // Step 1: Compound all eligible stakes first — this distributes team dividends
+    await compoundAllStakes();
 
     // Query all users that have team_volume > 0 or are referrers
     const usersResult = await query(
