@@ -586,7 +586,9 @@ async function processHistoricalEvents(
             }
         }
 
-        console.log(`[${contractName}] Processed blocks ${start}-${end}`);
+        // Always advance the last indexed block after processing each batch,
+        // even if no events were found (prevents polling loop from re-scanning same blocks)
+        await setLastIndexedBlock(contractName, end);
     }
 }
 
