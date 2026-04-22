@@ -192,7 +192,9 @@ export function useAffiliate() {
     return () => { cancelled = true; };
   }, [publicClient, address]);
 
-  // Fetch team level data: per-level member count, business, and earnings from TeamEarned events
+  // Fetch team level data with COMPRESSION: skip inactive users when counting levels.
+  // Each member's compressed level = parent's compressed level + (1 if active, 0 if inactive).
+  // Matches the contract's distributeTeamDividend() compression logic.
   useEffect(() => {
     if (!publicClient || !address) return;
     let cancelled = false;
@@ -204,10 +206,11 @@ export function useAffiliate() {
           console.warn('[BFS] affiliateDistributor address not set');
           return;
         }
+        const stakingAddr = contracts.stakingManager;
 
-        console.log('[BFS] Starting BFS for', address);
+        console.log('[BFS] Starting compressed BFS for', address);
 
-        // BFS to get per-level members and their teamVolume
+        // Compressed level buckets
         const levelMembers: Map<number, Set<string>> = new Map();
         const levelBusiness: Map<number, bigint> = new Map();
         for (let i = 1; i <= 15; i++) {
@@ -215,10 +218,20 @@ export function useAffiliate() {
           levelBusiness.set(i, 0n);
         }
 
-        // BFS: start from user's direct referrals (level 1), then their referrals (level 2), etc.
-        // Traverse ALL levels (not just 15) to get full team size. Dividend stats limited to 15.
-        let currentLevel: string[] = [];
-        const deepMembers: string[] = []; // members beyond level 15
+        // BFS entry: address + parentCompressedLevel
+        interface BFSEntry { addr: string; parentCL: number; }
+        const MAX_BFS_DEPTH = 50; // match contract MAX_TREE_DEPTH
+        const CHUNK = 200;
+
+        // All team addresses (for analytics)
+        const allTeamAddrs: string[] = [];
+        const deepMembers: string[] = [];
+        // Map address -> compressed level (for parent lookups)
+        const memberCL = new Map<string, number>();
+
+        // Direct referrals
+        let currentBatch: BFSEntry[] = [];
+        let directAddrs: string[] = [];
         try {
           const directs = await publicClient.readContract({
             address: contractAddr,
@@ -226,65 +239,100 @@ export function useAffiliate() {
             functionName: 'getDirectReferrals',
             args: [address],
           }) as string[];
-          currentLevel = directs || [];
-          console.log('[BFS] Direct referrals:', currentLevel.length);
-        } catch (e) { console.error('[BFS] getDirectReferrals failed:', e); currentLevel = []; }
+          directAddrs = directs || [];
+          currentBatch = directAddrs.map(a => ({ addr: a, parentCL: 0 }));
+          console.log('[BFS] Direct referrals:', directAddrs.length);
+        } catch (e) { console.error('[BFS] getDirectReferrals failed:', e); }
 
-        for (let lvl = 1; currentLevel.length > 0; lvl++) {
-          if (lvl <= 15) {
-            const membersSet = levelMembers.get(lvl)!;
-            for (const addr of currentLevel) membersSet.add(addr.toLowerCase());
+        let directActive = 0;
+        let directBusiness = 0n;
+        let activeTeamStakes = 0;
 
-            // Batch read getTotalActiveStakeValue for each member at this level (personal stake = their business)
-            const stakingAddr = contracts.stakingManager;
-            if (stakingAddr && stakingAddr !== '0x') {
-              const volCalls = currentLevel.map(addr => ({
-                address: stakingAddr,
-                abi: StakingManagerABI,
-                functionName: 'getTotalActiveStakeValue' as const,
-                args: [addr as `0x${string}`],
-              }));
-              try {
-                const results = await publicClient.multicall({ contracts: volCalls });
-                let totalVol = 0n;
-                for (const r of results) {
-                  if (r.status === 'success' && r.result) totalVol += BigInt(r.result as any);
-                }
-                levelBusiness.set(lvl, totalVol);
-              } catch {}
-            }
-          } else {
-            // Beyond level 15: just count members
-            for (const addr of currentLevel) deepMembers.push(addr.toLowerCase());
-          }
+        for (let bfsDepth = 1; bfsDepth <= MAX_BFS_DEPTH && currentBatch.length > 0; bfsDepth++) {
+          const addrs = currentBatch.map(e => e.addr);
+          allTeamAddrs.push(...addrs.map(a => a.toLowerCase()));
 
-          // Fetch next level referrals (continue BFS for full tree)
-          const CHUNK_REF = 200;
-          const nextLevel: string[] = [];
-          for (let c = 0; c < currentLevel.length; c += CHUNK_REF) {
-            const chunk = currentLevel.slice(c, c + CHUNK_REF);
-            const refCalls = chunk.map(addr => ({
-              address: contractAddr,
-              abi: AffiliateDistributorABI,
-              functionName: 'getDirectReferrals' as const,
+          // Batch check active stake for all members at this BFS depth
+          let stakeVals: bigint[] = [];
+          if (stakingAddr && stakingAddr !== '0x') {
+            const volCalls = addrs.map(addr => ({
+              address: stakingAddr,
+              abi: StakingManagerABI,
+              functionName: 'getTotalActiveStakeValue' as const,
               args: [addr as `0x${string}`],
             }));
             try {
+              const results = await publicClient.multicall({ contracts: volCalls });
+              stakeVals = results.map(r =>
+                r.status === 'success' ? BigInt(r.result as any) : 0n
+              );
+            } catch { stakeVals = addrs.map(() => 0n); }
+          } else {
+            stakeVals = addrs.map(() => 0n);
+          }
+
+          // Assign compressed levels and bucket members
+          for (let j = 0; j < currentBatch.length; j++) {
+            const { addr, parentCL } = currentBatch[j];
+            const stakeVal = stakeVals[j];
+            const isActive = stakeVal > 0n;
+            const myCL = isActive ? parentCL + 1 : parentCL;
+            memberCL.set(addr.toLowerCase(), myCL);
+
+            if (isActive) activeTeamStakes++;
+
+            // Track direct referral analytics (BFS depth 1)
+            if (bfsDepth === 1 && isActive) {
+              directActive++;
+              directBusiness += stakeVal;
+            }
+
+            // Place into compressed level bucket
+            if (myCL >= 1 && myCL <= 15) {
+              levelMembers.get(myCL)!.add(addr.toLowerCase());
+              if (isActive) {
+                levelBusiness.set(myCL, (levelBusiness.get(myCL) || 0n) + stakeVal);
+              }
+            } else if (myCL > 15) {
+              deepMembers.push(addr.toLowerCase());
+            }
+            // myCL === 0: inactive member with no active ancestor between them and user
+          }
+
+          // Fetch next BFS level referrals
+          const nextBatch: BFSEntry[] = [];
+          for (let c = 0; c < addrs.length; c += CHUNK) {
+            const chunk = currentBatch.slice(c, c + CHUNK);
+            const refCalls = chunk.map(e => ({
+              address: contractAddr,
+              abi: AffiliateDistributorABI,
+              functionName: 'getDirectReferrals' as const,
+              args: [e.addr as `0x${string}`],
+            }));
+            try {
               const results = await publicClient.multicall({ contracts: refCalls });
-              for (const r of results) {
-                if (r.status === 'success' && Array.isArray(r.result)) {
-                  nextLevel.push(...(r.result as string[]));
+              for (let k = 0; k < chunk.length; k++) {
+                const parentAddr = chunk[k].addr;
+                const pCL = memberCL.get(parentAddr.toLowerCase()) || 0;
+                const r = results[k];
+                if (r?.status === 'success' && Array.isArray(r.result)) {
+                  for (const ref of r.result as string[]) {
+                    nextBatch.push({ addr: ref, parentCL: pCL });
+                  }
                 }
               }
             } catch {}
           }
-          currentLevel = nextLevel;
-          if (cancelled) { console.warn('[BFS] Cancelled at level', lvl); return; }
+          currentBatch = nextBatch;
+          if (cancelled) { console.warn('[BFS] Cancelled at depth', bfsDepth); return; }
         }
 
-        console.log('[BFS] BFS complete. Level 1 members:', levelMembers.get(1)?.size);
-        // Fetch TeamEarned events for this user (indexed as upline)
-        // Wrapped in try/catch: some RPCs reject fromBlock:0n log queries
+        allTeamAddrs.push(...deepMembers);
+        const totalTeamSize = allTeamAddrs.length;
+
+        console.log('[BFS] Compressed BFS complete. Total team:', totalTeamSize, 'Active stakes:', activeTeamStakes);
+
+        // Fetch TeamEarned events (contract already emits compressed level numbers)
         const levelEarned: Map<number, bigint> = new Map();
         const levelTxCount: Map<number, number> = new Map();
         for (let i = 1; i <= 15; i++) {
@@ -331,63 +379,6 @@ export function useAffiliate() {
           });
         }
         setTeamLevelStats(stats);
-
-        // ── Team Analytics: active directs, direct business, team size, active team stakes ──
-        const directAddrs = levelMembers.get(1) ? [...levelMembers.get(1)!] : [];
-        console.log('[BFS] Analytics - directAddrs:', directAddrs.length, 'addresses');
-        const allTeamAddrs: string[] = [];
-        for (let i = 1; i <= 15; i++) {
-          const s = levelMembers.get(i);
-          if (s) allTeamAddrs.push(...s);
-        }
-        // Include members beyond level 15 in total count
-        allTeamAddrs.push(...deepMembers);
-        const totalTeamSize = allTeamAddrs.length;
-
-        // Batch check getTotalActiveStakeValue for direct referrals
-        const stakingAddrForAnalytics = contracts.stakingManager;
-        let directActive = 0;
-        let directBusiness = 0n;
-        if (directAddrs.length > 0 && stakingAddrForAnalytics && stakingAddrForAnalytics !== '0x') {
-          const stakeCalls = directAddrs.map(addr => ({
-            address: stakingAddrForAnalytics,
-            abi: StakingManagerABI,
-            functionName: 'getTotalActiveStakeValue' as const,
-            args: [addr as `0x${string}`],
-          }));
-          try {
-            const results = await publicClient.multicall({ contracts: stakeCalls });
-            for (const r of results) {
-              if (r.status === 'success') {
-                const val = BigInt(r.result as any);
-                if (val > 0n) { directActive++; directBusiness += val; }
-              }
-            }
-          } catch (mcErr) { console.error('[BFS] Direct stake multicall FAILED:', mcErr); }
-        }
-
-        // Batch check getTotalActiveStakeValue for ALL team members (chunked)
-        let activeTeamStakes = 0;
-        if (allTeamAddrs.length > 0 && stakingAddrForAnalytics && stakingAddrForAnalytics !== '0x') {
-          const CHUNK = 200;
-          for (let c = 0; c < allTeamAddrs.length; c += CHUNK) {
-            const chunk = allTeamAddrs.slice(c, c + CHUNK);
-            const calls = chunk.map(addr => ({
-              address: stakingAddrForAnalytics,
-              abi: StakingManagerABI,
-              functionName: 'getTotalActiveStakeValue' as const,
-              args: [addr as `0x${string}`],
-            }));
-            try {
-              const results = await publicClient.multicall({ contracts: calls });
-              for (const r of results) {
-                if (r.status === 'success' && BigInt(r.result as any) > 0n) activeTeamStakes++;
-              }
-            } catch (mcErr) { console.error('[BFS] Team stake multicall FAILED:', mcErr); }
-          }
-        }
-
-        if (cancelled) { console.warn('[BFS] Cancelled before setTeamAnalytics'); return; }
 
         console.log('[BFS] FINAL:', { directActive, directBusiness: directBusiness.toString(), activeTeamStakes, totalTeamSize });
         setTeamAnalytics({
