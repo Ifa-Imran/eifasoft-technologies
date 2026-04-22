@@ -259,6 +259,27 @@ async function handleStakingHarvested(
     await setLastIndexedBlock('StakingManager', blockNumber);
 }
 
+async function handleTierUpdated(
+    user: string, newTier: number,
+    txHash: string, blockNumber: number
+): Promise<void> {
+    const client = await getClient();
+    const addr = toLower(user);
+    try {
+        await client.query(
+            `UPDATE stakes SET tier = $1, updated_at = NOW()
+             WHERE user_address = $2 AND is_active = TRUE`,
+            [Number(newTier), addr]
+        );
+        console.log(`[StakingManager] TierUpdated indexed: user=${addr}, newTier=${newTier}`);
+    } catch (err) {
+        console.error('[StakingManager] Error handling TierUpdated:', err);
+    } finally {
+        client.release();
+    }
+    await setLastIndexedBlock('StakingManager', blockNumber);
+}
+
 // ============ AffiliateDistributor Event Handlers ============
 
 async function handleReferrerSet(
@@ -632,6 +653,12 @@ function setupRealtimeListeners(contracts: NonNullable<ReturnType<typeof getWsCo
         triggerClosingCheck();
     });
 
+    contracts.stakingManager.on('TierUpdated', async (user: string, newTier: number, event: any) => {
+        const txHash = event.log?.transactionHash || '';
+        const blockNumber = event.log?.blockNumber || 0;
+        await handleTierUpdated(user, newTier, txHash, blockNumber);
+    });
+
     // AffiliateDistributor
     contracts.affiliateDistributor.on('ReferrerSet', async (user: string, referrer: string, event: any) => {
         const txHash = event.log?.transactionHash || '';
@@ -802,6 +829,7 @@ export async function startIndexer(): Promise<void> {
                 Unstaked: handleUnstaked,
                 CapReached: handleCapReached,
                 Harvested: handleStakingHarvested,
+                TierUpdated: handleTierUpdated,
             },
         },
         {

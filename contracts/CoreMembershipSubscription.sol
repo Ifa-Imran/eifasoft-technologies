@@ -69,7 +69,7 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
 
     // ============ Deadlines (set via constructor) ============
     // Testing: deploy + 3h subscribe, deploy + 6h claim
-    // Production: May 6, 2026 00:00 UTC subscribe, June 1, 2026 00:00 UTC claim
+    // Production: May 16, 2026 00:00 UTC subscribe, June 1, 2026 00:00 UTC claim
     uint256 public immutable SUBSCRIBE_DEADLINE;
     uint256 public immutable CLAIM_DEADLINE;
 
@@ -103,7 +103,7 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
     // ============ Constructor ============
     /**
      * @param _subscribeDeadline Unix timestamp after which subscriptions are blocked
-     *        Testing: block.timestamp + 3 hours | Production: May 6, 2026 00:00 UTC
+     *        Testing: block.timestamp + 3 hours | Production: May 16, 2026 00:00 UTC
      * @param _claimDeadline Unix timestamp after which claims are blocked & tokens can be flushed
      *        Testing: block.timestamp + 6 hours | Production: June 1, 2026 00:00 UTC
      */

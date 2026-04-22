@@ -11,6 +11,7 @@ export const StakingManagerABI = [
     "event Unstaked(address indexed user, uint256 stakeId, uint256 returnAmount)",
     "event CapReached(address indexed user, uint256 stakeId, uint256 totalEarned)",
     "event Harvested(address indexed user, uint256 stakeId, uint256 amount)",
+    "event TierUpdated(address indexed user, uint8 newTier)",
     "event AffiliateDistributorSet(address indexed distributor)",
     "event SystemWalletSet(address indexed wallet)",
     // Key functions

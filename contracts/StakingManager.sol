@@ -119,6 +119,7 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
     event Unstaked(address indexed user, uint256 stakeId, uint256 returnAmount);
     event StakeCapped(address indexed user, uint256 stakeId, uint256 totalHarvested);
     event Harvested(address indexed user, uint256 stakeId, uint256 amount);
+    event TierUpdated(address indexed user, uint8 newTier);
     event AffiliateDistributorSet(address indexed distributor);
     event DevelopmentFundWalletSet(address indexed wallet);
     event DaoWalletsSet(address[6] wallets);
@@ -180,9 +181,6 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
             );
         }
 
-        // Auto-detect tier
-        uint8 tierIndex = _detectTier(_usdtAmount);
-
         // Transfer USDT from user to this contract
         require(usdt.transferFrom(msg.sender, address(this), _usdtAmount), "StakingManager: USDT transfer failed");
 
@@ -208,7 +206,7 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
         uint256 developmentFundShare = (_usdtAmount * 5) / 100;
         require(usdt.transfer(developmentFundWallet, developmentFundShare), "StakingManager: Development fund transfer failed");
 
-        // Create new stake
+        // Create new stake (tier assigned after totalActiveStakeValue update below)
         uint256 stakeId = userStakes[msg.sender].length;
         userStakes[msg.sender].push(Stake({
             amount: _usdtAmount,
@@ -219,10 +217,16 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
             totalEarned: 0,
             compoundEarned: 0,
             active: true,
-            tier: tierIndex
+            tier: 0  // placeholder, updated by _updateAllStakeTiers below
         }));
 
         totalActiveStakeValue[msg.sender] += _usdtAmount;
+
+        // Auto-detect tier based on TOTAL cumulative stake value
+        uint8 tierIndex = _detectTier(totalActiveStakeValue[msg.sender]);
+
+        // Update tier on ALL existing active stakes to match cumulative tier
+        _updateAllStakeTiers(msg.sender);
 
         // Distribute 5% direct dividend to referrer via AffiliateDistributor
         if (affiliateDistributor != address(0)) {
@@ -323,6 +327,9 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
             totalActiveStakeValue[_user] = 0;
         }
         emit StakeCapped(_user, _stakeId, stk.totalEarned);
+
+        // Recalculate tier for remaining active stakes (may downgrade)
+        _updateAllStakeTiers(_user);
     }
 
     /**
@@ -351,6 +358,9 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
         // Mark stake inactive
         totalActiveStakeValue[msg.sender] -= stk.amount;
         stk.active = false;
+
+        // Recalculate tier for remaining active stakes (may downgrade)
+        _updateAllStakeTiers(msg.sender);
 
         // Unharvested earnings are forfeited
         emit Unstaked(msg.sender, _stakeId, returnAmount);
@@ -633,7 +643,22 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
     }
 
     /**
-     * @dev Auto-detect tier based on USDT stake amount
+     * @dev Recalculate and update tier for ALL active stakes of a user
+     *      based on their totalActiveStakeValue. Emits TierUpdated.
+     * @param _user Stake owner
+     */
+    function _updateAllStakeTiers(address _user) internal {
+        uint8 newTier = _detectTier(totalActiveStakeValue[_user]);
+        for (uint256 i = 0; i < userStakes[_user].length; i++) {
+            if (userStakes[_user][i].active) {
+                userStakes[_user][i].tier = newTier;
+            }
+        }
+        emit TierUpdated(_user, newTier);
+    }
+
+    /**
+     * @dev Auto-detect tier based on USDT amount (cumulative total)
      * @param _amount USDT amount (18 decimals)
      * @return tierIndex Tier index (0, 1, or 2)
      */
