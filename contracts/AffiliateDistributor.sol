@@ -78,6 +78,7 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
 
     // ============ Constants ============
     uint256 public constant MIN_HARVEST = 10e18; // $10 minimum harvest
+    uint256 public constant MAX_TREE_DEPTH = 50;  // max hops to walk (gas safety)
 
     // Team dividend percentages (basis points: 1000 = 10%)
     // L1: 10%, L2-L10: 5% each, L11-L15: 2% each
@@ -246,26 +247,32 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
     }
 
     /**
-     * @dev Distribute team dividends through 15 levels (called by StakingManager on compound).
-     *      Income accrues freely — 3x cap is enforced at harvest time.
+     * @dev Distribute team dividends with level compression.
+     *      Walks up the referral tree, skipping inactive users.
+     *      Only active uplines (getTotalActiveStakeValue > 0) consume
+     *      a level slot. Inactive users are transparent pass-throughs.
+     *      Max 50 hops to prevent gas exhaustion.
      */
     function distributeTeamDividend(address _staker, uint256 _profit) external onlyRole(STAKING_ROLE) {
         address current = _staker;
-        for (uint256 i = 0; i < 15; i++) {
+        uint256 activeLevels = 0;
+
+        for (uint256 depth = 0; depth < MAX_TREE_DEPTH && activeLevels < 15; depth++) {
             address upline = referrerOf[current];
             if (upline == address(0) || upline == current) break; // stop at genesis sentinel
 
-            // Check if this upline has unlocked level (i+1)
-            uint256 unlockedLevels = _getUnlockedLevels(upline);
-            if (i < unlockedLevels) {
-                // Must have active stake to earn team income
-                if (IStakingManager(stakingManager).getTotalActiveStakeValue(upline) > 0) {
-                    uint256 dividend = (_profit * TEAM_PERCENTAGES[i]) / 10000;
-                    // Accrue freely — no cap check at accrual time
+            // Compression: only active uplines count as levels
+            if (IStakingManager(stakingManager).getTotalActiveStakeValue(upline) > 0) {
+                // Check if this upline has unlocked enough levels
+                if (activeLevels < _getUnlockedLevels(upline)) {
+                    uint256 dividend = (_profit * TEAM_PERCENTAGES[activeLevels]) / 10000;
                     teamDividends[upline] += dividend;
-                    emit TeamEarned(upline, _staker, i + 1, dividend);
+                    emit TeamEarned(upline, _staker, activeLevels + 1, dividend);
                 }
+                activeLevels++;
             }
+            // If inactive: skip — don't increment activeLevels
+
             current = upline;
         }
     }
