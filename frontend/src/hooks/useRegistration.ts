@@ -97,6 +97,7 @@ export function useRegistration() {
     isConnected,
     isGenesisMode,
     isFirstUserMode,
+    genesisAccount: genesisAccount as string | undefined,
     hasOnChainReferrer,
     storedReferrer,
     register,

@@ -15,7 +15,7 @@ function RegisterPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isConnected, address } = useAccount();
-  const { isRegistered, isLoading: regLoading, isGenesisMode, isFirstUserMode, register, isPending, isSuccess } = useRegistration();
+  const { isRegistered, isLoading: regLoading, isGenesisMode, isFirstUserMode, genesisAccount, register, isPending, isSuccess } = useRegistration();
 
   // Either genesis or first-user can skip referrer
   const skipReferrer = isGenesisMode || isFirstUserMode;
@@ -114,7 +114,11 @@ function RegisterPageInner() {
   }
 
   // --- Registration form ---
-  const effectiveReferrer = skipReferrer && !referrer ? SYSTEM_WALLET : referrer;
+  // In first-user mode, use genesis account as referrer (it's the only registered address)
+  // In genesis mode, use SYSTEM_WALLET (contract handles self-registration)
+  const effectiveReferrer = skipReferrer && !referrer
+    ? (isFirstUserMode && genesisAccount ? genesisAccount : SYSTEM_WALLET)
+    : referrer;
   // For non-genesis/non-first-user: require on-chain proof that the referrer is registered
   const referrerVerifiedOnChain = referrerOfReferrer !== undefined && referrerOfReferrer !== zeroAddress;
   const canSubmit = !referrerError && (
