@@ -243,7 +243,8 @@ async function handleStakingHarvested(
 
         await client.query(
             `INSERT INTO income_ledger (user_address, income_type, amount_usd, tx_hash, created_at)
-             VALUES ($1, 'STAKING_HARVEST', $2, $3, NOW())`,
+             VALUES ($1, 'STAKING_HARVEST', $2, $3, NOW())
+             ON CONFLICT (user_address, income_type, tx_hash) DO NOTHING`,
             [addr, formatUnits(amount), txHash]
         );
 
@@ -413,7 +414,8 @@ async function handleRewardsClaimed(
         // Record in income ledger
         await client.query(
             `INSERT INTO income_ledger (user_address, income_type, amount_kairo, tx_hash, created_at)
-             VALUES ($1, 'CMS_CLAIM', $2, $3, NOW())`,
+             VALUES ($1, 'CMS_CLAIM', $2, $3, NOW())
+             ON CONFLICT (user_address, income_type, tx_hash) DO NOTHING`,
             [addr, formatUnits(userAmount), txHash]
         );
 
