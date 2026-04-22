@@ -252,46 +252,54 @@ export function useAffiliate() {
           const addrs = currentBatch.map(e => e.addr);
           allTeamAddrs.push(...addrs.map(a => a.toLowerCase()));
 
-          // Batch check active stake for all members at this BFS depth
-          let stakeVals: bigint[] = [];
+          // Batch fetch all stakes for each member to get principal (originalAmount)
+          let memberStakes: { isActive: boolean; principalVal: bigint }[] = [];
           if (stakingAddr && stakingAddr !== '0x') {
-            const volCalls = addrs.map(addr => ({
+            const stakeCalls = addrs.map(addr => ({
               address: stakingAddr,
               abi: StakingManagerABI,
-              functionName: 'getTotalActiveStakeValue' as const,
+              functionName: 'getUserStakes' as const,
               args: [addr as `0x${string}`],
             }));
             try {
-              const results = await publicClient.multicall({ contracts: volCalls });
-              stakeVals = results.map(r =>
-                r.status === 'success' ? BigInt(r.result as any) : 0n
-              );
-            } catch { stakeVals = addrs.map(() => 0n); }
+              const results = await publicClient.multicall({ contracts: stakeCalls });
+              memberStakes = results.map(r => {
+                if (r.status !== 'success' || !Array.isArray(r.result)) return { isActive: false, principalVal: 0n };
+                let principal = 0n;
+                let hasActive = false;
+                for (const s of r.result as any[]) {
+                  if (s.active) {
+                    hasActive = true;
+                    principal += BigInt(s.originalAmount);
+                  }
+                }
+                return { isActive: hasActive, principalVal: principal };
+              });
+            } catch { memberStakes = addrs.map(() => ({ isActive: false, principalVal: 0n })); }
           } else {
-            stakeVals = addrs.map(() => 0n);
+            memberStakes = addrs.map(() => ({ isActive: false, principalVal: 0n }));
           }
 
           // Assign compressed levels and bucket members
           for (let j = 0; j < currentBatch.length; j++) {
             const { addr, parentCL } = currentBatch[j];
-            const stakeVal = stakeVals[j];
-            const isActive = stakeVal > 0n;
+            const { isActive, principalVal } = memberStakes[j];
             const myCL = isActive ? parentCL + 1 : parentCL;
             memberCL.set(addr.toLowerCase(), myCL);
 
             if (isActive) activeTeamStakes++;
 
-            // Track direct referral analytics (BFS depth 1)
+            // Track direct referral analytics (BFS depth 1) — use principal only
             if (bfsDepth === 1 && isActive) {
               directActive++;
-              directBusiness += stakeVal;
+              directBusiness += principalVal;
             }
 
-            // Place into compressed level bucket
+            // Place into compressed level bucket — business = principal only
             if (myCL >= 1 && myCL <= 15) {
               levelMembers.get(myCL)!.add(addr.toLowerCase());
               if (isActive) {
-                levelBusiness.set(myCL, (levelBusiness.get(myCL) || 0n) + stakeVal);
+                levelBusiness.set(myCL, (levelBusiness.get(myCL) || 0n) + principalVal);
               }
             } else if (myCL > 15) {
               deepMembers.push(addr.toLowerCase());
