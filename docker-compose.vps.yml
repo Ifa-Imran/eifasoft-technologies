@@ -1,0 +1,164 @@
+services:
+  postgres:
+    image: postgres:14-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kairo_admin
+      POSTGRES_PASSWORD: K41r0D3v2024!
+      POSTGRES_DB: kairo_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - kairo_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kairo_admin -d kairo_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --requirepass K41r0R3d1s! --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - kairo_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "K41r0R3d1s!", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: node:18-alpine
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "
+        apk add --no-cache git &&
+        rm -rf /tmp/repo &&
+        git clone https://github.com/Ifa-Imran/eifasoft-technologies.git /tmp/repo &&
+        cp -a /tmp/repo/backend/. /app/ &&
+        NODE_ENV=development npm ci &&
+        npx tsc &&
+        mkdir -p dist/db/migrations && cp src/db/migrations/*.sql dist/db/migrations/ &&
+        node -e 'require("./dist/db/migrate").runMigrations().then(() => console.log("Migrations done")).catch(e => { console.error(e); process.exit(1); })' &&
+        NODE_ENV=production node dist/index.js
+      "
+    environment:
+      - PORT=4000
+      - DATABASE_URL=postgresql://kairo_admin:K41r0D3v2024!@postgres:5432/kairo_dev
+      - REDIS_URL=redis://:K41r0R3d1s!@redis:6379
+      - RPC_URL=https://opbnb-testnet-rpc.bnbchain.org
+      - RPC_WS_URL=wss://opbnb-testnet-rpc.bnbchain.org
+      - CHAIN_ID=5611
+      - INDEXER_PRIVATE_KEY=0x322a887a89c0b019c85c0f63f3736f25ca22c139150f5cec15c73c0e675d2b52
+      - KAIRO_TOKEN_ADDRESS=0xa7F6CE610FC66Daf07017958cADa089476745c44
+      - LIQUIDITY_POOL_ADDRESS=0x30550b58699e8E0c5eFF4dF5d034Faafb91667EB
+      - STAKING_MANAGER_ADDRESS=0x14E9FAC14336cD1f4A145551CE41DacAab5427F5
+      - AFFILIATE_DISTRIBUTOR_ADDRESS=0x07667687121941a491569308c81c7D6dAD295a55
+      - CMS_ADDRESS=0x4B2C106f248A06D1CBc0278FF9185a30e506550E
+      - ATOMIC_P2P_ADDRESS=0xF6b79F8524c378fD89112192AAC766D0b708BA3c
+      - SYSTEM_WALLET=0x624D0985D844Cd1DF132723a9d849FE1A34cAf9D
+    volumes:
+      - backend_app:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - kairo_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=kairo-dev_kairo_network"
+      - "traefik.http.routers.kairodao-api.rule=Host(`dev.kairodao.com`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.kairodao-api.entrypoints=websecure"
+      - "traefik.http.routers.kairodao-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.kairodao-api.service=kairodao-backend"
+      - "traefik.http.routers.kairodao-ws.rule=Host(`dev.kairodao.com`) && PathPrefix(`/ws`)"
+      - "traefik.http.routers.kairodao-ws.entrypoints=websecure"
+      - "traefik.http.routers.kairodao-ws.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.kairodao-ws.service=kairodao-backend"
+      - "traefik.http.routers.kairodao-health.rule=Host(`dev.kairodao.com`) && PathPrefix(`/health`)"
+      - "traefik.http.routers.kairodao-health.entrypoints=websecure"
+      - "traefik.http.routers.kairodao-health.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.kairodao-health.service=kairodao-backend"
+      - "traefik.http.services.kairodao-backend.loadbalancer.server.port=4000"
+
+  frontend:
+    image: node:18-alpine
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "
+        apk add --no-cache git &&
+        rm -rf /tmp/repo &&
+        git clone https://github.com/Ifa-Imran/eifasoft-technologies.git /tmp/repo &&
+        cp -a /tmp/repo/frontend/. /app/ &&
+        npm ci --legacy-peer-deps &&
+        NEXT_PUBLIC_BACKEND_URL=https://dev.kairodao.com
+        NEXT_PUBLIC_WS_URL=wss://dev.kairodao.com/ws
+        NEXT_PUBLIC_CHAIN_ID=5611
+        NEXT_PUBLIC_KAIRO_TOKEN=0xa7F6CE610FC66Daf07017958cADa089476745c44
+        NEXT_PUBLIC_LIQUIDITY_POOL=0x30550b58699e8E0c5eFF4dF5d034Faafb91667EB
+        NEXT_PUBLIC_STAKING_MANAGER=0x14E9FAC14336cD1f4A145551CE41DacAab5427F5
+        NEXT_PUBLIC_AFFILIATE_DISTRIBUTOR=0x07667687121941a491569308c81c7D6dAD295a55
+        NEXT_PUBLIC_CMS=0x4B2C106f248A06D1CBc0278FF9185a30e506550E
+        NEXT_PUBLIC_ATOMIC_P2P=0xF6b79F8524c378fD89112192AAC766D0b708BA3c
+        NEXT_PUBLIC_USDT=0x8115B84D2a220b73D2af2AaFA93FC2fAb4f55cd6
+        NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=d9fddb48789291a159e8270ef32105c2
+        NEXT_PUBLIC_SYSTEM_WALLET=0x624D0985D844Cd1DF132723a9d849FE1A34cAf9D
+        npm run build &&
+        NODE_ENV=production node .next/standalone/server.js
+      "
+    volumes:
+      - frontend_app:/app
+    depends_on:
+      - backend
+    networks:
+      - kairo_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=kairo-dev_kairo_network"
+      - "traefik.http.routers.kairodao-frontend.rule=Host(`dev.kairodao.com`)"
+      - "traefik.http.routers.kairodao-frontend.entrypoints=websecure"
+      - "traefik.http.routers.kairodao-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.kairodao-frontend.loadbalancer.server.port=3000"
+      - "traefik.http.routers.kairodao-frontend.priority=1"
+
+  traefik:
+    image: traefik:latest
+    restart: unless-stopped
+    command:
+      - "--api.insecure=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=kairo-dev_kairo_network"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=admin@kairodao.com"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - letsencrypt:/letsencrypt
+    networks:
+      - kairo_network
+
+volumes:
+  postgres_data:
+  redis_data:
+  backend_app:
+  frontend_app:
+  letsencrypt:
+
+networks:
+  kairo_network:
+    driver: bridge
