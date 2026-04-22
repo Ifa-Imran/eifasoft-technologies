@@ -3,7 +3,7 @@ import IORedis from 'ioredis';
 import { config } from '../config';
 import { query } from '../db/connection';
 import { getStakingManager, getAffiliateDistributor } from './blockchain';
-import { getTeamVolume, getLargestLeg } from '../utils/referral-tree';
+import { getTeamVolume, getLargestLeg, getAllLegVolumes } from '../utils/referral-tree';
 
 // ============ Redis Connection ============
 
@@ -239,30 +239,30 @@ export async function runRankUpdate(): Promise<void> {
         try {
             const userAddr = row.wallet_address;
 
-            // Calculate team volume from DB
+            // Calculate team volume from DB (excludes user's own personal volume)
             const teamVolumeStr = await getTeamVolume(userAddr);
             const teamVolume = parseFloat(teamVolumeStr);
 
             if (teamVolume <= 0) continue;
 
-            // Get largest leg
-            const { largestLeg: largestLegStr } = await getLargestLeg(userAddr);
-            const largestLeg = parseFloat(largestLegStr);
+            // Get ALL leg volumes (each leg = direct referral's own stake + their downline)
+            const legVolumes = await getAllLegVolumes(userAddr);
 
-            // Apply 50% max leg rule
-            const maxLeg = teamVolume / 2;
-            let adjustedVolume: number;
-            if (largestLeg > maxLeg) {
-                adjustedVolume = teamVolume - largestLeg + maxLeg;
-            } else {
-                adjustedVolume = teamVolume;
-            }
-
-            // Determine rank level based on thresholds (highest qualifying)
+            // Apply 50%-of-rank-target rule:
+            // For each rank, cap each leg at 50% of that rank's threshold.
+            // Only qualify if the sum of capped legs meets the threshold.
             let rankLevel = 0;
             let rankSalary = 0;
             for (let i = RANK_THRESHOLDS.length - 1; i >= 0; i--) {
-                if (adjustedVolume >= RANK_THRESHOLDS[i]) {
+                const threshold = RANK_THRESHOLDS[i];
+                const maxPerLeg = threshold / 2; // 50% of THIS rank's target
+
+                let qualifyingVol = 0;
+                for (const legVol of legVolumes) {
+                    qualifyingVol += Math.min(legVol, maxPerLeg);
+                }
+
+                if (qualifyingVol >= threshold) {
                     rankLevel = i + 1;
                     rankSalary = RANK_SALARIES[i];
                     break;

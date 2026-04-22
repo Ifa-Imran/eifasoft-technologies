@@ -9,8 +9,8 @@
  */
 import { ethers } from "hardhat";
 
-const AFFILIATE_DISTRIBUTOR = "0x69Fe3f1c1D347412dAf7835C2eA490d12b964d69";
-const STAKING_MANAGER       = "0x35F95D1cC8933596d7B3fcc4328D1E1d39Def8F5";
+const AFFILIATE_DISTRIBUTOR = "0x07667687121941a491569308c81c7D6dAD295a55";
+const STAKING_MANAGER       = "0x14E9FAC14336cD1f4A145551CE41DacAab5427F5";
 
 const L1_KEY = "edea0b8af9080af0e04a95a59e68b5236fb9ebd911833bda712ea709a0348a38";
 const L2_KEY = "0ae0e3d497e3a4b330b363e9b3a3cacbe7e457ba1114dd68990853b9cd2ffb64";
@@ -99,19 +99,19 @@ async function main() {
     const allIncome = await ad.getAllIncome(addr);
     console.log(`  allIncome: direct=$${ethers.formatEther(allIncome[0])}, team=$${ethers.formatEther(allIncome[1])}, rank=$${ethers.formatEther(allIncome[2])}`);
 
-    // 10. 50% max-leg rule analysis
+    // 10. 50%-of-rank-target rule analysis
     if (teamVol > 0n) {
-      // Find largest leg
-      const referrals = await ad.directReferrals(addr, 0).catch(() => null);
-      // Get all direct referrals
-      let largestLeg = 0n;
+      // Get all direct referrals and their leg volumes (personalVolume + teamVolume)
+      const legVols: bigint[] = [];
       let legCount = 0;
       try {
         for (let i = 0; i < 50; i++) {
           try {
             const ref = await ad.directReferrals(addr, i);
-            const legVol = await ad.teamVolume(ref);
-            if (legVol > largestLeg) largestLeg = legVol;
+            const refPersonalVol = await ad.personalVolume(ref);
+            const refTeamVol = await ad.teamVolume(ref);
+            const legVol = refPersonalVol + refTeamVol;
+            legVols.push(legVol);
             legCount++;
           } catch {
             break;
@@ -119,27 +119,27 @@ async function main() {
         }
       } catch {}
 
-      const maxLeg = teamVol / 2n;
-      const adjustedVol = largestLeg > maxLeg
-        ? teamVol - largestLeg + maxLeg
-        : teamVol;
-
-      console.log(`  --- 50% Max-Leg Rule ---`);
+      console.log(`  --- 50%-of-Rank-Target Rule ---`);
       console.log(`  legs found:           ${legCount}`);
-      console.log(`  largestLeg:           $${ethers.formatEther(largestLeg)}`);
-      console.log(`  maxLeg (50%):         $${ethers.formatEther(maxLeg)}`);
-      console.log(`  adjustedVolume:       $${ethers.formatEther(adjustedVol)}`);
-      console.log(`  isCapped:             ${largestLeg > maxLeg}`);
+      for (let i = 0; i < legVols.length; i++) {
+        console.log(`    Leg ${i + 1}: $${ethers.formatEther(legVols[i])}`);
+      }
 
-      // Check rank thresholds
-      const thresholds = [];
+      // Check rank thresholds with per-rank leg cap
+      const thresholds: bigint[] = [];
       for (let i = 0; i < 10; i++) {
         thresholds.push(await ad.RANK_THRESHOLDS(i));
       }
-      console.log(`  --- Rank Thresholds ---`);
+      console.log(`  --- Rank Qualification (50% of target cap per leg) ---`);
       for (let i = 0; i < 10; i++) {
-        const met = adjustedVol >= thresholds[i];
-        console.log(`    Rank ${i + 1}: $${ethers.formatEther(thresholds[i])} ${met ? '✅ MET' : '❌ NOT MET'}`);
+        const threshold = thresholds[i];
+        const maxPerLeg = threshold / 2n;
+        let qualifyingVol = 0n;
+        for (const lv of legVols) {
+          qualifyingVol += lv > maxPerLeg ? maxPerLeg : lv;
+        }
+        const met = qualifyingVol >= threshold;
+        console.log(`    Rank ${i + 1}: target=$${ethers.formatEther(threshold)}, maxPerLeg=$${ethers.formatEther(maxPerLeg)}, qualifying=$${ethers.formatEther(qualifyingVol)} ${met ? '\u2705 MET' : '\u274C NOT MET'}`);
         if (!met) break;
       }
     }

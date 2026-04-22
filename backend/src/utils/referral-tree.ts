@@ -150,6 +150,39 @@ export async function getLargestLeg(
 }
 
 /**
+ * Get all leg volumes for a user.
+ * Each "leg" is a direct referral's total subtree volume (including their own stake).
+ * Used for the 50%-of-rank-target qualification rule.
+ * @param user - Wallet address (lowercase)
+ * @returns Array of leg volumes as numbers
+ */
+export async function getAllLegVolumes(user: string): Promise<number[]> {
+    const directsResult = await query(
+        `SELECT descendant FROM referral_tree
+         WHERE ancestor = $1 AND depth = 1`,
+        [user]
+    );
+
+    const legVolumes: number[] = [];
+
+    for (const row of directsResult.rows) {
+        const directRef = row.descendant;
+
+        const volResult = await query(
+            `SELECT COALESCE(SUM(u.total_staked_volume), 0) AS leg_volume
+             FROM referral_tree rt
+             JOIN users u ON u.wallet_address = rt.descendant
+             WHERE rt.ancestor = $1 AND rt.depth >= 0`,
+            [directRef]
+        );
+
+        legVolumes.push(parseFloat(volResult.rows[0]?.leg_volume || '0'));
+    }
+
+    return legVolumes;
+}
+
+/**
  * Get direct referral count for a user.
  * @param user - Wallet address (lowercase)
  * @returns Number of direct referrals

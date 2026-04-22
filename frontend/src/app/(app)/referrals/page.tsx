@@ -43,18 +43,20 @@ export default function RankDividendPage() {
   const teamVolumeUsd = teamVolume ? Number(formatUnits(teamVolume, USDT_DECIMALS)) : 0;
   const largestLegUsd = largestLegVolume ? Number(formatUnits(largestLegVolume, USDT_DECIMALS)) : 0;
 
-  // 50% max-leg rule calculation (mirrors contract logic)
-  const maxLeg = teamVolumeUsd / 2;
-  const adjustedVolume = largestLegUsd > maxLeg
-    ? teamVolumeUsd - largestLegUsd + maxLeg
-    : teamVolumeUsd;
-  const otherLegsVolume = teamVolumeUsd - largestLegUsd;
-  const isLegCapped = largestLegUsd > maxLeg;
+  // 50%-of-rank-target rule: for each rank, cap each leg at 50% of that rank's threshold
+  // Compute qualifying volume for each rank level
+  const legVolumeNumbers = legVolumes.map((l: any) => l.volumeUsd as number);
+
+  function getQualifyingVolume(threshold: number): number {
+    const maxPerLeg = threshold / 2;
+    return legVolumeNumbers.reduce((sum: number, lv: number) => sum + Math.min(lv, maxPerLeg), 0);
+  }
 
   // Next rank target
-  const nextRankIdx = currentRank < 10 ? currentRank : 9; // index into 0-based threshold array
+  const nextRankIdx = currentRank < 10 ? currentRank : 9;
   const nextThreshold = currentRank < 10 ? RANK_THRESHOLDS[nextRankIdx] : RANK_THRESHOLDS[9];
-  const progressToNext = nextThreshold > 0 ? Math.min((adjustedVolume / nextThreshold) * 100, 100) : 100;
+  const nextQualifyingVol = getQualifyingVolume(nextThreshold);
+  const progressToNext = nextThreshold > 0 ? Math.min((nextQualifyingVol / nextThreshold) * 100, 100) : 100;
 
   return (
     <div className="space-y-6">
@@ -193,9 +195,9 @@ export default function RankDividendPage() {
               </div>
               <ProgressBar value={progressToNext} label={`${progressToNext.toFixed(2)}% achieved`} variant="cyan" size="lg" />
               <p className="text-xs text-surface-400 mt-1">
-                {adjustedVolume >= nextThreshold
+                {nextQualifyingVol >= nextThreshold
                   ? 'Target met!'
-                  : `Need $${formatCompact(nextThreshold - adjustedVolume, 2)} more (adjusted)`}
+                  : `Need $${formatCompact(nextThreshold - nextQualifyingVol, 2)} more qualifying volume`}
               </p>
             </div>
           )}
@@ -246,23 +248,21 @@ export default function RankDividendPage() {
         </GlassCard>
       </div>
 
-      {/* 50% Max-Leg Rule Condition */}
+      {/* 50%-of-Rank-Target Rule */}
       <GlassCard>
         <div className="flex items-center gap-2 mb-4">
           <ScaleIcon className="w-5 h-5 text-secondary-600" />
-          <h3 className="text-lg font-semibold text-surface-900">50% Max-Leg Rule</h3>
-          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${isLegCapped ? 'bg-warn-100 text-warn-700' : 'bg-success-100 text-success-700'}`}>
-            {isLegCapped ? 'Capped' : 'Balanced'}
-          </span>
+          <h3 className="text-lg font-semibold text-surface-900">50% Per-Leg Cap Rule</h3>
         </div>
         <p className="text-xs text-surface-500 mb-4">
-          No single leg can count for more than 50% of your total team volume when calculating rank.
-          If your largest leg exceeds 50%, the excess is excluded from the qualifying volume.
+          For each rank target, a maximum of 50% of that specific rank&apos;s threshold can be credited from any single leg.
+          Your own personal volume does not count toward rank qualification.
+          Even if a single leg has massive volume, only 50% of the rank target will be credited from it.
         </p>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
           <div className="p-3 rounded-xl bg-gradient-to-br from-primary-50 to-primary-100/60 border border-primary-200/50 text-center">
-            <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Total Volume</p>
+            <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Total Team Volume</p>
             <p className="text-lg font-mono font-bold text-primary-700">${formatCompact(teamVolumeUsd, 2)}</p>
           </div>
           <div className="p-3 rounded-xl bg-gradient-to-br from-warn-50 to-warn-100/60 border border-warn-200/50 text-center">
@@ -270,48 +270,35 @@ export default function RankDividendPage() {
             <p className="text-lg font-mono font-bold text-warn-700">${formatCompact(largestLegUsd, 2)}</p>
           </div>
           <div className="p-3 rounded-xl bg-gradient-to-br from-secondary-50 to-secondary-100/60 border border-secondary-200/50 text-center">
-            <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Other Legs</p>
-            <p className="text-lg font-mono font-bold text-secondary-700">${formatCompact(otherLegsVolume, 2)}</p>
-          </div>
-          <div className={`p-3 rounded-xl border text-center ${isLegCapped ? 'bg-gradient-to-br from-warn-50 to-warn-100/60 border-warn-200/50' : 'bg-gradient-to-br from-success-50 to-success-100/60 border-success-200/50'}`}>
-            <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Qualifying Volume</p>
-            <p className={`text-lg font-mono font-bold ${isLegCapped ? 'text-warn-700' : 'text-success-700'}`}>${formatCompact(adjustedVolume, 2)}</p>
+            <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Number of Legs</p>
+            <p className="text-lg font-mono font-bold text-secondary-700">{legVolumeNumbers.length}</p>
           </div>
         </div>
 
-        {/* Leg distribution visual */}
-        {teamVolumeUsd > 0 && (
+        {/* Per-leg breakdown */}
+        {legVolumeNumbers.length > 0 && (
           <div className="space-y-2">
-            <div className="flex justify-between text-xs text-surface-500">
-              <span>Largest leg contribution</span>
-              <span className="font-mono">{((largestLegUsd / teamVolumeUsd) * 100).toFixed(2)}% of total</span>
-            </div>
-            <div className="w-full h-3 rounded-full bg-surface-100 overflow-hidden flex">
-              <div
-                className={`h-full transition-all ${isLegCapped ? 'bg-warn-400' : 'bg-success-400'}`}
-                style={{ width: `${Math.min((largestLegUsd / teamVolumeUsd) * 100, 100)}%` }}
-              />
-              <div
-                className="h-full bg-primary-300 transition-all"
-                style={{ width: `${Math.min((otherLegsVolume / teamVolumeUsd) * 100, 100)}%` }}
-              />
-            </div>
-            <div className="flex justify-between text-[10px]">
-              <span className={`flex items-center gap-1 ${isLegCapped ? 'text-warn-600' : 'text-success-600'}`}>
-                <span className={`w-2 h-2 rounded-full ${isLegCapped ? 'bg-warn-400' : 'bg-success-400'}`} />
-                Largest Leg {isLegCapped && '(50% cap applied)'}
-              </span>
-              <span className="flex items-center gap-1 text-primary-600">
-                <span className="w-2 h-2 rounded-full bg-primary-300" />
-                Other Legs
-              </span>
-            </div>
-            {isLegCapped && (
-              <p className="text-xs text-warn-600 mt-1 p-2 rounded-lg bg-warn-50 border border-warn-200">
-                Your largest leg ({((largestLegUsd / teamVolumeUsd) * 100).toFixed(2)}%) exceeds the 50% limit.
-                ${formatCompact(largestLegUsd - maxLeg, 2)} excluded from qualifying volume.
-              </p>
-            )}
+            <p className="text-xs font-semibold text-surface-600 mb-1">Leg Volume Breakdown</p>
+            {legVolumes.map((leg: any, i: number) => {
+              const maxForNextRank = nextThreshold / 2;
+              const credited = Math.min(leg.volumeUsd, maxForNextRank);
+              const isCapped = leg.volumeUsd > maxForNextRank;
+              return (
+                <div key={i} className="flex items-center gap-2 text-xs">
+                  <span className="w-16 text-surface-500 flex-shrink-0">Leg {i + 1}</span>
+                  <div className="flex-1 h-2.5 rounded-full bg-surface-100 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${isCapped ? 'bg-warn-400' : 'bg-success-400'}`}
+                      style={{ width: `${teamVolumeUsd > 0 ? Math.min((leg.volumeUsd / teamVolumeUsd) * 100, 100) : 0}%` }}
+                    />
+                  </div>
+                  <span className="font-mono text-surface-700 w-28 text-right">${formatCompact(leg.volumeUsd, 2)}</span>
+                  {isCapped && (
+                    <span className="text-warn-600 text-[10px] flex-shrink-0">(max ${formatCompact(credited, 2)})</span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </GlassCard>
@@ -335,7 +322,8 @@ export default function RankDividendPage() {
                 const rankLevel = i + 1;
                 const isAchieved = currentRank >= rankLevel;
                 const isNext = currentRank === i; // next rank to achieve
-                const adjustedProgressPct = Math.min((adjustedVolume / threshold) * 100, 100);
+                const qualifyingVol = getQualifyingVolume(threshold);
+                const qualifyingPct = Math.min((qualifyingVol / threshold) * 100, 100);
 
                 return (
                   <tr
@@ -373,13 +361,13 @@ export default function RankDividendPage() {
                     <td className="py-3 px-3">
                       <div className="w-full max-w-[120px] mx-auto">
                         <ProgressBar
-                          value={adjustedProgressPct}
+                          value={qualifyingPct}
                           variant={isAchieved ? 'green' : isNext ? 'cyan' : 'amber'}
                           size="sm"
                           showValue={false}
                         />
                         <p className="text-[10px] text-center text-surface-400 mt-0.5">
-                          {adjustedProgressPct >= 100 ? '100%' : `${adjustedProgressPct.toFixed(2)}%`}
+                          {qualifyingPct >= 100 ? '100%' : `${qualifyingPct.toFixed(2)}%`}
                         </p>
                       </div>
                     </td>

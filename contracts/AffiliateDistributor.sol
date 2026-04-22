@@ -63,6 +63,7 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
     mapping(address => address) public referrerOf;
     mapping(address => address[]) public directReferrals;
     mapping(address => uint256) public teamVolume;
+    mapping(address => uint256) public personalVolume;  // user's own total staked volume
     mapping(address => uint256) public directCount;
 
     // ============ Genesis Account ============
@@ -335,6 +336,9 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
      * a user first qualifies for a rank — no manual checkRankChange() needed.
      */
     function addTeamVolume(address _staker, uint256 _amount) external onlyRole(STAKING_ROLE) {
+        // Track staker's own volume (used for accurate leg calculation)
+        personalVolume[_staker] += _amount;
+
         address current = _staker;
         while (true) {
             address upline = referrerOf[current];
@@ -352,6 +356,13 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
      * Auto-syncs rank for each upline so demotions are handled immediately.
      */
     function removeTeamVolume(address _staker, uint256 _amount) external onlyRole(STAKING_ROLE) {
+        // Reduce staker's own volume
+        if (personalVolume[_staker] >= _amount) {
+            personalVolume[_staker] -= _amount;
+        } else {
+            personalVolume[_staker] = 0;
+        }
+
         address current = _staker;
         while (true) {
             address upline = referrerOf[current];
@@ -496,33 +507,39 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
     // ============ Internal: Rank Calculation ============
 
     /**
-     * @dev Calculate rank level and salary based on team volume with 50% max-leg rule
+     * @dev Calculate rank level and salary based on team volume.
+     *      50% max-leg rule: for each rank target, a maximum of 50% of that
+     *      specific rank's threshold can be credited from any single leg.
+     *      Personal volume does NOT count — only descendant legs.
+     *      Leg volume = direct referral's own stake + their downline's volume.
      */
     function _determineRankLevel(address _user) internal view returns (uint256 level, uint256 salary) {
         uint256 totalVol = teamVolume[_user];
         if (totalVol == 0) return (0, 0);
 
-        // Find largest leg volume
+        // Collect all leg volumes (personalVolume + teamVolume for each direct referral)
         address[] storage referrals = directReferrals[_user];
-        uint256 largestLeg = 0;
-        for (uint256 i = 0; i < referrals.length; i++) {
-            uint256 legVol = teamVolume[referrals[i]];
-            if (legVol > largestLeg) largestLeg = legVol;
+        uint256 numLegs = referrals.length;
+        if (numLegs == 0) return (0, 0);
+
+        uint256[] memory legVols = new uint256[](numLegs);
+        for (uint256 i = 0; i < numLegs; i++) {
+            legVols[i] = personalVolume[referrals[i]] + teamVolume[referrals[i]];
         }
 
-        // Apply 50% max per leg rule
-        uint256 maxLeg = totalVol / 2;
-        uint256 adjustedVol;
-        if (largestLeg > maxLeg) {
-            adjustedVol = totalVol - largestLeg + maxLeg;
-        } else {
-            adjustedVol = totalVol;
-        }
+        // Check each rank from highest to lowest
+        for (uint256 r = 10; r > 0; r--) {
+            uint256 threshold = RANK_THRESHOLDS[r - 1];
+            uint256 maxPerLeg = threshold / 2; // 50% of THIS rank's target
 
-        // Determine rank (highest qualifying)
-        for (uint256 i = 10; i > 0; i--) {
-            if (adjustedVol >= RANK_THRESHOLDS[i - 1]) {
-                return (i, RANK_SALARIES[i - 1]);
+            uint256 qualifyingVol = 0;
+            for (uint256 j = 0; j < numLegs; j++) {
+                uint256 credited = legVols[j] > maxPerLeg ? maxPerLeg : legVols[j];
+                qualifyingVol += credited;
+            }
+
+            if (qualifyingVol >= threshold) {
+                return (r, RANK_SALARIES[r - 1]);
             }
         }
 

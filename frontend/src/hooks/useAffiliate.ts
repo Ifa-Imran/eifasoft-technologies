@@ -514,13 +514,24 @@ export function useAffiliate() {
     toast({ type: 'pending', title: 'Checking rank...' });
   };
 
-  // Fetch per-referral team volumes for leg breakdown & 50% rule
+  // Fetch per-referral team volumes for leg breakdown & 50%-of-rank-target rule
   const referralsList = (directReferrals as `0x${string}`[]) || [];
   const legVolumeContracts = useMemo(() =>
     referralsList.map((ref) => ({
       address: contracts.affiliateDistributor as `0x${string}`,
       abi: AffiliateDistributorABI,
       functionName: 'teamVolume' as const,
+      args: [ref] as const,
+    })),
+    [referralsList.length]
+  );
+
+  // Fetch personalVolume for each direct referral (own stake volume)
+  const legPersonalVolumeContracts = useMemo(() =>
+    referralsList.map((ref) => ({
+      address: contracts.affiliateDistributor as `0x${string}`,
+      abi: AffiliateDistributorABI,
+      functionName: 'personalVolume' as const,
       args: [ref] as const,
     })),
     [referralsList.length]
@@ -545,6 +556,14 @@ export function useAffiliate() {
     },
   });
 
+  const { data: legPersonalVolumesRaw } = useReadContracts({
+    contracts: legPersonalVolumeContracts,
+    query: {
+      enabled: referralsList.length > 0 && contracts.affiliateDistributor !== '0x',
+      refetchInterval: 30000,
+    },
+  });
+
   const { data: legStakesRaw } = useReadContracts({
     contracts: legStakeContracts,
     query: {
@@ -557,7 +576,11 @@ export function useAffiliate() {
     if (!legVolumesRaw || !referralsList.length) return [];
     return referralsList.map((ref, i) => {
       const raw = legVolumesRaw[i];
-      const vol = raw?.status === 'success' ? BigInt(raw.result as any) : 0n;
+      const teamVol = raw?.status === 'success' ? BigInt(raw.result as any) : 0n;
+      const personalRaw = legPersonalVolumesRaw?.[i];
+      const personalVol = personalRaw?.status === 'success' ? BigInt(personalRaw.result as any) : 0n;
+      // Total leg volume = referral's own stake + their downline volume
+      const vol = personalVol + teamVol;
       const stakeRaw = legStakesRaw?.[i];
       // Sum originalAmount of active stakes to get principal (excludes compound growth)
       let principalVal = 0n;
@@ -574,7 +597,7 @@ export function useAffiliate() {
         ownStakeUsd: Number(formatUnits(principalVal, USDT_DECIMALS)),
       };
     });
-  }, [legVolumesRaw, legStakesRaw, referralsList.length]);
+  }, [legVolumesRaw, legPersonalVolumesRaw, legStakesRaw, referralsList.length]);
 
   const largestLegVolume = useMemo(() => {
     if (!legVolumes.length) return 0n;
