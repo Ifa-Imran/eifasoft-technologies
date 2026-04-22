@@ -705,10 +705,12 @@ function setupRealtimeListeners(contracts: NonNullable<ReturnType<typeof getWsCo
 
 const POLL_INTERVAL_MS = 15_000; // 15 seconds
 let pollingActive = false;
+let pollBusy = false;
 
 /**
  * Reliable polling loop that catches up on missed blocks every POLL_INTERVAL_MS.
  * This supplements WebSocket listeners which are unreliable on opBNB testnet.
+ * Uses setTimeout (not setInterval) to prevent overlapping polls.
  */
 async function startPollingLoop(
     httpContracts: {
@@ -728,6 +730,12 @@ async function startPollingLoop(
     console.log(`[Indexer] Polling loop started (interval: ${POLL_INTERVAL_MS / 1000}s)`);
 
     const poll = async () => {
+        if (pollBusy) {
+            console.log('[Indexer] Poll skipped (previous poll still running)');
+            setTimeout(poll, POLL_INTERVAL_MS);
+            return;
+        }
+        pollBusy = true;
         try {
             const currentBlock = await getCurrentBlock();
 
@@ -747,11 +755,15 @@ async function startPollingLoop(
             }
         } catch (err) {
             console.error('[Indexer] Polling loop error:', err);
+        } finally {
+            pollBusy = false;
         }
+        // Schedule next poll AFTER this one finishes
+        setTimeout(poll, POLL_INTERVAL_MS);
     };
 
-    // Run immediately on start, then on interval
-    setInterval(poll, POLL_INTERVAL_MS);
+    // Start first poll after a short delay
+    setTimeout(poll, POLL_INTERVAL_MS);
 }
 
 // ============ Main Indexer Entry Point ============
