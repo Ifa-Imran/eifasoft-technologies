@@ -111,6 +111,8 @@ services:
         NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=d9fddb48789291a159e8270ef32105c2
         NEXT_PUBLIC_SYSTEM_WALLET=0x624D0985D844Cd1DF132723a9d849FE1A34cAf9D
         npm run build &&
+        cp -r .next/static .next/standalone/.next/static &&
+        cp -r public .next/standalone/public &&
         NODE_ENV=production node .next/standalone/server.js
       "
     volumes:
