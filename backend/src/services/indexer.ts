@@ -4,6 +4,7 @@ import { getWsContracts, getCurrentBlock, getHttpProvider } from './blockchain';
 import { broadcastCompoundEvent, broadcastOrderBookUpdate } from './websocket';
 import { buildReferralTree } from '../utils/referral-tree';
 import { checkAndTriggerClosings } from './workers';
+import { config } from '../config';
 
 // Helper: fire-and-forget closing check after user events
 function triggerClosingCheck(): void {
@@ -741,7 +742,7 @@ async function startPollingLoop(
 
             for (const cfg of contractConfigs) {
                 const lastBlock = await getLastIndexedBlock(cfg.name);
-                const startBlock = lastBlock > 0 ? lastBlock + 1 : currentBlock;
+                const startBlock = lastBlock > 0 ? lastBlock + 1 : config.deploymentBlock;
 
                 if (startBlock > currentBlock) continue; // already caught up
 
@@ -834,7 +835,7 @@ export async function startIndexer(): Promise<void> {
     // Catch up on historical events
     for (const cfg of contractConfigs) {
         const lastBlock = await getLastIndexedBlock(cfg.name);
-        const startBlock = lastBlock > 0 ? lastBlock + 1 : Math.max(currentBlock - 10000, 0);
+        const startBlock = lastBlock > 0 ? lastBlock + 1 : config.deploymentBlock;
 
         if (startBlock <= currentBlock) {
             await processHistoricalEvents(cfg.contract, cfg.name, startBlock, currentBlock, cfg.handlers as any);

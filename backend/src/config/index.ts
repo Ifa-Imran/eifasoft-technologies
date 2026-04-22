@@ -19,6 +19,7 @@ interface Config {
         atomicP2p: string;
     };
     systemWallet: string;
+    deploymentBlock: number;
 }
 
 function requireEnv(key: string): string {
@@ -47,4 +48,5 @@ export const config: Config = {
         atomicP2p: process.env.ATOMIC_P2P_ADDRESS || '',
     },
     systemWallet: process.env.SYSTEM_WALLET || '',
+    deploymentBlock: parseInt(process.env.DEPLOYMENT_BLOCK || '152298000', 10),
 };
