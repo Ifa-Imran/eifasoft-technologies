@@ -312,6 +312,7 @@ export default function TeamDividendPage() {
                 <tr className="border-b border-surface-200">
                   <th className="text-left py-3 px-3 text-surface-500 font-medium">#</th>
                   <th className="text-left py-3 px-3 text-surface-500 font-medium">Referral</th>
+                  <th className="text-right py-3 px-3 text-surface-500 font-medium">Self Stake</th>
                   <th className="text-right py-3 px-3 text-surface-500 font-medium">Leg Volume</th>
                   <th className="py-3 px-3 text-surface-500 font-medium">Share</th>
                 </tr>
@@ -328,6 +329,9 @@ export default function TeamDividendPage() {
                       </td>
                       <td className="py-3 px-3 font-mono text-surface-600 text-xs">
                         {shortenAddress(leg.address)}
+                      </td>
+                      <td className="py-3 px-3 text-right font-mono font-semibold text-primary-600">
+                        ${formatCompact(leg.ownStakeUsd, 2)}
                       </td>
                       <td className="py-3 px-3 text-right font-mono font-semibold text-surface-700">
                         ${formatCompact(leg.volumeUsd, 2)}
@@ -358,7 +362,7 @@ export default function TeamDividendPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-surface-600">
           <div className="flex items-start gap-2">
             <span className="w-5 h-5 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center flex-shrink-0 text-[10px] font-bold">1</span>
-            <span>When any user in your team compounds their stake, profit is generated (0.1% per interval).</span>
+            <span>When any user in your team compounds their stake, profit is generated (0.15% per interval).</span>
           </div>
           <div className="flex items-start gap-2">
             <span className="w-5 h-5 rounded-full bg-secondary-100 text-secondary-600 flex items-center justify-center flex-shrink-0 text-[10px] font-bold">2</span>

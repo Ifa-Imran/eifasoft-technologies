@@ -19,18 +19,31 @@ import {
   ShieldCheckIcon,
   LockClosedIcon,
   CheckCircleIcon,
+  ClockIcon,
 } from '@heroicons/react/24/outline';
 
 export default function CMSPage() {
   const { isConnected } = useAccount();
   const [amount, setAmount] = useState('1');
-  const { totalSubscriptions, userSubscriptionCount, remainingSubscriptions, availableFormatted, loyaltyFormatted, leadershipFormatted, maxClaimableFormatted, claimableFormatted, maxClaimable, claimDeadline, isClaimDeadlinePassed, excessToBeDeletedFormatted, cmsDirectCount, hasAlreadyClaimed, levelDetails, subscribe, claimRewards, isPending } = useCMS();
+  const { totalSubscriptions, userSubscriptionCount, remainingSubscriptions, subscribeDeadline, isSubscriptionEnded, availableFormatted, loyaltyFormatted, leadershipFormatted, maxClaimableFormatted, claimableFormatted, maxClaimable, claimDeadline, isClaimDeadlinePassed, excessToBeDeletedFormatted, cmsDirectCount, hasAlreadyClaimed, levelDetails, subscribe, claimRewards, isPending } = useCMS();
   const { usdtFormatted } = useTokenBalances();
   const { storedReferrer, hasOnChainReferrer } = useRegistration();
   const { totalStaked } = useUserStakes();
   const totalCost = Number(amount) * CMS_PRICE_USDT;
   const costBigInt = parseUnits(totalCost.toString(), USDT_DECIMALS);
   const approval = useApproval(contracts.usdt, contracts.cms);
+
+  // Countdown timer
+  const [now, setNow] = useState(Math.floor(Date.now() / 1000));
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
+    return () => clearInterval(interval);
+  }, []);
+  const timeLeft = subscribeDeadline > 0 ? Math.max(0, subscribeDeadline - now) : 0;
+  const days = Math.floor(timeLeft / 86400);
+  const hours = Math.floor((timeLeft % 86400) / 3600);
+  const minutes = Math.floor((timeLeft % 3600) / 60);
+  const seconds = timeLeft % 60;
 
   const soldPercent = CMS_MAX_SUBSCRIPTIONS > 0 ? (totalSubscriptions / CMS_MAX_SUBSCRIPTIONS) * 100 : 0;
   const isAlmostSoldOut = remainingSubscriptions < 1000;
@@ -78,47 +91,52 @@ export default function CMSPage() {
         <p className="text-base text-surface-500 mt-1">Limited to {CMS_MAX_SUBSCRIPTIONS.toLocaleString()} memberships worldwide</p>
       </div>
 
-      {/* Scarcity Hero */}
+      {/* Subscription Countdown Timer */}
       <GlassCard variant="gradient" padding="p-0">
         <div className="relative overflow-hidden rounded-2xl">
           <div className="absolute inset-0 bg-gradient-to-r from-primary-500/5 via-secondary-500/5 to-accent-500/5" />
           <div className="relative p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-500 to-secondary-500 flex items-center justify-center shadow-lg shadow-primary-400/30">
-                  <TicketIcon className="w-6 h-6 text-white" />
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <div className="flex items-center gap-3 flex-1">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-accent-500 to-primary-500 flex items-center justify-center shadow-lg shadow-accent-400/30">
+                  <ClockIcon className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-surface-900">Subscription Progress</h3>
-                  <p className="text-sm text-surface-500">{soldPercent.toFixed(2)}% claimed</p>
+                  <h3 className="text-lg font-semibold text-surface-900">Subscription Phase</h3>
+                  <p className="text-sm text-surface-500">
+                    {isSubscriptionEnded ? 'Subscription phase has ended' : timeLeft > 0 ? 'Time remaining to subscribe' : 'Loading...'}
+                  </p>
                 </div>
               </div>
-              <div className="text-right">
-                {isAlmostSoldOut && (
-                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-danger-50 border border-danger-200 text-danger-600 text-xs font-semibold mb-1">
-                    <FireIcon className="w-3 h-3" /> Almost Sold Out!
-                  </span>
-                )}
-                <p className="text-2xl font-mono font-bold text-primary-600">{remainingSubscriptions.toLocaleString()}</p>
-                <p className="text-xs text-surface-400">remaining</p>
-              </div>
+              {!isSubscriptionEnded && timeLeft > 0 && (
+                <div className="flex items-center justify-center gap-1.5">
+                  {days > 0 && (
+                    <div className="text-center px-3 py-2 rounded-xl bg-white/70 border border-accent-200">
+                      <p className="text-2xl font-mono font-bold text-accent-700">{days}</p>
+                      <p className="text-[9px] uppercase tracking-wider text-surface-400">DAYS</p>
+                    </div>
+                  )}
+                  <div className="text-center px-3 py-2 rounded-xl bg-white/70 border border-accent-200">
+                    <p className="text-2xl font-mono font-bold text-accent-700">{String(hours).padStart(2, '0')}</p>
+                    <p className="text-[9px] uppercase tracking-wider text-surface-400">HRS</p>
+                  </div>
+                  <span className="text-accent-400 font-bold text-xl">:</span>
+                  <div className="text-center px-3 py-2 rounded-xl bg-white/70 border border-accent-200">
+                    <p className="text-2xl font-mono font-bold text-accent-700">{String(minutes).padStart(2, '0')}</p>
+                    <p className="text-[9px] uppercase tracking-wider text-surface-400">MIN</p>
+                  </div>
+                  <span className="text-accent-400 font-bold text-xl">:</span>
+                  <div className="text-center px-3 py-2 rounded-xl bg-white/70 border border-accent-200">
+                    <p className="text-2xl font-mono font-bold text-accent-700">{String(seconds).padStart(2, '0')}</p>
+                    <p className="text-[9px] uppercase tracking-wider text-surface-400">SEC</p>
+                  </div>
+                </div>
+              )}
             </div>
-
-            <ProgressBar
-              value={totalSubscriptions}
-              max={CMS_MAX_SUBSCRIPTIONS}
-              variant="cyan"
-              size="lg"
-            />
-
-            <div className="grid grid-cols-3 gap-4 mt-4">
+            <div className="grid grid-cols-2 gap-4 mt-4">
               <div className="text-center p-3 rounded-xl bg-gradient-to-br from-primary-50/60 to-white/60 border border-primary-100/50">
-                <p className="text-lg font-mono font-bold text-surface-900">{totalSubscriptions.toLocaleString()}</p>
-                <p className="text-[10px] uppercase tracking-wider text-surface-400">Sold</p>
-              </div>
-              <div className="text-center p-3 rounded-xl bg-gradient-to-br from-secondary-50/60 to-white/60 border border-secondary-100/50">
-                <p className="text-lg font-mono font-bold text-surface-900">{CMS_MAX_SUBSCRIPTIONS.toLocaleString()}</p>
-                <p className="text-[10px] uppercase tracking-wider text-surface-400">Max Supply</p>
+                <p className="text-lg font-mono font-bold text-surface-900">{userSubscriptionCount}</p>
+                <p className="text-[10px] uppercase tracking-wider text-surface-400">Your Subscriptions</p>
               </div>
               <div className="text-center p-3 rounded-xl bg-gradient-to-br from-accent-100/60 to-accent-50/40 border border-accent-200/50">
                 <p className="text-lg font-mono font-bold text-accent-600">${CMS_PRICE_USDT}</p>
@@ -309,10 +327,6 @@ export default function CMSPage() {
             </div>
 
             <div className="p-4 rounded-xl bg-gradient-to-r from-primary-100/50 to-secondary-100/50 border-2 border-primary-200/40 space-y-2 text-xs text-surface-600">
-              <div className="flex items-start gap-2">
-                <span className="text-primary-500 mt-0.5">&#8226;</span>
-                <span>90% sent to your wallet, 10% to system wallet</span>
-              </div>
               <div className="flex items-start gap-2">
                 <span className="text-primary-500 mt-0.5">&#8226;</span>
                 <span>Claimable amount capped by your active stake value</span>

@@ -67,7 +67,7 @@ export function IncomeSummary() {
           <div className="p-3 rounded-xl bg-gradient-to-r from-success-50 to-accent-50 border border-success-200/60">
             <div className="flex justify-between items-center mb-2">
               <span className="text-xs font-semibold text-surface-700">Affiliate Harvested</span>
-              <span className="font-mono font-bold text-success-700 text-base">${Number(lifetimeHarvested.totalFormatted).toFixed(2)}</span>
+              <span className="font-mono font-bold text-success-700 text-base">${Number(formatUnits(lifetimeHarvested.total, USDT_DECIMALS)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="grid grid-cols-2 gap-1 text-[10px]">
               {lifetimeHarvested.direct > 0n && (

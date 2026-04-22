@@ -527,10 +527,29 @@ export function useAffiliate() {
     [referralsList.length]
   );
 
+  // Fetch all stakes for each direct referral (to extract principal/originalAmount)
+  const legStakeContracts = useMemo(() =>
+    referralsList.map((ref) => ({
+      address: contracts.stakingManager as `0x${string}`,
+      abi: StakingManagerABI,
+      functionName: 'getUserStakes' as const,
+      args: [ref] as const,
+    })),
+    [referralsList.length]
+  );
+
   const { data: legVolumesRaw } = useReadContracts({
     contracts: legVolumeContracts,
     query: {
       enabled: referralsList.length > 0 && contracts.affiliateDistributor !== '0x',
+      refetchInterval: 30000,
+    },
+  });
+
+  const { data: legStakesRaw } = useReadContracts({
+    contracts: legStakeContracts,
+    query: {
+      enabled: referralsList.length > 0 && contracts.stakingManager !== '0x',
       refetchInterval: 30000,
     },
   });
@@ -540,13 +559,23 @@ export function useAffiliate() {
     return referralsList.map((ref, i) => {
       const raw = legVolumesRaw[i];
       const vol = raw?.status === 'success' ? BigInt(raw.result as any) : 0n;
+      const stakeRaw = legStakesRaw?.[i];
+      // Sum originalAmount of active stakes to get principal (excludes compound growth)
+      let principalVal = 0n;
+      if (stakeRaw?.status === 'success' && Array.isArray(stakeRaw.result)) {
+        for (const s of stakeRaw.result as any[]) {
+          if (s.active) principalVal += BigInt(s.originalAmount);
+        }
+      }
       return {
         address: ref,
         volume: vol,
         volumeUsd: Number(formatUnits(vol, USDT_DECIMALS)),
+        ownStake: principalVal,
+        ownStakeUsd: Number(formatUnits(principalVal, USDT_DECIMALS)),
       };
     });
-  }, [legVolumesRaw, referralsList.length]);
+  }, [legVolumesRaw, legStakesRaw, referralsList.length]);
 
   const largestLegVolume = useMemo(() => {
     if (!legVolumes.length) return 0n;

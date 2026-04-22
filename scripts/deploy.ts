@@ -1,5 +1,8 @@
 import { ethers } from "hardhat";
 
+const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+const WAIT = 5000;
+
 async function main() {
     const [deployer] = await ethers.getSigners();
     console.log("=== KAIRO DeFi Ecosystem Deployment ===");
@@ -33,6 +36,7 @@ async function main() {
     await mockUSDT.waitForDeployment();
     const usdtAddress = await mockUSDT.getAddress();
     console.log("  MockUSDT deployed at:", usdtAddress);
+    await delay(WAIT);
     console.log("");
 
     // ============================================================
@@ -45,6 +49,7 @@ async function main() {
     await kairoToken.waitForDeployment();
     const kairoAddress = await kairoToken.getAddress();
     console.log("  KAIROToken deployed at:", kairoAddress);
+    await delay(WAIT);
     console.log("");
 
     // ============================================================
@@ -58,6 +63,7 @@ async function main() {
     await liquidityPool.waitForDeployment();
     const liquidityPoolAddress = await liquidityPool.getAddress();
     console.log("  LiquidityPool deployed at:", liquidityPoolAddress);
+    await delay(WAIT);
     console.log("");
 
     // ============================================================
@@ -73,6 +79,7 @@ async function main() {
     const txMint = await kairoToken.mintInitialSupply();
     await txMint.wait();
     console.log("  Initial supply minted (10,000 KAIRO social lock to LiquidityPool)");
+    await delay(WAIT);
     console.log("");
 
     // ============================================================
@@ -90,6 +97,7 @@ async function main() {
     await affiliateDistributor.waitForDeployment();
     const affiliateAddress = await affiliateDistributor.getAddress();
     console.log("  AffiliateDistributor deployed at:", affiliateAddress);
+    await delay(WAIT);
     console.log("");
 
     // ============================================================
@@ -118,6 +126,7 @@ async function main() {
     const txSetStaking = await affiliateDistributor.setStakingManager(stakingAddress);
     await txSetStaking.wait();
     console.log("  AffiliateDistributor -> StakingManager linked (STAKING_ROLE granted)");
+    await delay(WAIT);
     console.log("");
 
     // ============================================================
@@ -151,6 +160,7 @@ async function main() {
     await cms.waitForDeployment();
     const cmsAddress = await cms.getAddress();
     console.log("  CoreMembershipSubscription deployed at:", cmsAddress);
+    await delay(WAIT);
     console.log("");
 
     // ============================================================
@@ -164,6 +174,7 @@ async function main() {
     await atomicP2p.waitForDeployment();
     const p2pAddress = await atomicP2p.getAddress();
     console.log("  AtomicP2p deployed at:", p2pAddress);
+    await delay(WAIT);
     console.log("");
 
     // ============================================================

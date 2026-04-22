@@ -165,7 +165,7 @@ function CompoundingCalculator() {
       )}
 
       <p className="text-[10px] text-surface-400 text-center">
-        0.1% per compound &middot; Tier &amp; frequency auto-detected from amount
+        0.15% per compound &middot; Tier &amp; frequency auto-detected from amount
       </p>
     </div>
   );

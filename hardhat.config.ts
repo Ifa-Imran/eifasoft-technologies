@@ -18,11 +18,11 @@ const config: HardhatUserConfig = {
       chainId: 31337,
     },
     opbnbTestnet: {
-      url: process.env.OPBNB_TESTNET_RPC || "https://opbnb-testnet.publicnode.com",
+      url: process.env.OPBNB_TESTNET_RPC || "https://opbnb-testnet-rpc.bnbchain.org",
       chainId: 5611,
       accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
-      gasPrice: 100000000, // 0.1 gwei
-      timeout: 120000, // 2 minutes
+      gasPrice: 200000000, // 0.2 gwei
+      timeout: 180000, // 3 minutes
       httpHeaders: {},
     },
     opbnbMainnet: {

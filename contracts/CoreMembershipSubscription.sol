@@ -402,11 +402,11 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
 
     /**
      * @dev Flush unclaimed rewards to zero after claim deadline has passed.
-     *      Called by admin for users who did not claim in time.
+     *      Permissionless — anyone can call after CLAIM_DEADLINE.
      *      Both loyalty reward tokens and leadership reward tokens are zeroed out.
      * @param _users Array of user addresses to flush
      */
-    function flushExpiredRewards(address[] calldata _users) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function flushExpiredRewards(address[] calldata _users) external {
         require(block.timestamp > CLAIM_DEADLINE, "CMS: Claim period not ended yet");
         for (uint256 i = 0; i < _users.length; i++) {
             address user = _users[i];
