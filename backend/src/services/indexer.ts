@@ -89,11 +89,12 @@ async function handleStakeCreated(
             [addr]
         );
 
-        // Insert stake
+        // Insert stake (ON CONFLICT to handle duplicate events from WS + polling)
         await client.query(
             `INSERT INTO stakes (user_address, stake_id_on_chain, amount, original_amount, tier,
                 start_time, last_compound, total_earned, harvested_rewards, is_active, cap_reached, tx_hash, created_at, updated_at)
-             VALUES ($1, $2, $3, $3, $4, NOW(), NOW(), 0, 0, TRUE, FALSE, $5, NOW(), NOW())`,
+             VALUES ($1, $2, $3, $3, $4, NOW(), NOW(), 0, 0, TRUE, FALSE, $5, NOW(), NOW())
+             ON CONFLICT (user_address, stake_id_on_chain) DO NOTHING`,
             [addr, Number(stakeId), formatUnits(amount), Number(tier), txHash]
         );
 
@@ -307,7 +308,8 @@ async function handleDirectEarned(
         await upsertUserDirect(addr);
         await query(
             `INSERT INTO income_ledger (user_address, income_type, amount_usd, tx_hash, created_at)
-             VALUES ($1, 'DIRECT', $2, $3, NOW())`,
+             VALUES ($1, 'DIRECT', $2, $3, NOW())
+             ON CONFLICT (user_address, income_type, tx_hash) DO NOTHING`,
             [addr, formatUnits(amount), txHash]
         );
         console.log(`[Affiliate] DirectEarned indexed: referrer=${addr}, amount=${formatUnits(amount)}`);
@@ -326,7 +328,8 @@ async function handleTeamEarned(
         await upsertUserDirect(addr);
         await query(
             `INSERT INTO income_ledger (user_address, income_type, amount_usd, tx_hash, created_at)
-             VALUES ($1, 'TEAM', $2, $3, NOW())`,
+             VALUES ($1, 'TEAM', $2, $3, NOW())
+             ON CONFLICT (user_address, income_type, tx_hash) DO NOTHING`,
             [addr, formatUnits(amount), txHash]
         );
         console.log(`[Affiliate] TeamEarned indexed: upline=${addr}, level=${level}, amount=${formatUnits(amount)}`);
@@ -346,7 +349,8 @@ async function handleAffiliateHarvested(
         await upsertUserDirect(addr);
         await query(
             `INSERT INTO income_ledger (user_address, income_type, amount_usd, amount_kairo, tx_hash, created_at)
-             VALUES ($1, $2, $3, $4, $5, NOW())`,
+             VALUES ($1, $2, $3, $4, $5, NOW())
+             ON CONFLICT (user_address, income_type, tx_hash) DO NOTHING`,
             [addr, typeName, formatUnits(usdAmount), formatUnits(kairoAmount), txHash]
         );
         console.log(`[Affiliate] Harvested indexed: user=${addr}, type=${typeName}, usd=${formatUnits(usdAmount)}`);
@@ -695,6 +699,59 @@ function setupRealtimeListeners(contracts: NonNullable<ReturnType<typeof getWsCo
     });
 }
 
+// ============ Polling-based Catchup Loop ============
+
+const POLL_INTERVAL_MS = 15_000; // 15 seconds
+let pollingActive = false;
+
+/**
+ * Reliable polling loop that catches up on missed blocks every POLL_INTERVAL_MS.
+ * This supplements WebSocket listeners which are unreliable on opBNB testnet.
+ */
+async function startPollingLoop(
+    httpContracts: {
+        stakingManager: ethers.Contract;
+        affiliateDistributor: ethers.Contract;
+        cms: ethers.Contract;
+        atomicP2p: ethers.Contract;
+    },
+    contractConfigs: Array<{
+        name: string;
+        contract: ethers.Contract;
+        handlers: Record<string, (...args: any[]) => Promise<void>>;
+    }>
+): Promise<void> {
+    if (pollingActive) return;
+    pollingActive = true;
+    console.log(`[Indexer] Polling loop started (interval: ${POLL_INTERVAL_MS / 1000}s)`);
+
+    const poll = async () => {
+        try {
+            const currentBlock = await getCurrentBlock();
+
+            for (const cfg of contractConfigs) {
+                const lastBlock = await getLastIndexedBlock(cfg.name);
+                const startBlock = lastBlock > 0 ? lastBlock + 1 : currentBlock;
+
+                if (startBlock > currentBlock) continue; // already caught up
+
+                const gap = currentBlock - startBlock;
+                if (gap > 0) {
+                    console.log(`[Indexer] Polling catchup for ${cfg.name}: blocks ${startBlock}-${currentBlock} (${gap} blocks behind)`);
+                    await processHistoricalEvents(
+                        cfg.contract, cfg.name, startBlock, currentBlock, cfg.handlers as any
+                    );
+                }
+            }
+        } catch (err) {
+            console.error('[Indexer] Polling loop error:', err);
+        }
+    };
+
+    // Run immediately on start, then on interval
+    setInterval(poll, POLL_INTERVAL_MS);
+}
+
 // ============ Main Indexer Entry Point ============
 
 export async function startIndexer(): Promise<void> {
@@ -771,10 +828,13 @@ export async function startIndexer(): Promise<void> {
         console.log(`  ${cfg.name}: caught up to block ${currentBlock}`);
     }
 
-    // Switch to real-time event listening
-    console.log('Historical catch-up complete. Switching to real-time event listening...');
+    // Set up WebSocket listeners as best-effort fast path
+    console.log('Historical catch-up complete. Setting up event listeners...');
     setupRealtimeListeners(contracts);
 
-    console.log('KAIRO event indexer started. Listening for events...');
+    // Start reliable HTTP-based polling loop to catch any events missed by WebSocket
+    await startPollingLoop(httpContracts, contractConfigs as any);
+
+    console.log('KAIRO event indexer started. Listening for events + polling every 15s...');
 }
 
