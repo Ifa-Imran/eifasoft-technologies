@@ -1,18 +1,18 @@
 import { ethers, formatUnits } from "ethers";
 import "dotenv/config";
 
-// ── Contract addresses (opBNB Testnet v14) ──
-const STAKING_MANAGER   = "0x548cd2EE5BbeaeB80a5396a872E36d31eB3bFe7E";
-const AFFILIATE_DIST    = "0x1f230901951A3fd731156a5E8A28D1925bfBDE39";
-const USDT_TOKEN        = "0x9A573463F5f8dBcd4a5D32c7d77c850d6C6BEdCA";
-const KAIRO_TOKEN       = "0xb9bBf81749F4500DC34134746d1B5C90B2CB1E48";
-const LIQUIDITY_POOL    = "0xFE51aa6d2AAe29da104765F019de868AeA977F20";
+// ── Contract addresses (opBNB Testnet v24) ──
+const STAKING_MANAGER   = "0x0F26f57606581ac1cFD06c8431F8Ed5d32D5e57D";
+const AFFILIATE_DIST    = "0x35DB2f9BB8D0702c81285E813490317d9431cD39";
+const USDT_TOKEN        = "0xd43f9a36Fa8C12f807Ef0D1661A5C2FF9248800a";
+const KAIRO_TOKEN       = "0x1400F88FC4341740e277A0DCaED90CD3DCbE4b86";
+const LIQUIDITY_POOL    = "0xe78BE09835882248ae336FA6D66f1d90f3F2B8de";
 
 const USDT_DECIMALS = 18;
 const RPC = process.env.OPBNB_TESTNET_RPC || "https://opbnb-testnet.publicnode.com";
 
 // Wallet to debug — use the provided private key
-const DEBUG_PRIVATE_KEY = "edea0b8af9080af0e04a95a59e68b5236fb9ebd911833bda712ea709a0348a38";
+const DEBUG_PRIVATE_KEY = "7e58650618428dc840047c3d352d0f42c9bd6e9762b8997cdb230fa5f72b6924";
 
 // ── Minimal ABIs ──
 const StakingABI = [
