@@ -141,10 +141,11 @@ describe("StakingManager", function () {
             expect(stakes[0].amount).to.equal(expected);
         });
 
-        it("should revert when no intervals have passed", async function () {
+        it("should not revert when no intervals have passed (global sync)", async function () {
             const { stakingManager, user1 } = await loadFixture(stakeFixture);
             await stakingManager.connect(user1).stake(ethers.parseEther("100"), REF);
-            await expect(stakingManager.connect(user1).compound(0)).to.be.revertedWith("StakingManager: No intervals passed");
+            // compound() now does global sync — no revert, just a no-op
+            await expect(stakingManager.connect(user1).compound(0)).to.not.be.reverted;
         });
 
         it("should allow compoundFor by COMPOUNDER_ROLE", async function () {
@@ -211,7 +212,7 @@ describe("StakingManager", function () {
             expect(stkAfter.active).to.be.false;
         });
 
-        it("should revert compounding on capped stakes", async function () {
+        it("should not revert compounding on capped stakes (global sync)", async function () {
             const { stakingManager, user1 } = await loadFixture(stakeFixture);
             const stakeAmount = ethers.parseEther("10");
             await stakingManager.connect(user1).stake(stakeAmount, REF);
@@ -225,11 +226,11 @@ describe("StakingManager", function () {
             await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
             await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
 
-            // Try to compound again - should revert (stake is inactive/capped)
+            // compound() is now global sync — doesn't revert, just a no-op
             await time.increase(900);
             await expect(
                 stakingManager.connect(user1).compound(0)
-            ).to.be.revertedWith("StakingManager: Stake not active");
+            ).to.not.be.reverted;
         });
 
         it("should not allow unstaking on capped stakes", async function () {

@@ -71,6 +71,9 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
     /// @notice The first registered address (root of the referral tree). Cannot stake.
     address public genesisAccount;
 
+    // ============ Global User Tracking ============
+    address[] private allRegistered;
+
     // ============ On-Chain Rank Tracking ============
     mapping(address => uint256) public userRankLevel;       // 0-10
     mapping(address => uint256) public lastRankClaimTime;
@@ -161,6 +164,7 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
             require(msg.sender != address(0), "AD: Invalid user");
             genesisAccount = msg.sender;
             referrerOf[msg.sender] = msg.sender;
+            allRegistered.push(msg.sender);
             emit ReferrerSet(msg.sender, address(0));
             return;
         }
@@ -181,6 +185,7 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
         referrerOf[msg.sender] = _referrer;
         directReferrals[_referrer].push(msg.sender);
         directCount[_referrer]++;
+        allRegistered.push(msg.sender);
 
         emit ReferrerSet(msg.sender, _referrer);
 
@@ -450,6 +455,17 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
      *      Can be called by anyone. Accrues salary at old rank rate first,
      *      then updates rank if changed. No separate "claim" step needed.
      */
+    /**
+     * @dev Accrue pending rank salary for ALL registered users.
+     *      Permissionless — called by StakingManager._globalSync() on every action.
+     *      Safe to call frequently — only accrues earned salary periods.
+     */
+    function accrueAllRanks() external {
+        for (uint256 i = 0; i < allRegistered.length; i++) {
+            _accrueAndSyncRank(allRegistered[i]);
+        }
+    }
+
     function checkRankChange(address _user) external {
         _accrueAndSyncRank(_user);
     }
@@ -662,5 +678,15 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
 
     function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _unpause();
+    }
+
+    // ============ Global User View Functions ============
+
+    function getAllRegistered() external view returns (address[] memory) {
+        return allRegistered;
+    }
+
+    function getRegisteredCount() external view returns (uint256) {
+        return allRegistered.length;
     }
 }

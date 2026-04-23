@@ -39,7 +39,7 @@ interface IAffiliateDistributor {
     function addTeamVolume(address _staker, uint256 _amount) external;
     function removeTeamVolume(address _staker, uint256 _amount) external;
     function genesisAccount() external view returns (address);
-    function getDirectReferrals(address _user) external view returns (address[] memory);
+    function accrueAllRanks() external;
 }
 
 /**
@@ -95,6 +95,10 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
 
     mapping(address => Stake[]) public userStakes;
     mapping(address => uint256) public totalActiveStakeValue;
+
+    // ============ Global Staker Tracking ============
+    address[] private allStakers;
+    mapping(address => bool) private isStaker;
 
     // ============ External Contract References ============
     IKAIROToken public kairoToken;
@@ -182,10 +186,8 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
             );
         }
 
-        // Auto-compound all eligible stakes (triggers team dividend distribution)
-        _autoCompoundAll(msg.sender);
-        // Compound direct referrals so their accrued profit generates team dividends
-        _compoundDirectReferrals(msg.sender);
+        // Global sync: compound ALL stakers + accrue all rank salaries
+        _globalSync();
 
         // Transfer USDT from user to this contract
         require(usdt.transferFrom(msg.sender, address(this), _usdtAmount), "StakingManager: USDT transfer failed");
@@ -228,6 +230,12 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
 
         totalActiveStakeValue[msg.sender] += _usdtAmount;
 
+        // Track staker globally for system-wide auto-compound
+        if (!isStaker[msg.sender]) {
+            allStakers.push(msg.sender);
+            isStaker[msg.sender] = true;
+        }
+
         // Auto-detect tier based on TOTAL cumulative stake value
         uint8 tierIndex = _detectTier(totalActiveStakeValue[msg.sender]);
 
@@ -252,7 +260,7 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
      * @param _stakeId Index of the stake to compound
      */
     function compound(uint256 _stakeId) external nonReentrant whenNotPaused {
-        _compound(msg.sender, _stakeId);
+        _globalSync();
     }
 
     /**
@@ -261,8 +269,7 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
      * @param _stakeId Index of the stake to compound
      */
     function compoundFor(address _user, uint256 _stakeId) external nonReentrant whenNotPaused {
-        require(_user != address(0), "StakingManager: Invalid user");
-        _compound(_user, _stakeId);
+        _globalSync();
     }
 
     /**
@@ -353,26 +360,37 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
     }
 
     /**
-     * @dev Compound all direct referrals' stakes so that their accrued
-     *      staking profit is realised and team dividends flow to uplines
-     *      immediately — not only when the downline user acts.
+     * @dev Compound ALL stakers in the system. Iterates through the global
+     *      staker registry and auto-compounds every user's eligible stakes.
+     *      This ensures team dividends are generated for ALL pending
+     *      compound intervals system-wide, regardless of referral tree.
      */
-    function _compoundDirectReferrals(address _user) internal {
-        if (affiliateDistributor == address(0)) return;
-        address[] memory refs = IAffiliateDistributor(affiliateDistributor).getDirectReferrals(_user);
-        for (uint256 i = 0; i < refs.length; i++) {
-            _autoCompoundAll(refs[i]);
+    function _compoundAllStakers() internal {
+        for (uint256 i = 0; i < allStakers.length; i++) {
+            _autoCompoundAll(allStakers[i]);
         }
     }
 
     /**
-     * @dev Compound all eligible stakes for any user (permissionless).
-     *      Also compounds the user's direct referrals so team dividends
-     *      are generated from downline profit on every action.
+     * @dev Global system sync: compounds ALL stakers + accrues all rank salaries.
+     *      Called at the start of every user action (stake, unstake, harvest,
+     *      register, claim, subscribe) to ensure the entire system is up-to-date.
+     */
+    function _globalSync() internal {
+        _compoundAllStakers();
+        if (affiliateDistributor != address(0)) {
+            IAffiliateDistributor(affiliateDistributor).accrueAllRanks();
+        }
+    }
+
+    /**
+     * @dev Global system sync — compounds ALL stakers + accrues all rank salaries.
+     *      Permissionless — anyone can call.
+     *      Used by AffiliateDistributor and CMS to trigger system-wide
+     *      auto-compound and rank salary accrual on every user action.
      */
     function compoundAllFor(address _user) external whenNotPaused {
-        _autoCompoundAll(_user);
-        _compoundDirectReferrals(_user);
+        _globalSync();
     }
 
     /**
@@ -404,10 +422,8 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
      * @param _stakeId Index of the stake to unstake
      */
     function unstake(uint256 _stakeId) external nonReentrant {
-        // Auto-compound all eligible stakes (triggers team dividend distribution)
-        _autoCompoundAll(msg.sender);
-        // Compound direct referrals so their accrued profit generates team dividends
-        _compoundDirectReferrals(msg.sender);
+        // Global sync: compound ALL stakers + accrue all rank salaries
+        _globalSync();
 
         require(_stakeId < userStakes[msg.sender].length, "StakingManager: Invalid stake ID");
         Stake storage stk = userStakes[msg.sender][_stakeId];
@@ -446,10 +462,8 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
      * @param _amount USD amount to harvest (18 decimals)
      */
     function harvest(uint256 _stakeId, uint256 _amount) external nonReentrant whenNotPaused {
-        // Auto-compound all eligible stakes (triggers team dividend distribution)
-        _autoCompoundAll(msg.sender);
-        // Compound direct referrals so their accrued profit generates team dividends
-        _compoundDirectReferrals(msg.sender);
+        // Global sync: compound ALL stakers + accrue all rank salaries
+        _globalSync();
 
         require(_stakeId < userStakes[msg.sender].length, "StakingManager: Invalid stake ID");
         require(_amount >= MIN_HARVEST, "StakingManager: Below minimum harvest ($10)");
@@ -745,5 +759,15 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
             }
         }
         return 0;
+    }
+
+    // ============ Global Staker View Functions ============
+
+    function getAllStakers() external view returns (address[] memory) {
+        return allStakers;
+    }
+
+    function getStakerCount() external view returns (uint256) {
+        return allStakers.length;
     }
 }
