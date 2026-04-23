@@ -79,7 +79,7 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
     mapping(address => uint256) public lastRankClaimTime;
 
     // ============ Closing Intervals ============
-    uint256 public constant RANK_INTERVAL = 1 hours;        // TESTING (prod: 7 days)
+    uint256 public constant RANK_INTERVAL = 7 days;         // 7-day rank salary accrual period
 
     // ============ Constants ============
     uint256 public constant MIN_HARVEST = 10e18; // $10 minimum harvest

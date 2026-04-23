@@ -157,7 +157,6 @@ async function main() {
 
     // KAIROToken roles
     const MINTER_ROLE = await kairoToken.MINTER_ROLE();
-    const BURNER_ROLE = await kairoToken.BURNER_ROLE();
 
     tx = await kairoToken.grantRole(MINTER_ROLE, stakingAddress);
     await waitTx(tx);
@@ -170,14 +169,6 @@ async function main() {
     tx = await kairoToken.grantRole(MINTER_ROLE, cmsAddress);
     await waitTx(tx);
     console.log("  KAIROToken MINTER_ROLE -> CMS");
-
-    tx = await kairoToken.grantRole(BURNER_ROLE, liquidityPoolAddress);
-    await waitTx(tx);
-    console.log("  KAIROToken BURNER_ROLE -> LiquidityPool");
-
-    tx = await kairoToken.grantRole(BURNER_ROLE, p2pAddress);
-    await waitTx(tx);
-    console.log("  KAIROToken BURNER_ROLE -> AtomicP2p");
 
     // AffiliateDistributor roles
     const STAKING_ROLE = await affiliateDistributor.STAKING_ROLE();
@@ -197,6 +188,15 @@ async function main() {
     tx = await liquidityPool.grantP2PRole(p2pAddress);
     await waitTx(tx);
     console.log("  LiquidityPool P2P_ROLE -> AtomicP2p");
+
+    // Link StakingManager to LiquidityPool & AtomicP2p (for global auto-compound on DEX/P2P)
+    tx = await liquidityPool.setStakingManager(stakingAddress);
+    await waitTx(tx);
+    console.log("  LiquidityPool -> StakingManager linked (auto-compound on swap)");
+
+    tx = await atomicP2p.setStakingManager(stakingAddress);
+    await waitTx(tx);
+    console.log("  AtomicP2p -> StakingManager linked (auto-compound on P2P)");
     console.log("");
 
     // ============================================================
@@ -212,10 +212,10 @@ async function main() {
     await waitTx(tx);
     console.log("  Genesis account registered:", deployer.address);
 
-    // Mint extra USDT to deployer for testing
-    tx = await mockUSDT.mint(deployer.address, ethers.parseEther("100000"));
+    // Mint extra USDT to deployer for testing (constructor minted 1M, add 9M more = 10M total)
+    tx = await mockUSDT.mint(deployer.address, ethers.parseEther("9000000"));
     await waitTx(tx);
-    console.log("  Minted 100,000 extra USDT to deployer");
+    console.log("  Minted 9,000,000 extra USDT to deployer (10M total)");
 
     // Seed LiquidityPool with 10,000 USDT initial liquidity
     const INITIAL_LIQUIDITY = ethers.parseEther("10000");

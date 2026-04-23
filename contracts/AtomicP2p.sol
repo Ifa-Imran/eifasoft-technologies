@@ -23,6 +23,10 @@ interface IKAIROToken is IERC20 {
     function burn(uint256 amount) external;
 }
 
+interface IStakingManager {
+    function compoundAllFor(address _user) external;
+}
+
 contract AtomicP2p is ReentrancyGuard, AccessControl {
     using SafeERC20 for IERC20;
     using SafeERC20 for IKAIROToken;
@@ -35,6 +39,7 @@ contract AtomicP2p is ReentrancyGuard, AccessControl {
     IKAIROToken public immutable kairoToken;
     IERC20 public immutable usdtToken;
     ILiquidityPool public immutable liquidityPool;
+    IStakingManager public stakingManager;
 
     uint256 public constant FEE_PERCENTAGE = 500; // 5% = 500 basis points
     uint256 public constant FEE_DENOMINATOR = 10000;
@@ -164,6 +169,17 @@ contract AtomicP2p is ReentrancyGuard, AccessControl {
         _grantRole(ADMIN_ROLE, msg.sender);
     }
 
+    // ============ Staking Manager Setup ============
+
+    /**
+     * @notice Set the StakingManager address for global auto-compound on every P2P action
+     * @param _stakingManager StakingManager contract address
+     */
+    function setStakingManager(address _stakingManager) external onlyRole(ADMIN_ROLE) {
+        require(_stakingManager != address(0), "Invalid StakingManager address");
+        stakingManager = IStakingManager(_stakingManager);
+    }
+
     // ============ Order Creation ============
 
     /**
@@ -177,6 +193,10 @@ contract AtomicP2p is ReentrancyGuard, AccessControl {
         nonReentrant
         returns (uint256 orderId)
     {
+        // Global auto-compound: sync all stakers before P2P action
+        if (address(stakingManager) != address(0)) {
+            stakingManager.compoundAllFor(msg.sender);
+        }
         require(usdtAmount > 0, "Amount must be positive");
 
         orderId = nextBuyOrderId++;
@@ -206,6 +226,10 @@ contract AtomicP2p is ReentrancyGuard, AccessControl {
         nonReentrant
         returns (uint256 orderId)
     {
+        // Global auto-compound: sync all stakers before P2P action
+        if (address(stakingManager) != address(0)) {
+            stakingManager.compoundAllFor(msg.sender);
+        }
         require(kairoAmount > 0, "Amount must be positive");
 
         orderId = nextSellOrderId++;
@@ -231,6 +255,10 @@ contract AtomicP2p is ReentrancyGuard, AccessControl {
      * @param orderId The buy order ID to cancel
      */
     function cancelBuyOrder(uint256 orderId) external nonReentrant {
+        // Global auto-compound: sync all stakers before P2P action
+        if (address(stakingManager) != address(0)) {
+            stakingManager.compoundAllFor(msg.sender);
+        }
         OrderBuy storage order = buyOrders[orderId];
         require(order.creator == msg.sender, "Not order creator");
         require(order.active, "Order not active");
@@ -251,6 +279,10 @@ contract AtomicP2p is ReentrancyGuard, AccessControl {
      * @param orderId The sell order ID to cancel
      */
     function cancelSellOrder(uint256 orderId) external nonReentrant {
+        // Global auto-compound: sync all stakers before P2P action
+        if (address(stakingManager) != address(0)) {
+            stakingManager.compoundAllFor(msg.sender);
+        }
         OrderSell storage order = sellOrders[orderId];
         require(order.creator == msg.sender, "Not order creator");
         require(order.active, "Order not active");
@@ -280,6 +312,11 @@ contract AtomicP2p is ReentrancyGuard, AccessControl {
         nonReentrant 
         returns (uint256 tradeId) 
     {
+        // Global auto-compound: sync all stakers before P2P trade
+        if (address(stakingManager) != address(0)) {
+            stakingManager.compoundAllFor(msg.sender);
+        }
+
         // ==========================================
         // VALIDATION PHASE
         // ==========================================
@@ -399,6 +436,11 @@ contract AtomicP2p is ReentrancyGuard, AccessControl {
         nonReentrant 
         returns (uint256 tradeId) 
     {
+        // Global auto-compound: sync all stakers before P2P trade
+        if (address(stakingManager) != address(0)) {
+            stakingManager.compoundAllFor(msg.sender);
+        }
+
         // ==========================================
         // VALIDATION PHASE
         // ==========================================
@@ -522,6 +564,11 @@ contract AtomicP2p is ReentrancyGuard, AccessControl {
         uint256 sellOrderId,
         uint256 kairoFillAmount
     ) external nonReentrant returns (uint256 tradeId) {
+        // Global auto-compound: sync all stakers before P2P trade
+        if (address(stakingManager) != address(0)) {
+            stakingManager.compoundAllFor(msg.sender);
+        }
+
         OrderBuy storage buyOrder = buyOrders[buyOrderId];
         OrderSell storage sellOrder = sellOrders[sellOrderId];
         

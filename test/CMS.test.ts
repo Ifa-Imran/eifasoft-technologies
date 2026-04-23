@@ -153,14 +153,14 @@ describe("CoreMembershipSubscription", function () {
     describe("Deadline Enforcement", function () {
         it("should allow subscription before deadline", async function () {
             const { cms, user1 } = await loadFixture(cmsFixture);
-            // SUBSCRIBE_DEADLINE = deployTime + 3 hours; current test time should be before that
+            // SUBSCRIBE_DEADLINE = deployTime + 1 year; current test time should be before that
             await expect(cms.connect(user1).subscribe(1, ethers.ZeroAddress)).to.not.be.reverted;
         });
 
         it("should revert subscription after deadline", async function () {
             const { cms, user1 } = await loadFixture(cmsFixture);
-            // Advance past SUBSCRIBE_DEADLINE (3 hours from deploy)
-            await time.increase(3 * 3600 + 1);
+            // Advance past SUBSCRIBE_DEADLINE (1 year from deploy)
+            await time.increase(365 * 24 * 3600 + 1);
             await expect(
                 cms.connect(user1).subscribe(1, ethers.ZeroAddress)
             ).to.be.revertedWith("CMS: Subscription period ended");
@@ -311,7 +311,7 @@ describe("CoreMembershipSubscription", function () {
 
         it("should return correct isSubscriptionEnded", async function () {
             const { cms } = await loadFixture(cmsFixture);
-            // SUBSCRIBE_DEADLINE is 3 hours from deploy, so should not be passed yet
+            // SUBSCRIBE_DEADLINE is 1 year from deploy, so should not be passed yet
             const deadline = await cms.SUBSCRIBE_DEADLINE();
             const latest = await time.latest();
             if (latest < deadline) {

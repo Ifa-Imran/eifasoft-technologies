@@ -27,16 +27,13 @@ async function main() {
     console.log("");
 
     // ============================================================
-    // Step 1: Deploy MockUSDT (testnet only)
-    // Constructor: () - no params, mints 1M USDT to deployer
+    // Step 1: USDT Token Address (from environment variable)
+    // Production: use real USDT on opBNB mainnet
     // ============================================================
-    console.log("Step 1: Deploying MockUSDT...");
-    const MockUSDT = await ethers.getContractFactory("MockUSDT");
-    const mockUSDT = await MockUSDT.deploy();
-    await mockUSDT.waitForDeployment();
-    const usdtAddress = await mockUSDT.getAddress();
-    console.log("  MockUSDT deployed at:", usdtAddress);
-    await delay(WAIT);
+    console.log("Step 1: Resolving USDT token address...");
+    const usdtAddress = process.env.USDT_TOKEN_ADDRESS;
+    if (!usdtAddress) throw new Error("USDT_TOKEN_ADDRESS env variable required for mainnet deployment");
+    console.log("  Using USDT token at:", usdtAddress);
     console.log("");
 
     // ============================================================
@@ -184,7 +181,6 @@ async function main() {
 
     // --- KAIROToken Roles ---
     const MINTER_ROLE = await kairoToken.MINTER_ROLE();
-    const BURNER_ROLE = await kairoToken.BURNER_ROLE();
 
     // Grant MINTER_ROLE to StakingManager (for mintTo on compound/unstake/harvest)
     let tx = await kairoToken.grantRole(MINTER_ROLE, stakingAddress);
@@ -201,28 +197,10 @@ async function main() {
     await tx.wait();
     console.log("  KAIROToken: MINTER_ROLE -> CoreMembershipSubscription");
 
-    // Grant BURNER_ROLE to LiquidityPool (for burn on swapKAIROForUSDT)
-    tx = await kairoToken.grantRole(BURNER_ROLE, liquidityPoolAddress);
-    await tx.wait();
-    console.log("  KAIROToken: BURNER_ROLE -> LiquidityPool");
-
-    // Grant BURNER_ROLE to AtomicP2p (for burn on trade fee)
-    tx = await kairoToken.grantRole(BURNER_ROLE, p2pAddress);
-    await tx.wait();
-    console.log("  KAIROToken: BURNER_ROLE -> AtomicP2p");
-
     // --- StakingManager: Set CMS contract ---
     tx = await stakingManager.setCMS(cmsAddress);
     await tx.wait();
     console.log("  StakingManager: CMS contract set ->", cmsAddress);
-
-    // --- StakingManager Roles ---
-    const COMPOUNDER_ROLE = await stakingManager.COMPOUNDER_ROLE();
-
-    // Grant COMPOUNDER_ROLE to deployer (backend will trigger compounding)
-    tx = await stakingManager.grantRole(COMPOUNDER_ROLE, deployer.address);
-    await tx.wait();
-    console.log("  StakingManager: COMPOUNDER_ROLE -> deployer");
 
     // --- LiquidityPool Roles ---
     // Grant CORE_ROLE to StakingManager (for receiveStakingFunds, etc.)
@@ -240,21 +218,94 @@ async function main() {
     await tx.wait();
     console.log("  LiquidityPool: P2P_ROLE -> AtomicP2p");
 
+    // Link StakingManager to LiquidityPool & AtomicP2p (for global auto-compound on DEX/P2P)
+    tx = await liquidityPool.setStakingManager(stakingAddress);
+    await tx.wait();
+    console.log("  LiquidityPool -> StakingManager linked (auto-compound on swap)");
+
+    tx = await atomicP2p.setStakingManager(stakingAddress);
+    await tx.wait();
+    console.log("  AtomicP2p -> StakingManager linked (auto-compound on P2P)");
+
     console.log("");
 
     // ============================================================
-    // Step 10: Seed LiquidityPool with initial USDT liquidity
+    // Step 10: Seed LiquidityPool with initial USDT liquidity (OPTIONAL)
     // Transfer initial USDT to LiquidityPool so price oracle works correctly
+    // Skip if deployer has no USDT yet — can be funded later
     // ============================================================
-    console.log("Step 10: Seeding LiquidityPool with initial USDT liquidity...");
-    const INITIAL_LIQUIDITY = ethers.parseEther("10000"); // 10,000 USDT
-    tx = await mockUSDT.transfer(liquidityPoolAddress, INITIAL_LIQUIDITY);
-    await tx.wait();
-    console.log("  Transferred 10,000 USDT to LiquidityPool");
+    console.log("Step 10: Checking LiquidityPool USDT seeding...");
+    const usdt = await ethers.getContractAt("IERC20", usdtAddress);
+    const deployerUSDT = await usdt.balanceOf(deployer.address);
+    if (deployerUSDT > 0n) {
+        const INITIAL_LIQUIDITY = deployerUSDT < ethers.parseEther("10000")
+            ? deployerUSDT
+            : ethers.parseEther("10000");
+        tx = await usdt.transfer(liquidityPoolAddress, INITIAL_LIQUIDITY);
+        await tx.wait();
+        console.log("  Transferred", ethers.formatEther(INITIAL_LIQUIDITY), "USDT to LiquidityPool");
+        const initialPrice = await liquidityPool.getLivePrice();
+        console.log("  Initial KAIRO price:", ethers.formatEther(initialPrice), "USDT");
+    } else {
+        console.log("  SKIPPED: Deployer has 0 USDT. Fund LiquidityPool manually later.");
+    }
+    console.log("");
 
-    // Verify initial price
-    const initialPrice = await liquidityPool.getLivePrice();
-    console.log("  Initial KAIRO price:", ethers.formatEther(initialPrice), "USDT");
+    // ============================================================
+    // Step 11: BURN ALL DEPLOYER ADMIN ROLES (CRITICAL FOR SECURITY)
+    // After this, the deployer private key has ZERO admin powers.
+    // This is IRREVERSIBLE — the system becomes fully decentralized.
+    // ============================================================
+    console.log("--- Step 11: Burn ALL Deployer Admin Roles ---");
+    console.log("  WARNING: This is IRREVERSIBLE. Deployer will lose all admin control.");
+    console.log("");
+
+    const DEFAULT_ADMIN_ROLE = await kairoToken.DEFAULT_ADMIN_ROLE();
+
+    // 1. KAIROToken — renounce DEFAULT_ADMIN_ROLE
+    tx = await kairoToken.renounceRole(DEFAULT_ADMIN_ROLE, deployer.address);
+    await tx.wait();
+    await delay(WAIT);
+    console.log("  [BURNED] KAIROToken DEFAULT_ADMIN_ROLE");
+
+    // 2. StakingManager — renounce DEFAULT_ADMIN_ROLE
+    tx = await stakingManager.renounceRole(DEFAULT_ADMIN_ROLE, deployer.address);
+    await tx.wait();
+    await delay(WAIT);
+    console.log("  [BURNED] StakingManager DEFAULT_ADMIN_ROLE");
+
+    // 3. AffiliateDistributor — renounce DEFAULT_ADMIN_ROLE
+    tx = await affiliateDistributor.renounceRole(DEFAULT_ADMIN_ROLE, deployer.address);
+    await tx.wait();
+    await delay(WAIT);
+    console.log("  [BURNED] AffiliateDistributor DEFAULT_ADMIN_ROLE");
+
+    // 4. CoreMembershipSubscription — renounce DEFAULT_ADMIN_ROLE
+    tx = await cms.renounceRole(DEFAULT_ADMIN_ROLE, deployer.address);
+    await tx.wait();
+    await delay(WAIT);
+    console.log("  [BURNED] CMS DEFAULT_ADMIN_ROLE");
+
+    // 5. LiquidityPool — renounce DEFAULT_ADMIN_ROLE
+    tx = await liquidityPool.renounceRole(DEFAULT_ADMIN_ROLE, deployer.address);
+    await tx.wait();
+    await delay(WAIT);
+    console.log("  [BURNED] LiquidityPool DEFAULT_ADMIN_ROLE");
+
+    // 6. AtomicP2p — renounce ADMIN_ROLE + DEFAULT_ADMIN_ROLE
+    const P2P_ADMIN_ROLE = await atomicP2p.ADMIN_ROLE();
+    tx = await atomicP2p.renounceRole(P2P_ADMIN_ROLE, deployer.address);
+    await tx.wait();
+    await delay(WAIT);
+    console.log("  [BURNED] AtomicP2p ADMIN_ROLE");
+    tx = await atomicP2p.renounceRole(DEFAULT_ADMIN_ROLE, deployer.address);
+    await tx.wait();
+    await delay(WAIT);
+    console.log("  [BURNED] AtomicP2p DEFAULT_ADMIN_ROLE");
+
+    console.log("");
+    console.log("  ALL DEPLOYER ADMIN ROLES BURNED. System is now fully decentralized.");
+    console.log("  The deployer private key can be safely revealed — it has ZERO powers.");
     console.log("");
 
     // ============================================================
@@ -265,7 +316,7 @@ async function main() {
     console.log("=========================================");
     console.log("");
     console.log("Contract Addresses:");
-    console.log("  MockUSDT:                    ", usdtAddress);
+    console.log("  USDT:                        ", usdtAddress);
     console.log("  KAIROToken:                  ", kairoAddress);
     console.log("  LiquidityPool:               ", liquidityPoolAddress);
     console.log("  AffiliateDistributor:        ", affiliateAddress);
@@ -275,18 +326,17 @@ async function main() {
     console.log("");
     console.log("Configuration:");
     console.log("  System Wallet:               ", systemWallet);
-    console.log("  Deployer (admin):            ", deployer.address);
-    console.log("  Initial KAIRO Price:         ", ethers.formatEther(initialPrice), "USDT");
+    console.log("  Deployer (BURNED - no admin):", deployer.address);
     console.log("  Social Lock:                  10,000 KAIRO (locked in LiquidityPool)");
     console.log("  Initial USDT Liquidity:       10,000 USDT");
     console.log("");
-    console.log("Roles Granted:");
+    console.log("Active Roles (contract-to-contract only, NO human admins):");
     console.log("  KAIROToken MINTER_ROLE:       StakingManager, AffiliateDistributor, CMS");
-    console.log("  KAIROToken BURNER_ROLE:       LiquidityPool, AtomicP2p");
     console.log("  AffiliateDistributor STAKING_ROLE: StakingManager");
-    console.log("  StakingManager COMPOUNDER_ROLE: deployer");
     console.log("  LiquidityPool CORE_ROLE:      StakingManager, CMS");
     console.log("  LiquidityPool P2P_ROLE:       AtomicP2p");
+    console.log("");
+    console.log("  ALL DEPLOYER ADMIN ROLES: BURNED (deployer key is safe to reveal)");
     console.log("=========================================");
 }
 

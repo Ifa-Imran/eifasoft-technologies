@@ -29,7 +29,7 @@ interface ILiquidityPool {
 contract KAIROToken is ERC20, ERC20Permit, ERC20Burnable, AccessControl {
     // ============ Roles ============
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
+    // NOTE: BURNER_ROLE was removed — burn() is public via ERC20Burnable (anyone can burn their own tokens).
 
     // ============ State Variables ============
     address public liquidityPool;

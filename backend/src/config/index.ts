@@ -36,7 +36,7 @@ export const config: Config = {
     redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
     rpcUrl: requireEnv('RPC_URL'),
     rpcWsUrl: process.env.RPC_WS_URL || '',
-    chainId: parseInt(process.env.CHAIN_ID || '5611', 10),
+    chainId: parseInt(process.env.CHAIN_ID || '204', 10),
     contracts: {
         kairoToken: process.env.KAIRO_TOKEN_ADDRESS || '',
         liquidityPool: process.env.LIQUIDITY_POOL_ADDRESS || '',

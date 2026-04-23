@@ -69,8 +69,6 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
     uint256[5] public LEVEL_DIRECTS = [0, 2, 3, 4, 5];
 
     // ============ Deadlines (set via constructor) ============
-    // Testing: deploy + 3h subscribe, deploy + 6h claim
-    // Production: May 16, 2026 00:00 UTC subscribe, June 1, 2026 00:00 UTC claim
     uint256 public immutable SUBSCRIBE_DEADLINE;
     uint256 public immutable CLAIM_DEADLINE;
 

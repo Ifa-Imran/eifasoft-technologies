@@ -1,6 +1,6 @@
 import { Address } from 'viem';
 
-export const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID || 5611);
+export const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID || 204);
 
 export const contracts = {
   kairoToken: (process.env.NEXT_PUBLIC_KAIRO_TOKEN || '0x') as Address,
@@ -12,7 +12,7 @@ export const contracts = {
   usdt: (process.env.NEXT_PUBLIC_USDT || '0x') as Address,
 } as const;
 
-export const EXPLORER_URL = 'https://testnet.opbnbscan.com';
+export const EXPLORER_URL = 'https://opbnbscan.com';
 
 export function getExplorerTxUrl(hash: string) {
   return `${EXPLORER_URL}/tx/${hash}`;
@@ -24,9 +24,9 @@ export function getExplorerAddressUrl(address: string) {
 
 // Constants from contracts
 export const STAKING_TIERS = [
-  { name: 'Bronze', minAmount: 10, maxAmount: 499, compoundInterval: 15 * 60, color: '#CD7F32' },
-  { name: 'Silver', minAmount: 500, maxAmount: 1999, compoundInterval: 10 * 60, color: '#C0C0C0' },
-  { name: 'Gold', minAmount: 2000, maxAmount: Infinity, compoundInterval: 5 * 60, color: '#FFD700' },
+  { name: 'Bronze', minAmount: 10, maxAmount: 499, compoundInterval: 8 * 60 * 60, color: '#CD7F32' },
+  { name: 'Silver', minAmount: 500, maxAmount: 1999, compoundInterval: 6 * 60 * 60, color: '#C0C0C0' },
+  { name: 'Gold', minAmount: 2000, maxAmount: Infinity, compoundInterval: 4 * 60 * 60, color: '#FFD700' },
 ] as const;
 
 export const RANK_NAMES = [
@@ -46,7 +46,7 @@ export const RANK_SALARIES_USD = [
   10, 30, 70, 200, 600, 1_200, 4_000, 12_000, 40_000, 100_000,
 ] as const;
 
-export const USDT_DECIMALS = 18; // MockUSDT uses 18 decimals
+export const USDT_DECIMALS = 18;
 export const KAIRO_DECIMALS = 18;
 export const BASIS_POINTS = 10000;
 export const SWAP_FEE_BPS = 1000; // 10%

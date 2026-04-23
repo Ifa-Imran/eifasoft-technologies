@@ -36,7 +36,7 @@ contract AtomicP2p is ReentrancyGuard, AccessControl {
     IERC20 public immutable usdtToken;
     ILiquidityPool public immutable liquidityPool;
 
-    uint256 public constant FEE_PERCENTAGE = 300; // 3% = 300 basis points
+    uint256 public constant FEE_PERCENTAGE = 500; // 5% = 500 basis points
     uint256 public constant FEE_DENOMINATOR = 10000;
 
     uint256 public nextBuyOrderId = 1;

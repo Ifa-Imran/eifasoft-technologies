@@ -37,8 +37,8 @@ export function usePostAction() {
       if (!stakes || stakes.length === 0) return;
 
       const now = Math.floor(Date.now() / 1000);
-      // TESTING intervals: Tier0=900s, Tier1=600s, Tier2=300s
-      const intervals = [900, 600, 300];
+      // Production intervals: Tier0=28800s (8h), Tier1=21600s (6h), Tier2=14400s (4h)
+      const intervals = [28800, 21600, 14400];
 
       let compounded = 0;
       for (let i = 0; i < stakes.length; i++) {

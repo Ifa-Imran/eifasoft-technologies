@@ -466,7 +466,7 @@ export default function RankDividendPage() {
                       </td>
                       <td className="py-2.5 px-2 text-right">
                         <a
-                          href={`https://testnet.opbnbscan.com/tx/${event.txHash}`}
+                          href={`https://opbnbscan.com/tx/${event.txHash}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-xs text-primary-500 hover:text-primary-700 font-mono"

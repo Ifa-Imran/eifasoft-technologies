@@ -8,6 +8,28 @@ import { pool } from '../db/connection';
 
 const router = Router();
 
+// ============ Admin Authentication Middleware ============
+// Protects admin endpoints with API key. Set ADMIN_API_KEY in .env for production.
+function requireAdminAuth(req: Request, res: Response, next: Function): void {
+    const apiKey = process.env.ADMIN_API_KEY;
+    if (!apiKey) {
+        // No API key configured — block all admin access in production
+        if (process.env.NODE_ENV === 'production') {
+            res.status(403).json({ success: false, error: 'Admin access disabled (no ADMIN_API_KEY configured)' });
+            return;
+        }
+        // Allow in development without key
+        next();
+        return;
+    }
+    const provided = req.headers['x-admin-key'] || req.query.admin_key;
+    if (provided !== apiKey) {
+        res.status(401).json({ success: false, error: 'Unauthorized: invalid admin key' });
+        return;
+    }
+    next();
+}
+
 // Rank thresholds (team volume in USD, matching contract RANK_THRESHOLDS)
 const RANK_THRESHOLDS = [
     0,          // Rank 0 - no requirement
@@ -66,7 +88,7 @@ async function calculateUserRank(address: string): Promise<{
  * Body: { address?: string }
  * Trigger rank calculation for a specific user or all users
  */
-router.post('/admin/calculate-rank', async (req: Request, res: Response) => {
+router.post('/admin/calculate-rank', requireAdminAuth, async (req: Request, res: Response) => {
     try {
         const { address } = req.body;
 
@@ -126,7 +148,7 @@ router.post('/admin/calculate-rank', async (req: Request, res: Response) => {
  * GET /api/v1/admin/system-stats
  * System health: DB connections, last indexed block, queue sizes, WS clients
  */
-router.get('/admin/system-stats', async (_req: Request, res: Response) => {
+router.get('/admin/system-stats', requireAdminAuth, async (_req: Request, res: Response) => {
     try {
         // DB pool stats
         const poolStats = {

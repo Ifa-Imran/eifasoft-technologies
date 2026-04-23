@@ -15,12 +15,16 @@ interface IKAIROToken is IERC20 {
     function getEffectiveSupply() external view returns (uint256);
 }
 
+interface IStakingManager {
+    function compoundAllFor(address _user) external;
+}
+
 /**
  * @title LiquidityPool - "Mini-DEX" for KAIRO/USDT Trading (One-Way)
  * @dev Automated Market Maker with sophisticated pricing mechanism
  * Features:
  * - Dynamic pricing based on USDT balance and KAIRO supply
- * - 5% swap fees retained for price appreciation
+ * - 10% swap fees retained for price appreciation
  * - Social lock integration (5,000 KAIRO) for price stability
  * - Only KAIRO → USDT swaps allowed (one-way DEX for deflationary tokenomics)
  * - Slippage protection on all operations
@@ -108,6 +112,9 @@ contract LiquidityPool is ReentrancyGuard, AccessControl {
     
     // Pool balances (0 = Weekly Qualifiers Dividend, 1 = Monthly Qualifiers Dividend)
     mapping(uint256 => uint256) public poolBalances;
+
+    // StakingManager for global auto-compound on DEX actions
+    IStakingManager public stakingManager;
     
     constructor(address _kairoToken, address _usdtToken) {
         require(_kairoToken != address(0), "LiquidityPool: Invalid KAIRO token");
@@ -122,6 +129,15 @@ contract LiquidityPool is ReentrancyGuard, AccessControl {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         
         emit LiquidityPoolInitialized(_kairoToken, _usdtToken, block.timestamp);
+    }
+
+    /**
+     * @notice Set the StakingManager address for global auto-compound on every DEX swap
+     * @param _stakingManager StakingManager contract address
+     */
+    function setStakingManager(address _stakingManager) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_stakingManager != address(0), "LiquidityPool: Invalid StakingManager");
+        stakingManager = IStakingManager(_stakingManager);
     }
     
     /**
@@ -168,6 +184,11 @@ contract LiquidityPool is ReentrancyGuard, AccessControl {
         uint256 minUSDTOut,
         address recipient
     ) external nonReentrant returns (uint256 usdtOut) {
+        // Global auto-compound: sync all stakers before DEX swap
+        if (address(stakingManager) != address(0)) {
+            stakingManager.compoundAllFor(msg.sender);
+        }
+
         require(kairoAmount > 0, "LiquidityPool: Invalid KAIRO amount");
         require(recipient != address(0), "LiquidityPool: Invalid recipient");
         
@@ -181,7 +202,7 @@ contract LiquidityPool is ReentrancyGuard, AccessControl {
         uint256 currentPrice = getCurrentPrice();
         uint256 grossUSDTOut = (kairoAmount * currentPrice) / PRICE_PRECISION;
         
-        // Apply 3% swap fee
+        // Apply 10% swap fee
         uint256 swapFee = (grossUSDTOut * SWAP_FEE_PERCENT) / 100;
         usdtOut = grossUSDTOut - swapFee;
         
@@ -235,7 +256,7 @@ contract LiquidityPool is ReentrancyGuard, AccessControl {
         uint256 currentPrice = getCurrentPrice();
         uint256 grossKAIROOut = (usdtAmount * PRICE_PRECISION) / currentPrice;
         
-        // Apply 3% swap fee
+        // Apply 10% swap fee
         uint256 swapFee = (grossKAIROOut * SWAP_FEE_PERCENT) / 100;
         kairoOut = grossKAIROOut - swapFee;
         

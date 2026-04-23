@@ -52,11 +52,11 @@ export async function deployFullEcosystemFixture() {
     // Step 7: Deploy CoreMembershipSubscription
     const CMS = await ethers.getContractFactory("CoreMembershipSubscription");
 
-    // Testing deadlines: 3 hours subscribe, 6 hours claim from current block
+    // Testing deadlines: generous window to accommodate production compound intervals
     const latestBlock = await ethers.provider.getBlock("latest");
     const nowTs = latestBlock!.timestamp;
-    const SUBSCRIBE_DEADLINE = nowTs + 3 * 60 * 60;
-    const CLAIM_DEADLINE = nowTs + 6 * 60 * 60;
+    const SUBSCRIBE_DEADLINE = nowTs + 365 * 24 * 60 * 60;  // +1 year
+    const CLAIM_DEADLINE = nowTs + 365 * 24 * 60 * 60 + 30 * 24 * 60 * 60;  // +1 year + 30 days
 
     const cms = await CMS.deploy(
         await kairoToken.getAddress(),

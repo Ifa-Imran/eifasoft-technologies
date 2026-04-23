@@ -70,8 +70,8 @@ describe("Integration - Full User Journey", function () {
         expect(directDiv).to.equal(ethers.parseEther("50"));
 
         // ========== Step 3: Advance time and compound multiple times ==========
-        // Tier 1 compound interval = 600s in test mode
-        await time.increase(600 * 10); // 10 intervals
+        // Tier 1 compound interval = 21600s production
+        await time.increase(21600 * 10); // 10 intervals
         await stakingManager.connect(user1).compound(0);
 
         let stakeAfterCompound = await stakingManager.getStake(user1.address, 0);
@@ -128,8 +128,8 @@ describe("Integration - Full User Journey", function () {
         const stakeAmount = ethers.parseEther("10");
         await stakingManager.connect(user1).stake(stakeAmount, REF);
 
-        // Tier 0: 900s test interval. Need lots of compound to build up earnings
-        await time.increase(900 * 1500);
+        // Tier 0: 28800s production interval. Need lots of compound to build up earnings
+        await time.increase(28800 * 1500);
         await stakingManager.connect(user1).compound(0);
 
         const stake = await stakingManager.getStake(user1.address, 0);
@@ -148,7 +148,7 @@ describe("Integration - Full User Journey", function () {
         expect(stakeAfterHarvest.active).to.be.false; // Capped = inactive
 
         // Compounding via global sync doesn't revert on capped stake
-        await time.increase(900);
+        await time.increase(28800);
         await expect(
             stakingManager.connect(user1).compound(0)
         ).to.not.be.reverted;
@@ -203,7 +203,7 @@ describe("Integration - Full User Journey", function () {
         expect(directDiv).to.equal(ethers.parseEther("5"));
 
         // Compound and check team dividends
-        await time.increase(900); // 1 interval (Tier 0 = 900s test)
+        await time.increase(28800); // 1 interval (Tier 0 = 28800s)
         await stakingManager.connect(testUser1).compound(0);
 
         // testUser2 should have team dividend (L1: 10% of profit)
@@ -246,7 +246,7 @@ describe("Integration - Full User Journey", function () {
         expect(directDiv).to.equal(ethers.parseEther("5"));
 
         // 2) Compound staker to generate team dividends for referrer
-        await time.increase(900 * 10); // 10 Tier 0 intervals
+        await time.increase(28800 * 10); // 10 Tier 0 intervals
         await stakingManager.connect(staker).compound(0);
 
         const teamDiv = await affiliateDistributor.teamDividends(referrer.address);
@@ -258,7 +258,7 @@ describe("Integration - Full User Journey", function () {
         expect(totalCap).to.equal(ethers.parseEther("1500")); // 3 * 500
 
         // 4) Compound referrer's own stake and harvest compound rewards
-        await time.increase(600 * 100); // Tier 1 (500 USDT) = 600s intervals
+        await time.increase(21600 * 100); // Tier 1 (500 USDT) = 21600s intervals
         await stakingManager.connect(referrer).compound(0);
         await stakingManager.connect(referrer).harvest(0, ethers.parseEther("10"));
 

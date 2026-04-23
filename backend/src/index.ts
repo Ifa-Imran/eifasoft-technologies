@@ -30,7 +30,10 @@ process.on('uncaughtException', (err) => {
 });
 
 // Middleware
-app.use(cors());
+const corsOrigins = process.env.NODE_ENV === 'production'
+    ? (process.env.CORS_ORIGINS || '').split(',').filter(Boolean)
+    : true; // Allow all in development
+app.use(cors(typeof corsOrigins === 'boolean' ? undefined : { origin: corsOrigins, credentials: true }));
 app.use(helmet());
 app.use(morgan('combined'));
 app.use(compression());

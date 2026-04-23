@@ -42,7 +42,7 @@ async function setLastRun(key: string, timestamp: number): Promise<void> {
 
 // ============ Closing Interval Constants (TESTING) ============
 
-const RANK_INTERVAL_SECS = 1 * 3600;     // TESTING: 1 hour (prod: 7 days)
+const RANK_INTERVAL_SECS = 7 * 24 * 3600;   // Production: 7 days (matches contract RANK_INTERVAL)
 
 // ============ Rank Thresholds & Salaries (mirrors AffiliateDistributor.sol) ============
 

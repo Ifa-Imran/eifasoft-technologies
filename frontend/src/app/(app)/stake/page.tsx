@@ -23,9 +23,9 @@ function getTier(amount: number) {
 
 // Compounding frequencies per tier
 const COMPOUND_TIERS = [
-  { name: 'Bronze', min: 10, max: 499, testInterval: 15, prodInterval: 480 },    // 15m test, 8h prod
-  { name: 'Silver', min: 500, max: 1999, testInterval: 10, prodInterval: 360 },   // 10m test, 6h prod
-  { name: 'Gold', min: 2000, max: Infinity, testInterval: 5, prodInterval: 240 }, // 5m test, 4h prod
+  { name: 'Bronze', min: 10, max: 499, interval: 480 },    // 8h
+  { name: 'Silver', min: 500, max: 1999, interval: 360 },   // 6h
+  { name: 'Gold', min: 2000, max: Infinity, interval: 240 }, // 4h
 ] as const;
 
 function getCompoundTier(amount: number) {
@@ -34,38 +34,30 @@ function getCompoundTier(amount: number) {
   return COMPOUND_TIERS[0];
 }
 
-const DURATION_OPTIONS_TEST = [1, 2, 4, 6, 8, 12, 16, 20, 24] as const;
-const DURATION_OPTIONS_PROD = [1, 3, 6, 9, 12, 15, 18, 21, 24] as const;
+const DURATION_OPTIONS = [1, 3, 6, 9, 12, 15, 18, 21, 24] as const;
 const DAILY_RATE = 0.0015; // 0.15% per compound
 
 function CompoundingCalculator() {
   const [principal, setPrincipal] = useState('1000');
   const [duration, setDuration] = useState(6);
-  const [mode, setMode] = useState<'test' | 'prod'>('test');
-
-  const durationOptions = mode === 'test' ? DURATION_OPTIONS_TEST : DURATION_OPTIONS_PROD;
-  const durationLabel = mode === 'test' ? 'hour' : 'month';
-  const durationSuffix = mode === 'test' ? 'h' : 'm';
 
   const result = useMemo(() => {
     const P = Number(principal) || 0;
     if (P <= 0) return { profit: 0, tierName: '', intervalLabel: '', totalCompounds: 0 };
 
     const tier = getCompoundTier(P);
-    const intervalMinutes = mode === 'test' ? tier.testInterval : tier.prodInterval;
+    const intervalMinutes = tier.interval;
     const compoundsPerDay = (24 * 60) / intervalMinutes;
     const r = DAILY_RATE;
 
-    // Duration in days
-    const days = mode === 'test' ? duration / 24 : duration * 30;
+    // Duration in days (months * 30)
+    const days = duration * 30;
 
     const totalCompounds = compoundsPerDay * days;
     const A = P * Math.pow(1 + r, totalCompounds);
     const profit = A - P;
 
-    const intervalLabel = intervalMinutes >= 60
-      ? `${intervalMinutes / 60}h`
-      : `${intervalMinutes}m`;
+    const intervalLabel = `${intervalMinutes / 60}h`;
 
     return {
       profit,
@@ -73,30 +65,10 @@ function CompoundingCalculator() {
       intervalLabel,
       totalCompounds: Math.floor(totalCompounds),
     };
-  }, [principal, duration, mode]);
+  }, [principal, duration]);
 
   return (
     <div className="space-y-5">
-      {/* Mode Toggle */}
-      <div className="flex rounded-xl border-2 border-surface-200 overflow-hidden">
-        <button
-          onClick={() => { setMode('test'); setDuration(6); }}
-          className={`flex-1 py-2 text-xs font-semibold transition-colors ${
-            mode === 'test' ? 'bg-primary-500 text-white' : 'bg-white text-surface-500 hover:bg-surface-50'
-          }`}
-        >
-          Testing
-        </button>
-        <button
-          onClick={() => { setMode('prod'); setDuration(6); }}
-          className={`flex-1 py-2 text-xs font-semibold transition-colors ${
-            mode === 'prod' ? 'bg-primary-500 text-white' : 'bg-white text-surface-500 hover:bg-surface-50'
-          }`}
-        >
-          Production
-        </button>
-      </div>
-
       <div>
         <label className="text-xs font-semibold text-surface-600 mb-1.5 block">Stake Amount (USDT)</label>
         <input
@@ -111,7 +83,7 @@ function CompoundingCalculator() {
 
       <div>
         <label className="text-xs font-semibold text-surface-600 mb-1.5 block">
-          Duration: {duration} {durationLabel}{duration > 1 ? 's' : ''}
+          Duration: {duration} month{duration > 1 ? 's' : ''}
         </label>
         <input
           type="range"
@@ -123,7 +95,7 @@ function CompoundingCalculator() {
           className="w-full h-2 rounded-full appearance-none cursor-pointer accent-primary-500 bg-gradient-to-r from-primary-200 to-secondary-200"
         />
         <div className="flex justify-between mt-2">
-          {durationOptions.map((d) => (
+          {DURATION_OPTIONS.map((d) => (
             <button
               key={d}
               onClick={() => setDuration(d)}
@@ -133,7 +105,7 @@ function CompoundingCalculator() {
                   : 'text-surface-400 hover:text-primary-600'
               }`}
             >
-              {d}{durationSuffix}
+              {d}m
             </button>
           ))}
         </div>
@@ -295,7 +267,7 @@ function StakePageInner() {
               <div className="text-center">
                 <Badge tier={tierBadge} size="md">{t.name}</Badge>
                 <p className="text-sm text-surface-400 mt-3">${t.minAmount.toLocaleString()}{t.maxAmount === Infinity ? '+' : ` – $${t.maxAmount.toLocaleString()}`}</p>
-                <p className="text-2xl font-mono font-bold text-surface-900 mt-1">{t.compoundInterval / 60}m</p>
+                <p className="text-2xl font-mono font-bold text-surface-900 mt-1">{t.compoundInterval >= 3600 ? `${t.compoundInterval / 3600}h` : `${t.compoundInterval / 60}m`}</p>
                 <p className="text-sm text-surface-500">closing interval</p>
               </div>
             </GlassCard>
@@ -322,7 +294,7 @@ function StakePageInner() {
               <div className="flex items-center gap-2 p-3 rounded-xl bg-gradient-to-r from-primary-50 to-secondary-50 border border-primary-100">
                 <Badge tier={tier.name.toLowerCase() as any}>{tier.name}</Badge>
                 <span className="text-xs text-surface-500">
-                  Auto-compound every {tier.compoundInterval / 60}m &middot; 3X FIFO Cap
+                  Auto-compound every {tier.compoundInterval >= 3600 ? `${tier.compoundInterval / 3600}h` : `${tier.compoundInterval / 60}m`} &middot; 3X FIFO Cap
                 </span>
               </div>
             )}

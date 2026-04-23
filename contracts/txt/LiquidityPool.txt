@@ -20,7 +20,7 @@ interface IKAIROToken is IERC20 {
  * @dev Automated Market Maker with sophisticated pricing mechanism
  * Features:
  * - Dynamic pricing based on USDT balance and KAIRO supply
- * - 3% swap fees retained for price appreciation
+ * - 5% swap fees retained for price appreciation
  * - Social lock integration (5,000 KAIRO) for price stability
  * - Only KAIRO → USDT swaps allowed (one-way DEX for deflationary tokenomics)
  * - Slippage protection on all operations
@@ -39,7 +39,7 @@ contract LiquidityPool is ReentrancyGuard, AccessControl {
     address public immutable deployer;
     
     // Constants
-    uint256 public constant SWAP_FEE_PERCENT = 3; // 3% swap fee
+    uint256 public constant SWAP_FEE_PERCENT = 10; // 10% swap fee
     uint256 public constant PRICE_PRECISION = 10**18;
     uint256 public constant SOCIAL_LOCK_AMOUNT = 5000 * 10**18; // 5,000 KAIRO
     

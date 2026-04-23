@@ -68,7 +68,8 @@ interface IAffiliateDistributor {
  */
 contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
     // ============ Roles ============
-    bytes32 public constant COMPOUNDER_ROLE = keccak256("COMPOUNDER_ROLE");
+    // NOTE: COMPOUNDER_ROLE was removed — compounding is fully permissionless.
+    // All compound functions are open to any caller (time-gated on-chain).
 
     // ============ Tier System ============
     struct Tier {
@@ -158,12 +159,12 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
 
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
 
-        // Tier 0: 10-499 USDT, 15 minutes (900s) TESTING
-        tiers[0] = Tier(10 * 10 ** 18, 499 * 10 ** 18, 900, 3);
-        // Tier 1: 500-1999 USDT, 10 minutes (600s) TESTING
-        tiers[1] = Tier(500 * 10 ** 18, 1999 * 10 ** 18, 600, 4);
-        // Tier 2: 2000+ USDT, 5 minutes (300s) TESTING
-        tiers[2] = Tier(2000 * 10 ** 18, type(uint256).max, 300, 6);
+        // Tier 0: 10-499 USDT, 8 hours (28800s)
+        tiers[0] = Tier(10 * 10 ** 18, 499 * 10 ** 18, 28800, 3);
+        // Tier 1: 500-1999 USDT, 6 hours (21600s)
+        tiers[1] = Tier(500 * 10 ** 18, 1999 * 10 ** 18, 21600, 4);
+        // Tier 2: 2000+ USDT, 4 hours (14400s)
+        tiers[2] = Tier(2000 * 10 ** 18, type(uint256).max, 14400, 6);
     }
 
     // ============ Core Functions ============
@@ -196,7 +197,6 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
 
         // Forward 90% of staking funds to LiquidityPool for liquidity backing
         uint256 liquidityPoolShare = (_usdtAmount * 90) / 100;
-        require(usdt.approve(address(liquidityPool), liquidityPoolShare), "StakingManager: USDT approve failed");
         require(usdt.transfer(address(liquidityPool), liquidityPoolShare), "StakingManager: LiquidityPool transfer failed");
         liquidityPool.receiveStakingFunds(liquidityPoolShare);
 
