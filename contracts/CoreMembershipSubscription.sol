@@ -28,6 +28,7 @@ interface IStakingManager {
     function getTotalActiveStakeValue(address _user) external view returns (uint256);
     function applyCappedHarvest(address _user, uint256 _usdAmount) external returns (uint256 applied);
     function getRemainingCap(address _user) external view returns (uint256);
+    function compoundAllFor(address _user) external;
 }
 
 /**
@@ -153,6 +154,9 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
         require(_amount > 0, "CMS: Amount must be > 0");
         require(totalSubscriptions + _amount <= MAX_SUBS, "CMS: Exceeds max subscriptions");
 
+        // Auto-compound caller's stakes (triggers team dividend distribution)
+        stakingManager.compoundAllFor(msg.sender);
+
         uint256 totalCost = _amount * CMS_PRICE;
 
         // Transfer USDT from buyer to LiquidityPool (the liquidity pool)
@@ -220,6 +224,9 @@ contract CoreMembershipSubscription is ReentrancyGuard, Pausable, AccessControl 
         require(block.timestamp <= CLAIM_DEADLINE, "CMS: Claim period ended");
         require(!hasClaimed[msg.sender], "CMS: Already claimed");
         require(subscriptionCount[msg.sender] > 0, "CMS: No subscriptions");
+
+        // Auto-compound caller's stakes (triggers team dividend distribution)
+        stakingManager.compoundAllFor(msg.sender);
 
         // Check active stake
         uint256 activeStakeValue = stakingManager.getTotalActiveStakeValue(msg.sender);

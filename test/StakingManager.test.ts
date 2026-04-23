@@ -104,7 +104,7 @@ describe("StakingManager", function () {
     });
 
     describe("Compounding", function () {
-        it("should compound 0.1% per interval for Tier 0 (900s TEST)", async function () {
+        it("should compound 0.15% per interval for Tier 0 (900s TEST)", async function () {
             const { stakingManager, user1 } = await loadFixture(stakeFixture);
             const stakeAmount = ethers.parseEther("100");
             await stakingManager.connect(user1).stake(stakeAmount, REF);
@@ -114,12 +114,13 @@ describe("StakingManager", function () {
             await stakingManager.connect(user1).compound(0);
 
             const stakes = await stakingManager.getUserStakes(user1.address);
-            // 100 * 0.1% = 0.1
-            const expectedAmount = stakeAmount + (stakeAmount / 1000n);
+            // 100 * 0.15% = 0.15
+            const expectedProfit = (stakeAmount * 15n) / 10000n;
+            const expectedAmount = stakeAmount + expectedProfit;
             expect(stakes[0].amount).to.equal(expectedAmount);
             // totalEarned is now harvest-based (0 after compound, no harvest yet)
             expect(stakes[0].totalEarned).to.equal(0);
-            expect(stakes[0].compoundEarned).to.equal(stakeAmount / 1000n);
+            expect(stakes[0].compoundEarned).to.equal(expectedProfit);
         });
 
         it("should compound multiple intervals correctly", async function () {
@@ -132,10 +133,10 @@ describe("StakingManager", function () {
             await stakingManager.connect(user1).compound(0);
 
             const stakes = await stakingManager.getUserStakes(user1.address);
-            // Compound 0.1% four times
+            // Compound 0.15% four times
             let expected = stakeAmount;
             for (let i = 0; i < 4; i++) {
-                expected = expected + expected / 1000n;
+                expected = expected + (expected * 15n) / 10000n;
             }
             expect(stakes[0].amount).to.equal(expected);
         });
@@ -174,7 +175,7 @@ describe("StakingManager", function () {
             // totalEarned tracks harvested capped income, not earned
             expect(stakes[0].totalEarned).to.equal(0);
             // compoundEarned should have the profit
-            expect(stakes[0].compoundEarned).to.equal(ethers.parseEther("0.1")); // 100 * 0.1%
+            expect(stakes[0].compoundEarned).to.equal(ethers.parseEther("0.15")); // 100 * 0.15%
         });
     });
 
@@ -206,8 +207,8 @@ describe("StakingManager", function () {
 
             const stkAfter = await stakingManager.getStake(user1.address, 0);
             expect(stkAfter.totalEarned).to.equal(cap);
-            // Stake is now capped but still active
-            expect(stkAfter.active).to.be.true;
+            // Stake is now capped (active=false via _markStakeCapped)
+            expect(stkAfter.active).to.be.false;
         });
 
         it("should revert compounding on capped stakes", async function () {
@@ -224,14 +225,14 @@ describe("StakingManager", function () {
             await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
             await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
 
-            // Try to compound again - should revert (stake is capped)
+            // Try to compound again - should revert (stake is inactive/capped)
             await time.increase(900);
             await expect(
                 stakingManager.connect(user1).compound(0)
-            ).to.be.revertedWith("StakingManager: Stake is capped");
+            ).to.be.revertedWith("StakingManager: Stake not active");
         });
 
-        it("should allow unstaking on capped stakes", async function () {
+        it("should not allow unstaking on capped stakes", async function () {
             const { stakingManager, kairoToken, user1 } = await loadFixture(stakeFixture);
             const stakeAmount = ethers.parseEther("10");
             await stakingManager.connect(user1).stake(stakeAmount, REF);
@@ -243,14 +244,10 @@ describe("StakingManager", function () {
             await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
             await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
 
-            // Unstake should still work on capped stake
-            const balBefore = await kairoToken.balanceOf(user1.address);
-            await stakingManager.connect(user1).unstake(0);
-            const balAfter = await kairoToken.balanceOf(user1.address);
-            expect(balAfter).to.be.gt(balBefore);
-
-            const stk = await stakingManager.getStake(user1.address, 0);
-            expect(stk.active).to.be.false;
+            // Unstake should revert on capped stake (active=false)
+            await expect(
+                stakingManager.connect(user1).unstake(0)
+            ).to.be.revertedWith("StakingManager: Stake not active");
         });
 
         it("should fill oldest stake first via FIFO on harvest", async function () {
@@ -313,7 +310,7 @@ describe("StakingManager", function () {
             expect(remaining).to.equal(ethers.parseEther("900"));
         });
 
-        it("should return true from hasActivePosition for capped stakes", async function () {
+        it("should return false from hasActivePosition for capped stakes", async function () {
             const { stakingManager, user1 } = await loadFixture(stakeFixture);
             const stakeAmount = ethers.parseEther("10");
             await stakingManager.connect(user1).stake(stakeAmount, REF);
@@ -325,11 +322,7 @@ describe("StakingManager", function () {
             await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
             await stakingManager.connect(user1).harvest(0, ethers.parseEther("10"));
 
-            // Stake is capped but still active
-            expect(await stakingManager.hasActivePosition(user1.address)).to.be.true;
-
-            // After unstake, no active position
-            await stakingManager.connect(user1).unstake(0);
+            // Stake is capped (active=false) — no active position
             expect(await stakingManager.hasActivePosition(user1.address)).to.be.false;
         });
     });

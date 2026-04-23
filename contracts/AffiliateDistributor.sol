@@ -28,6 +28,7 @@ interface IStakingManager {
     function getTotalActiveStakeValue(address _user) external view returns (uint256);
     function getRemainingCap(address _user) external view returns (uint256);
     function hasActivePosition(address _user) external view returns (bool);
+    function compoundAllFor(address _user) external;
 }
 
 /**
@@ -182,6 +183,11 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
         directCount[_referrer]++;
 
         emit ReferrerSet(msg.sender, _referrer);
+
+        // Auto-compound caller's stakes (triggers team dividend distribution)
+        if (stakingManager != address(0)) {
+            IStakingManager(stakingManager).compoundAllFor(msg.sender);
+        }
     }
 
     // ============ Referral Functions (STAKING_ROLE - contract-to-contract) ============
@@ -460,6 +466,11 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
      * @param _incomeType 0=Direct, 1=Team, 2=Rank
      */
     function harvest(uint8 _incomeType) external nonReentrant whenNotPaused {
+        // Auto-compound caller's stakes (triggers team dividend distribution)
+        if (stakingManager != address(0)) {
+            IStakingManager(stakingManager).compoundAllFor(msg.sender);
+        }
+
         // Always auto-accrue and sync rank on any harvest — keeps rank up-to-date
         _accrueAndSyncRank(msg.sender);
 

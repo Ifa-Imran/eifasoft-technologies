@@ -365,6 +365,19 @@ export const AffiliateDistributorABI = [
   },
   {
     "inputs": [],
+    "name": "MAX_TREE_DEPTH",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "MIN_HARVEST",
     "outputs": [
       {
@@ -1002,6 +1015,25 @@ export const AffiliateDistributorABI = [
         "type": "address"
       }
     ],
+    "name": "personalVolume",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
     "name": "rankDividends",
     "outputs": [
       {
@@ -1216,25 +1248,6 @@ export const AffiliateDistributorABI = [
       }
     ],
     "name": "teamVolume",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "personalVolume",
     "outputs": [
       {
         "internalType": "uint256",

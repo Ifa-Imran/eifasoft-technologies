@@ -181,6 +181,9 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
             );
         }
 
+        // Auto-compound all eligible stakes (triggers team dividend distribution)
+        _autoCompoundAll(msg.sender);
+
         // Transfer USDT from user to this contract
         require(usdt.transferFrom(msg.sender, address(this), _usdtAmount), "StakingManager: USDT transfer failed");
 
@@ -310,6 +313,52 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
     }
 
     /**
+     * @dev Auto-compound ALL eligible stakes for a user.
+     *      Silently skips stakes with no intervals due.
+     *      Called internally on every user action (stake/unstake/harvest)
+     *      and externally by AffiliateDistributor and CMS.
+     */
+    function _autoCompoundAll(address _user) internal {
+        for (uint256 i = 0; i < userStakes[_user].length; i++) {
+            Stake storage stk = userStakes[_user][i];
+            if (!stk.active) continue;
+
+            Tier memory tier = tiers[stk.tier];
+            uint256 elapsed = block.timestamp - stk.lastCompoundTime;
+            uint256 intervals = elapsed / tier.compoundInterval;
+            if (intervals == 0) continue;
+
+            uint256 totalProfit = 0;
+            uint256 currentAmount = stk.amount;
+            for (uint256 j = 0; j < intervals; j++) {
+                uint256 profit = (currentAmount * PROFIT_NUMERATOR) / PROFIT_DENOMINATOR;
+                currentAmount += profit;
+                totalProfit += profit;
+            }
+
+            stk.amount = currentAmount;
+            stk.compoundEarned += totalProfit;
+            stk.lastCompoundTime += intervals * tier.compoundInterval;
+            totalActiveStakeValue[_user] += totalProfit;
+
+            if (affiliateDistributor != address(0) && totalProfit > 0) {
+                IAffiliateDistributor(affiliateDistributor).distributeTeamDividend(_user, totalProfit);
+            }
+
+            emit Compounded(_user, i, totalProfit, stk.amount);
+        }
+    }
+
+    /**
+     * @dev Compound all eligible stakes for any user (permissionless).
+     *      Called by AffiliateDistributor and CMS to trigger team dividend
+     *      distribution on every user action. Silently no-ops if user has no stakes.
+     */
+    function compoundAllFor(address _user) external whenNotPaused {
+        _autoCompoundAll(_user);
+    }
+
+    /**
      * @dev Mark a stake as capped when 3X harvest cap is reached.
      *      The stake is fully deactivated — no more compounding, no rank
      *      eligibility, no income of any kind until a new stake is created.
@@ -338,6 +387,9 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
      * @param _stakeId Index of the stake to unstake
      */
     function unstake(uint256 _stakeId) external nonReentrant {
+        // Auto-compound all eligible stakes (triggers team dividend distribution)
+        _autoCompoundAll(msg.sender);
+
         require(_stakeId < userStakes[msg.sender].length, "StakingManager: Invalid stake ID");
         Stake storage stk = userStakes[msg.sender][_stakeId];
         require(stk.active, "StakingManager: Stake not active");
@@ -375,6 +427,9 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
      * @param _amount USD amount to harvest (18 decimals)
      */
     function harvest(uint256 _stakeId, uint256 _amount) external nonReentrant whenNotPaused {
+        // Auto-compound all eligible stakes (triggers team dividend distribution)
+        _autoCompoundAll(msg.sender);
+
         require(_stakeId < userStakes[msg.sender].length, "StakingManager: Invalid stake ID");
         require(_amount >= MIN_HARVEST, "StakingManager: Below minimum harvest ($10)");
 

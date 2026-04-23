@@ -352,6 +352,25 @@ export const StakingManagerABI = [
     "anonymous": false,
     "inputs": [
       {
+        "indexed": true,
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "newTier",
+        "type": "uint8"
+      }
+    ],
+    "name": "TierUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
         "indexed": false,
         "internalType": "address",
         "name": "account",
@@ -562,6 +581,19 @@ export const StakingManagerABI = [
       }
     ],
     "name": "compound",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_user",
+        "type": "address"
+      }
+    ],
+    "name": "compoundAllFor",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

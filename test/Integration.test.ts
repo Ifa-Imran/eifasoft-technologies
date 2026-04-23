@@ -145,13 +145,13 @@ describe("Integration - Full User Journey", function () {
 
         const stakeAfterHarvest = await stakingManager.getStake(user1.address, 0);
         expect(stakeAfterHarvest.totalEarned).to.equal(3n * stakeAmount); // 3x capped
-        expect(stakeAfterHarvest.active).to.be.true; // Still active for rank purposes
+        expect(stakeAfterHarvest.active).to.be.false; // Capped = inactive
 
         // Compounding should be blocked on capped stake
         await time.increase(900);
         await expect(
             stakingManager.connect(user1).compound(0)
-        ).to.be.revertedWith("StakingManager: Stake is capped");
+        ).to.be.revertedWith("StakingManager: Stake not active");
     });
 
     it("should handle affiliate direct + team dividends through staking", async function () {
