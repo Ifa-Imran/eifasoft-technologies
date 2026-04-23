@@ -28,15 +28,18 @@ async function main() {
 
     const systemWallet = process.env.SYSTEM_WALLET || deployer.address;
 
-    // DAO wallets: use env vars for production, deployer address as fallback for testnet
+    // DAO wallets (1% each for first 4, 0.5% each for last 2 — totaling 5%)
     const daoWallets = [
-        process.env.DAO_WALLET_1 || deployer.address,
-        process.env.DAO_WALLET_2 || deployer.address,
-        process.env.DAO_WALLET_3 || deployer.address,
-        process.env.DAO_WALLET_4 || deployer.address,
-        process.env.DAO_WALLET_5 || deployer.address,
-        process.env.DAO_WALLET_6 || deployer.address,
+        '0x4465f4e53241c118a19d092d2495984f467a01a9',
+        '0x3c5bB7A176F2787de0A6Ae73C6Eff4Ff5dD63295',
+        '0xA91970AcA653591fd20231ad29ecCA0c7F691ceB',
+        '0xe3E3Ca6feD0F6Bd26B1E684854F2B7AFB49b2805',
+        '0x20d8cF481f06459FdFEAfF9219AD7a979eE06c32',
+        '0xBDAb83d8eb19b0454648Db15897796BCFBB2F9B7',
     ];
+
+    // Development fund wallet (receives 5% of staking rewards)
+    const developmentFundWallet = '0x1bdbE7e3411E6439741335f1FC9fa37Adf385E07';
 
     // ============================================================
     // PHASE 1: Deploy all contracts
@@ -95,7 +98,7 @@ async function main() {
     console.log("[6/8] Deploying StakingManager...");
     const StakingManager = await ethers.getContractFactory("StakingManager");
     const stakingManager = await StakingManager.deploy(
-        kairoAddress, liquidityPoolAddress, usdtAddress, systemWallet, daoWallets, deployer.address
+        kairoAddress, liquidityPoolAddress, usdtAddress, developmentFundWallet, daoWallets, deployer.address
     );
     await stakingManager.waitForDeployment();
     await sleep(DELAY);
@@ -181,12 +184,6 @@ async function main() {
     tx = await affiliateDistributor.grantRole(STAKING_ROLE, cmsAddress);
     await waitTx(tx);
     console.log("  AffiliateDistributor STAKING_ROLE -> CMS");
-
-    // StakingManager roles
-    const COMPOUNDER_ROLE = await stakingManager.COMPOUNDER_ROLE();
-    tx = await stakingManager.grantRole(COMPOUNDER_ROLE, deployer.address);
-    await waitTx(tx);
-    console.log("  StakingManager COMPOUNDER_ROLE -> deployer");
 
     // LiquidityPool roles
     tx = await liquidityPool.grantCoreRole(stakingAddress);
@@ -284,11 +281,10 @@ async function main() {
     }
 
     // ============================================================
-    // PHASE 5: Burn ALL deployer admin roles (keep COMPOUNDER_ROLE)
+    // PHASE 5: Burn ALL deployer admin roles
     // ============================================================
     console.log("--- PHASE 5: Burn ALL Deployer Admin Roles ---");
     console.log("  WARNING: This is irreversible. Deployer will lose all admin control.");
-    console.log("  NOTE: COMPOUNDER_ROLE is kept for auto-compound daemon.");
     console.log("");
 
     const DEFAULT_ADMIN_ROLE = await kairoToken.DEFAULT_ADMIN_ROLE();
@@ -298,11 +294,10 @@ async function main() {
     await waitTx(tx);
     console.log("  [BURNED] KAIROToken DEFAULT_ADMIN_ROLE");
 
-    // 2. StakingManager — renounce DEFAULT_ADMIN_ROLE (keep COMPOUNDER_ROLE for daemon)
+    // 2. StakingManager — renounce DEFAULT_ADMIN_ROLE
     tx = await stakingManager.renounceRole(DEFAULT_ADMIN_ROLE, deployer.address);
     await waitTx(tx);
     console.log("  [BURNED] StakingManager DEFAULT_ADMIN_ROLE");
-    console.log("  [KEPT]   StakingManager COMPOUNDER_ROLE (for auto-compound daemon)");
 
     // 3. AffiliateDistributor — renounce STAKING_ROLE (genesis setup) + DEFAULT_ADMIN_ROLE
     tx = await affiliateDistributor.renounceRole(STAKING_ROLE, deployer.address);
@@ -332,7 +327,7 @@ async function main() {
     console.log("  [BURNED] AtomicP2p DEFAULT_ADMIN_ROLE");
 
     console.log("");
-    console.log("  ALL DEPLOYER ADMIN ROLES BURNED. COMPOUNDER_ROLE retained.");
+    console.log("  ALL DEPLOYER ADMIN ROLES BURNED.");
     console.log("");
 
     // ============================================================
@@ -351,11 +346,13 @@ async function main() {
     console.log(`  CMS_ADDRESS=${cmsAddress}`);
     console.log(`  ATOMIC_P2P_ADDRESS=${p2pAddress}`);
     console.log(`  SYSTEM_WALLET=${systemWallet}`);
+    console.log(`  DEVELOPMENT_FUND_WALLET=${developmentFundWallet}`);
+    console.log(`  DAO_WALLETS=${daoWallets.join(', ')}`);
     console.log("");
     console.log("Next steps:");
     console.log("  1. Copy addresses above into your .env file");
     console.log("  2. Verify contracts on explorer (npx hardhat verify)");
-    console.log("  3. Configure backend with COMPOUNDER_ROLE and RANK_UPDATER_ROLE keys");
+    console.log("  3. All on-chain operations (compound, rank sync) are user-initiated");
     console.log("  4. Fund system wallet with gas for operations");
     console.log("=============================================");
 }

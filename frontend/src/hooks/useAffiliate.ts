@@ -7,6 +7,7 @@ import { StakingManagerABI } from '@/config/abis/StakingManager';
 import { useToast } from '@/components/ui/Toast';
 import { useEffect, useMemo, useState } from 'react';
 import { formatUnits, parseAbiItem } from 'viem';
+import { usePostAction } from '@/hooks/usePostAction';
 
 export interface SalaryClaimEvent {
   txHash: string;
@@ -65,6 +66,7 @@ export function useAffiliate() {
   const [lifetimeHarvested, setLifetimeHarvested] = useState<LifetimeHarvested | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [teamLevelLoading, setTeamLevelLoading] = useState(false);
+  const { runPostActionTasks } = usePostAction();
 
   // Fetch salary claim & harvest history + lifetime harvested totals from on-chain events
   useEffect(() => {
@@ -488,9 +490,9 @@ export function useAffiliate() {
   const { isSuccess: harvestSuccess, isError: harvestError } = useWaitForTransactionReceipt({ hash: harvestHash });
   const { isSuccess: checkRankSuccess, isError: checkRankError } = useWaitForTransactionReceipt({ hash: checkRankHash });
 
-  useEffect(() => { if (harvestSuccess) toast({ type: 'success', title: 'Income harvested!' }); }, [harvestSuccess]);
+  useEffect(() => { if (harvestSuccess) { toast({ type: 'success', title: 'Income harvested!' }); runPostActionTasks(); } }, [harvestSuccess]);
   useEffect(() => { if (harvestError) toast({ type: 'error', title: 'Harvest failed' }); }, [harvestError]);
-  useEffect(() => { if (checkRankSuccess) toast({ type: 'success', title: 'Rank updated!' }); }, [checkRankSuccess]);
+  useEffect(() => { if (checkRankSuccess) { toast({ type: 'success', title: 'Rank updated!' }); runPostActionTasks(); } }, [checkRankSuccess]);
   useEffect(() => { if (checkRankError) toast({ type: 'error', title: 'Rank check failed' }); }, [checkRankError]);
 
   const harvestIncome = (incomeType: number) => {

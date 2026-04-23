@@ -7,12 +7,14 @@ import { useToast } from '@/components/ui/Toast';
 import { Address } from 'viem';
 import { useEffect, useRef, useCallback, useState } from 'react';
 import type { StakeInfo } from '@/hooks/useUserStakes';
+import { usePostAction } from '@/hooks/usePostAction';
 
 export function useStaking() {
   const { toast } = useToast();
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const [harvesting, setHarvesting] = useState(false);
+  const { runPostActionTasks } = usePostAction();
 
   const { writeContractAsync } = useWriteContract();
 
@@ -22,9 +24,9 @@ export function useStaking() {
   const { isSuccess: stakeSuccess, isError: stakeError } = useWaitForTransactionReceipt({ hash: stakeHash });
   const { isSuccess: unstakeSuccess, isError: unstakeError } = useWaitForTransactionReceipt({ hash: unstakeHash });
 
-  useEffect(() => { if (stakeSuccess) toast({ type: 'success', title: 'Staked successfully!' }); }, [stakeSuccess]);
+  useEffect(() => { if (stakeSuccess) { toast({ type: 'success', title: 'Staked successfully!' }); runPostActionTasks(); } }, [stakeSuccess]);
   useEffect(() => { if (stakeError) toast({ type: 'error', title: 'Stake failed' }); }, [stakeError]);
-  useEffect(() => { if (unstakeSuccess) toast({ type: 'success', title: 'Unstaked successfully!' }); }, [unstakeSuccess]);
+  useEffect(() => { if (unstakeSuccess) { toast({ type: 'success', title: 'Unstaked successfully!' }); runPostActionTasks(); } }, [unstakeSuccess]);
   useEffect(() => { if (unstakeError) toast({ type: 'error', title: 'Unstake failed' }); }, [unstakeError]);
 
   const stake = async (amount: bigint, referrer: Address) => {
@@ -83,6 +85,7 @@ export function useStaking() {
           }
         }
         toast({ type: 'success', title: 'Harvest complete!' });
+        runPostActionTasks();
       } else {
         toast({ type: 'error', title: 'Nothing to harvest yet' });
       }

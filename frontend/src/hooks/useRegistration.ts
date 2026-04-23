@@ -7,11 +7,13 @@ import { contracts, SYSTEM_WALLET } from '@/config/contracts';
 import { AffiliateDistributorABI } from '@/config/abis/AffiliateDistributor';
 import { useEffect } from 'react';
 import { useToast } from '@/components/ui/Toast';
+import { usePostAction } from '@/hooks/usePostAction';
 
 export function useRegistration() {
   const { address, isConnected } = useAccount();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { runPostActionTasks } = usePostAction();
 
   // Check if user has a referrer set on-chain (source of truth)
   const { data: onChainReferrer, isLoading: referrerLoading, queryKey: referrerQueryKey } = useReadContract({
@@ -66,6 +68,7 @@ export function useRegistration() {
     if (registerSuccess) {
       toast({ type: 'success', title: 'Registration successful!' });
       queryClient.invalidateQueries({ queryKey: referrerQueryKey });
+      runPostActionTasks();
     }
   }, [registerSuccess]);
 

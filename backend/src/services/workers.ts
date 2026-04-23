@@ -1,9 +1,7 @@
-import { Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { config } from '../config';
 import { query } from '../db/connection';
-import { getStakingManager, getAffiliateDistributor } from './blockchain';
-import { getTeamVolume, getLargestLeg, getAllLegVolumes } from '../utils/referral-tree';
+import { getTeamVolume, getAllLegVolumes } from '../utils/referral-tree';
 
 // ============ Redis Connection ============
 
@@ -58,166 +56,17 @@ const RANK_SALARIES = [
     1_200, 4_000, 12_000, 40_000, 100_000,
 ];
 
-// ============ Compound Worker ============
-
-function createCompoundWorker(): Worker {
-    return new Worker(
-        'compounding',
-        async (job: Job) => {
-            const tier: number = job.data.tier;
-            console.log(`[CompoundWorker] Starting compound for tier ${tier}...`);
-
-            try {
-                // Query active stakes for this tier that are due for compounding
-                // TESTING intervals: Tier0=900s(15m), Tier1=600s(10m), Tier2=300s(5m)
-                // PRODUCTION intervals: Tier0=28800s(8h), Tier1=21600s(6h), Tier2=14400s(4h)
-                const result = await query(
-                    `SELECT s.user_address, s.stake_id_on_chain
-                     FROM stakes s
-                     WHERE s.is_active = TRUE
-                       AND s.tier = $1
-                       AND s.cap_reached = FALSE
-                       AND s.last_compound < NOW() - INTERVAL '1 second' *
-                           CASE
-                               WHEN $1 = 0 THEN 900
-                               WHEN $1 = 1 THEN 600
-                               WHEN $1 = 2 THEN 300
-                               ELSE 900
-                           END
-                     ORDER BY s.last_compound ASC`,
-                    [tier]
-                );
-
-                console.log(`[CompoundWorker] Found ${result.rows.length} stakes due for tier ${tier}`);
-
-                const stakingManager = getStakingManager(true);
-                if (!stakingManager) {
-                    console.warn('[CompoundWorker] Contracts not configured, skipping compound');
-                    return;
-                }
-                let successCount = 0;
-                let failCount = 0;
-
-                for (const row of result.rows) {
-                    try {
-                        // Estimate gas first
-                        const gasEstimate = await stakingManager.compoundFor.estimateGas(
-                            row.user_address,
-                            row.stake_id_on_chain
-                        );
-
-                        // Execute compound with 20% gas buffer
-                        const tx = await stakingManager.compoundFor(
-                            row.user_address,
-                            row.stake_id_on_chain,
-                            { gasLimit: (gasEstimate * BigInt(120)) / BigInt(100) }
-                        );
-
-                        await tx.wait();
-                        successCount++;
-                        console.log(`[CompoundWorker] Compounded: user=${row.user_address}, stakeId=${row.stake_id_on_chain}`);
-                    } catch (err: any) {
-                        failCount++;
-                        console.error(
-                            `[CompoundWorker] Failed to compound: user=${row.user_address}, stakeId=${row.stake_id_on_chain}:`,
-                            err.message || err
-                        );
-                    }
-                }
-
-                console.log(`[CompoundWorker] Tier ${tier} complete: ${successCount} success, ${failCount} failed`);
-            } catch (err) {
-                console.error(`[CompoundWorker] Error processing tier ${tier}:`, err);
-                throw err;
-            }
-        },
-        {
-            connection: getRedisConnection(),
-            concurrency: 1,
-        }
-    );
-}
-
-// ============ Compound All Stakes (runs before rank closing) ============
+// ============ DB-Only Rank Update (no on-chain signing) ============
 
 /**
- * Compound ALL active stakes across every tier during closing.
- * No interval filter — we attempt every active stake and let the
- * on-chain require(intervals > 0) handle timing naturally.
- * "No intervals passed" reverts are silently skipped.
+ * Update rank levels in the database based on team volume calculations.
+ * This is purely a DB operation — no on-chain transactions are signed.
+ * On-chain rank sync happens when users call checkRankChange() from the frontend.
  */
-async function compoundAllStakes(): Promise<void> {
-    console.log('[Closing] Compounding all active stakes before rank update...');
-
-    const stakingManager = getStakingManager(true);
-    if (!stakingManager) {
-        console.warn('[Closing] Contracts not configured, skipping compound-all');
-        return;
-    }
-
-    let totalSuccess = 0;
-    let totalSkipped = 0;
-    let totalFail = 0;
-
-    try {
-        // Query ALL active, non-capped stakes regardless of last_compound time
-        const result = await query(
-            `SELECT s.user_address, s.stake_id_on_chain, s.tier
-             FROM stakes s
-             WHERE s.is_active = TRUE
-               AND s.cap_reached = FALSE
-             ORDER BY s.tier ASC, s.last_compound ASC`
-        );
-
-        console.log(`[Closing] Found ${result.rows.length} active stakes to attempt compounding`);
-
-        for (const row of result.rows) {
-            try {
-                // estimateGas acts as a dry-run; if it reverts (not due, inactive, etc.) we skip
-                let gasEstimate: bigint;
-                try {
-                    gasEstimate = await stakingManager.compoundFor.estimateGas(
-                        row.user_address,
-                        row.stake_id_on_chain
-                    );
-                } catch {
-                    // Revert at estimation = not ready to compound, skip silently
-                    totalSkipped++;
-                    continue;
-                }
-
-                const tx = await stakingManager.compoundFor(
-                    row.user_address,
-                    row.stake_id_on_chain,
-                    { gasLimit: (gasEstimate * BigInt(150)) / BigInt(100) }
-                );
-                await tx.wait();
-                totalSuccess++;
-                console.log(`[Closing] Compounded: user=${row.user_address}, stakeId=${row.stake_id_on_chain}`);
-            } catch (err: any) {
-                totalFail++;
-                console.error(
-                    `[Closing] Compound tx failed: user=${row.user_address}, stakeId=${row.stake_id_on_chain}:`,
-                    err.message || err
-                );
-            }
-        }
-    } catch (err) {
-        console.error('[Closing] Error querying stakes for compounding:', err);
-    }
-
-    console.log(`[Closing] Compound-all complete: ${totalSuccess} compounded, ${totalSkipped} skipped (not due), ${totalFail} failed`);
-}
-
-// ============ Rank Update Core Logic ============
-
 export async function runRankUpdate(): Promise<void> {
-    console.log('[Closing] Rank update starting...');
+    console.log('[Closing] DB-only rank update starting...');
 
-    // Step 1: Compound all eligible stakes first — this distributes team dividends
-    await compoundAllStakes();
-
-    // Query all users that have team_volume > 0 or are referrers
+    // Query all users that have team volume (are referrers)
     const usersResult = await query(
         `SELECT DISTINCT u.wallet_address
          FROM users u
@@ -228,11 +77,6 @@ export async function runRankUpdate(): Promise<void> {
 
     console.log(`[Closing] Processing ${usersResult.rows.length} users for rank update`);
 
-    const affiliateDistributor = getAffiliateDistributor(true);
-    if (!affiliateDistributor) {
-        console.warn('[Closing] Contracts not configured, skipping rank update');
-        return;
-    }
     let updatedCount = 0;
 
     for (const row of usersResult.rows) {
@@ -252,7 +96,6 @@ export async function runRankUpdate(): Promise<void> {
             // For each rank, cap each leg at 50% of that rank's threshold.
             // Only qualify if the sum of capped legs meets the threshold.
             let rankLevel = 0;
-            let rankSalary = 0;
             for (let i = RANK_THRESHOLDS.length - 1; i >= 0; i--) {
                 const threshold = RANK_THRESHOLDS[i];
                 const maxPerLeg = threshold / 2; // 50% of THIS rank's target
@@ -264,76 +107,37 @@ export async function runRankUpdate(): Promise<void> {
 
                 if (qualifyingVol >= threshold) {
                     rankLevel = i + 1;
-                    rankSalary = RANK_SALARIES[i];
                     break;
                 }
             }
 
-            // Update rank in DB
+            // Update rank in DB only (no on-chain call)
             await query(
                 `UPDATE users SET rank_level = $1, team_volume = $2, updated_at = NOW()
                  WHERE wallet_address = $3`,
                 [rankLevel, teamVolumeStr, userAddr]
             );
 
-            // If user qualifies for rank salary, update on-chain
-            if (rankSalary > 0) {
-                try {
-                    const salaryWei = BigInt(rankSalary) * BigInt(10) ** BigInt(18);
-                    const tx = await affiliateDistributor.updateRankDividend(
-                        userAddr,
-                        salaryWei
-                    );
-                    await tx.wait();
-                    updatedCount++;
-                    console.log(`[Closing] Updated rank for ${userAddr}: level=${rankLevel}, salary=${rankSalary}`);
-                } catch (err: any) {
-                    console.error(`[Closing] On-chain rank update failed for ${userAddr}:`, err.message || err);
-                }
+            if (rankLevel > 0) {
+                updatedCount++;
+                console.log(`[Closing] DB rank updated for ${userAddr}: level=${rankLevel}`);
             }
         } catch (err: any) {
             console.error(`[Closing] Error processing user ${row.wallet_address}:`, err.message || err);
         }
     }
 
-    console.log(`[Closing] Rank update complete: ${updatedCount} users updated on-chain`);
-}
-
-// ============ Rank Calculator Worker ============
-
-function createRankUpdateWorker(): Worker {
-    return new Worker(
-        'rank-update',
-        async (_job: Job) => {
-            // Check if already triggered by event within this period
-            const lastRank = await getLastRun('closing:rank:lastRun');
-            const now = Math.floor(Date.now() / 1000);
-            if (now - lastRank < RANK_INTERVAL_SECS) {
-                console.log('[Worker] Rank update already triggered by event, skipping');
-                return;
-            }
-
-            try {
-                await runRankUpdate();
-                await setLastRun('closing:rank:lastRun', Math.floor(Date.now() / 1000));
-            } catch (err) {
-                console.error('[RankWorker] Error in rank calculation:', err);
-                throw err;
-            }
-        },
-        {
-            connection: getRedisConnection(),
-            concurrency: 1,
-        }
-    );
+    console.log(`[Closing] DB rank update complete: ${updatedCount} users updated`);
 }
 
 // ============ Event-Triggered Closing Check ============
 
 /**
- * Check if any closing period has elapsed and trigger immediately.
+ * Check if any closing period has elapsed and trigger DB-only rank update.
  * Called from the indexer after any user event (stake, unstake, harvest, subscribe).
  * Uses Redis locks to prevent concurrent closings.
+ * NOTE: No on-chain transactions are signed. Users trigger on-chain rank sync
+ * by calling checkRankChange() from the frontend (user pays gas).
  */
 export async function checkAndTriggerClosings(): Promise<void> {
     const now = Math.floor(Date.now() / 1000);
@@ -358,47 +162,23 @@ export async function checkAndTriggerClosings(): Promise<void> {
     }
 }
 
-// ============ Worker Lifecycle ============
-
-let workers: Worker[] = [];
+// ============ Worker Lifecycle (no-op — workers removed) ============
 
 /**
- * Start all BullMQ workers
+ * Start workers (no-op: all on-chain workers removed).
+ * Compounding and rank sync are now user-initiated from the frontend.
  */
 export async function startWorkers(): Promise<void> {
-    console.log('Starting BullMQ workers...');
-
-    const compoundWorker = createCompoundWorker();
-    const rankUpdateWorker = createRankUpdateWorker();
-
-    workers = [compoundWorker, rankUpdateWorker];
-
-    // Set up error handlers
-    for (const worker of workers) {
-        worker.on('failed', (job, err) => {
-            console.error(`[Worker:${worker.name}] Job ${job?.id} failed:`, err.message);
-        });
-
-        worker.on('completed', (job) => {
-            console.log(`[Worker:${worker.name}] Job ${job.id} completed`);
-        });
-
-        worker.on('error', (err) => {
-            console.error(`[Worker:${worker.name}] Worker error:`, err);
-        });
-    }
-
-    console.log('BullMQ workers started: compounding, rank-update');
+    console.log('[Workers] No backend workers needed — compounding and rank sync are user-initiated.');
 }
 
 /**
- * Gracefully close all workers
+ * Gracefully close workers (no-op)
  */
 export async function stopWorkers(): Promise<void> {
-    console.log('Stopping BullMQ workers...');
-    await Promise.all(workers.map((w) => w.close()));
     if (redisConnection) {
         redisConnection.disconnect();
+        redisConnection = null;
     }
-    console.log('BullMQ workers stopped.');
+    console.log('[Workers] Cleanup complete.');
 }

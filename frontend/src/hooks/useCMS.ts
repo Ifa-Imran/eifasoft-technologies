@@ -7,11 +7,13 @@ import { CoreMembershipSubscriptionABI } from '@/config/abis/CoreMembershipSubsc
 import { useToast } from '@/components/ui/Toast';
 import { formatUnits } from 'viem';
 import { useEffect } from 'react';
+import { usePostAction } from '@/hooks/usePostAction';
 
 export function useCMS() {
   const { address } = useAccount();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { runPostActionTasks } = usePostAction();
 
   // Global total subscriptions sold
   const { data: totalSubs, isLoading: countLoading, queryKey: totalSubsKey } = useReadContract({
@@ -173,6 +175,7 @@ export function useCMS() {
       queryClient.invalidateQueries({ queryKey: remainingKey });
       queryClient.invalidateQueries({ queryKey: claimableKey });
       queryClient.invalidateQueries({ queryKey: levelDetailsKey });
+      runPostActionTasks();
     }
   }, [subscribeSuccess]);
   useEffect(() => { if (subscribeError) toast({ type: 'error', title: 'Subscription failed' }); }, [subscribeError]);
@@ -182,6 +185,7 @@ export function useCMS() {
     if (claimSuccess) {
       toast({ type: 'success', title: 'CMS rewards claimed!' });
       queryClient.invalidateQueries({ queryKey: claimableKey });
+      runPostActionTasks();
     }
   }, [claimSuccess]);
   useEffect(() => { if (claimError) toast({ type: 'error', title: 'Claim failed' }); }, [claimError]);

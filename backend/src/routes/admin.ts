@@ -87,20 +87,7 @@ router.post('/admin/calculate-rank', async (req: Request, res: Response) => {
 
             const result = await calculateUserRank(address);
 
-            // Call on-chain updateRankDividend if rank changed
-            if (result.newRank !== result.previousRank) {
-                try {
-                    const affiliate = getAffiliateDistributor(true);
-                    if (!affiliate) throw new Error('Contracts not configured');
-                    const amountWei = await affiliate.calculateRankSalary(address.toLowerCase());
-                    if (amountWei > 0n) {
-                        const tx = await affiliate.updateRankDividend(address.toLowerCase(), amountWei);
-                        await tx.wait();
-                    }
-                } catch (err) {
-                    console.warn('On-chain rank update failed (will retry):', err);
-                }
-            }
+            // Rank sync is now user-initiated from frontend (checkRankChange)
 
             res.json({
                 success: true,

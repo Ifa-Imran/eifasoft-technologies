@@ -1,103 +1,16 @@
-import { Queue, Worker, QueueEvents } from 'bullmq';
-import IORedis from 'ioredis';
-import { config } from '../config';
-
-// ============ Redis Connection for BullMQ ============
-
-let redisConnection: IORedis | null = null;
-
-function getRedisConnection(): IORedis {
-    if (!redisConnection) {
-        redisConnection = new IORedis(config.redisUrl, {
-            maxRetriesPerRequest: null,
-            enableReadyCheck: false,
-        });
-        redisConnection.on('error', (err) => {
-            console.error('Redis connection error:', err);
-        });
-        redisConnection.on('connect', () => {
-            console.log('Redis connected for BullMQ');
-        });
-    }
-    return redisConnection;
-}
-
-// ============ Queue Definitions ============
-
 /**
- * Compounding queue - triggers compound for stakes based on tier intervals
- * TESTING: Tier 0: every 15m, Tier 1: every 10m, Tier 2: every 5m
- * PRODUCTION: Tier 0: every 8h, Tier 1: every 6h, Tier 2: every 4h
+ * Queue module (no-op).
+ * 
+ * All on-chain operations (compounding, rank sync) are now user-initiated
+ * from the frontend. The backend is read-only — no signing, no queues.
+ * 
+ * These exports remain for backward compatibility with index.ts imports.
  */
-export const compoundingQueue = new Queue('compounding', {
-    connection: getRedisConnection(),
-    defaultJobOptions: {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 5000 },
-        removeOnComplete: { count: 1000 },
-        removeOnFail: { count: 5000 },
-    },
-});
 
-/**
- * Rank update queue - recalculates rank qualifications
- * Runs every hour to check team volumes and 50% leg rule
- */
-export const rankUpdateQueue = new Queue('rank-update', {
-    connection: getRedisConnection(),
-    defaultJobOptions: {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 5000 },
-        removeOnComplete: { count: 100 },
-        removeOnFail: { count: 500 },
-    },
-});
-
-/**
- * Initialize recurring jobs (cron-style schedules)
- * Called once at startup
- */
 export async function initQueues(): Promise<void> {
-    console.log('Initializing BullMQ queues...');
-
-    // Compound Tier 0 every 15 minutes (TESTING - prod: 8 hours)
-    await compoundingQueue.upsertJobScheduler(
-        'compound-tier-0',
-        { every: 15 * 60 * 1000 },  // TESTING: 15m (prod: 8 * 60 * 60 * 1000)
-        { data: { tier: 0 }, name: 'compound-tier-0' }
-    );
-
-    // Compound Tier 1 every 10 minutes (TESTING - prod: 6 hours)
-    await compoundingQueue.upsertJobScheduler(
-        'compound-tier-1',
-        { every: 10 * 60 * 1000 },  // TESTING: 10m (prod: 6 * 60 * 60 * 1000)
-        { data: { tier: 1 }, name: 'compound-tier-1' }
-    );
-
-    // Compound Tier 2 every 5 minutes (TESTING - prod: 4 hours)
-    await compoundingQueue.upsertJobScheduler(
-        'compound-tier-2',
-        { every: 5 * 60 * 1000 },   // TESTING: 5m (prod: 4 * 60 * 60 * 1000)
-        { data: { tier: 2 }, name: 'compound-tier-2' }
-    );
-
-    // Rank salary update every 1 hour (TESTING) — production: 7 days
-    await rankUpdateQueue.upsertJobScheduler(
-        'hourly-rank-update',
-        { every: 1 * 60 * 60 * 1000 }, // TESTING: 1 hour (prod: 7 days)
-        { data: {}, name: 'hourly-rank-update' }
-    );
-
-    console.log('BullMQ queues initialized with scheduled jobs.');
+    console.log('[Queues] No queues needed — all on-chain operations are user-initiated.');
 }
 
-/**
- * Gracefully close all queue connections
- */
 export async function closeQueues(): Promise<void> {
-    await compoundingQueue.close();
-    await rankUpdateQueue.close();
-    if (redisConnection) {
-        redisConnection.disconnect();
-    }
+    // no-op
 }

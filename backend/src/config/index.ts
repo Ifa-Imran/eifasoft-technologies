@@ -9,7 +9,6 @@ interface Config {
     rpcUrl: string;
     rpcWsUrl: string;
     chainId: number;
-    indexerPrivateKey: string;
     contracts: {
         kairoToken: string;
         liquidityPool: string;
@@ -38,7 +37,6 @@ export const config: Config = {
     rpcUrl: requireEnv('RPC_URL'),
     rpcWsUrl: process.env.RPC_WS_URL || '',
     chainId: parseInt(process.env.CHAIN_ID || '5611', 10),
-    indexerPrivateKey: process.env.INDEXER_PRIVATE_KEY || '',
     contracts: {
         kairoToken: process.env.KAIRO_TOKEN_ADDRESS || '',
         liquidityPool: process.env.LIQUIDITY_POOL_ADDRESS || '',

@@ -1,4 +1,4 @@
-import { ethers, JsonRpcProvider, WebSocketProvider, Contract, Wallet } from 'ethers';
+import { ethers, JsonRpcProvider, WebSocketProvider, Contract } from 'ethers';
 import { config } from '../config';
 import {
     StakingManagerABI,
@@ -13,7 +13,6 @@ import {
 
 let httpProvider: JsonRpcProvider;
 let wsProvider: WebSocketProvider | null = null;
-let signer: Wallet | null = null;
 
 /**
  * Initialize blockchain providers
@@ -30,11 +29,6 @@ export function initProviders(): void {
             console.warn('WebSocket provider failed to initialize, falling back to HTTP polling:', err);
             wsProvider = null;
         }
-    }
-
-    if (config.indexerPrivateKey) {
-        signer = new Wallet(config.indexerPrivateKey, httpProvider);
-        console.log('Signer wallet initialized:', signer.address);
     }
 
     console.log('Blockchain providers initialized (chainId:', config.chainId, ')');
@@ -57,13 +51,6 @@ export function getWsProvider(): WebSocketProvider | null {
     return wsProvider;
 }
 
-/**
- * Get the signer wallet (for backend-triggered transactions)
- */
-export function getSigner(): Wallet | null {
-    return signer;
-}
-
 // ============ Contract Instances ============
 
 /**
@@ -74,28 +61,24 @@ export function areContractsConfigured(): boolean {
     return !!(c.kairoToken && c.liquidityPool && c.stakingManager && c.affiliateDistributor && c.cms && c.atomicP2p);
 }
 
-export function getStakingManager(useSigner = false): Contract | null {
+export function getStakingManager(): Contract | null {
     if (!config.contracts.stakingManager) return null;
-    const provider = useSigner && signer ? signer : getHttpProvider();
-    return new Contract(config.contracts.stakingManager, StakingManagerABI, provider);
+    return new Contract(config.contracts.stakingManager, StakingManagerABI, getHttpProvider());
 }
 
-export function getAffiliateDistributor(useSigner = false): Contract | null {
+export function getAffiliateDistributor(): Contract | null {
     if (!config.contracts.affiliateDistributor) return null;
-    const provider = useSigner && signer ? signer : getHttpProvider();
-    return new Contract(config.contracts.affiliateDistributor, AffiliateDistributorABI, provider);
+    return new Contract(config.contracts.affiliateDistributor, AffiliateDistributorABI, getHttpProvider());
 }
 
-export function getCMS(useSigner = false): Contract | null {
+export function getCMS(): Contract | null {
     if (!config.contracts.cms) return null;
-    const provider = useSigner && signer ? signer : getHttpProvider();
-    return new Contract(config.contracts.cms, CoreMembershipSubscriptionABI, provider);
+    return new Contract(config.contracts.cms, CoreMembershipSubscriptionABI, getHttpProvider());
 }
 
-export function getAtomicP2p(useSigner = false): Contract | null {
+export function getAtomicP2p(): Contract | null {
     if (!config.contracts.atomicP2p) return null;
-    const provider = useSigner && signer ? signer : getHttpProvider();
-    return new Contract(config.contracts.atomicP2p, AtomicP2pABI, provider);
+    return new Contract(config.contracts.atomicP2p, AtomicP2pABI, getHttpProvider());
 }
 
 export function getKAIROToken(): Contract | null {

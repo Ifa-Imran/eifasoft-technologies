@@ -1,0 +1,13 @@
+﻿{
+    "name":  "kairo-dev",
+    "status":  "running(5)",
+    "state":  "running",
+    "path":  "/docker/kairo-dev/docker-compose.yml",
+    "containers":  [
+                       "@{id=40a56308c8e5; name=kairo-dev-backend-1; image=node:18-alpine; command=\"docker-entrypoint.s…\"; status=Up 6 minutes; state=running; health=; ports=System.Object[]; stats=}",
+                       "@{id=611af8318b91; name=kairo-dev-frontend-1; image=node:18-alpine; command=\"docker-entrypoint.s…\"; status=Up 6 minutes; state=running; health=; ports=System.Object[]; stats=}",
+                       "@{id=9a039dc0e7d8; name=kairo-dev-postgres-1; image=postgres:14-alpine; command=\"docker-entrypoint.s…\"; status=Up 6 minutes (healthy); state=running; health=healthy; ports=System.Object[]; stats=}",
+                       "@{id=207885eeba51; name=kairo-dev-redis-1; image=redis:7-alpine; command=\"docker-entrypoint.s…\"; status=Up 6 minutes (healthy); state=running; health=healthy; ports=System.Object[]; stats=}",
+                       "@{id=435ed54c1e38; name=kairo-dev-traefik-1; image=traefik:latest; command=\"/entrypoint.sh --ap…\"; status=Up 6 minutes; state=running; health=; ports=System.Object[]; stats=}"
+                   ]
+}
