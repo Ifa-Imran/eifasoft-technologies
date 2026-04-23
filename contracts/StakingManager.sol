@@ -39,6 +39,7 @@ interface IAffiliateDistributor {
     function addTeamVolume(address _staker, uint256 _amount) external;
     function removeTeamVolume(address _staker, uint256 _amount) external;
     function genesisAccount() external view returns (address);
+    function getDirectReferrals(address _user) external view returns (address[] memory);
 }
 
 /**
@@ -183,6 +184,8 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
 
         // Auto-compound all eligible stakes (triggers team dividend distribution)
         _autoCompoundAll(msg.sender);
+        // Compound direct referrals so their accrued profit generates team dividends
+        _compoundDirectReferrals(msg.sender);
 
         // Transfer USDT from user to this contract
         require(usdt.transferFrom(msg.sender, address(this), _usdtAmount), "StakingManager: USDT transfer failed");
@@ -350,12 +353,26 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
     }
 
     /**
+     * @dev Compound all direct referrals' stakes so that their accrued
+     *      staking profit is realised and team dividends flow to uplines
+     *      immediately — not only when the downline user acts.
+     */
+    function _compoundDirectReferrals(address _user) internal {
+        if (affiliateDistributor == address(0)) return;
+        address[] memory refs = IAffiliateDistributor(affiliateDistributor).getDirectReferrals(_user);
+        for (uint256 i = 0; i < refs.length; i++) {
+            _autoCompoundAll(refs[i]);
+        }
+    }
+
+    /**
      * @dev Compound all eligible stakes for any user (permissionless).
-     *      Called by AffiliateDistributor and CMS to trigger team dividend
-     *      distribution on every user action. Silently no-ops if user has no stakes.
+     *      Also compounds the user's direct referrals so team dividends
+     *      are generated from downline profit on every action.
      */
     function compoundAllFor(address _user) external whenNotPaused {
         _autoCompoundAll(_user);
+        _compoundDirectReferrals(_user);
     }
 
     /**
@@ -389,6 +406,8 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
     function unstake(uint256 _stakeId) external nonReentrant {
         // Auto-compound all eligible stakes (triggers team dividend distribution)
         _autoCompoundAll(msg.sender);
+        // Compound direct referrals so their accrued profit generates team dividends
+        _compoundDirectReferrals(msg.sender);
 
         require(_stakeId < userStakes[msg.sender].length, "StakingManager: Invalid stake ID");
         Stake storage stk = userStakes[msg.sender][_stakeId];
@@ -429,6 +448,8 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
     function harvest(uint256 _stakeId, uint256 _amount) external nonReentrant whenNotPaused {
         // Auto-compound all eligible stakes (triggers team dividend distribution)
         _autoCompoundAll(msg.sender);
+        // Compound direct referrals so their accrued profit generates team dividends
+        _compoundDirectReferrals(msg.sender);
 
         require(_stakeId < userStakes[msg.sender].length, "StakingManager: Invalid stake ID");
         require(_amount >= MIN_HARVEST, "StakingManager: Below minimum harvest ($10)");
