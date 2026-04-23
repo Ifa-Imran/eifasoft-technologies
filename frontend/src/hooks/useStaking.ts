@@ -7,14 +7,14 @@ import { useToast } from '@/components/ui/Toast';
 import { Address } from 'viem';
 import { useEffect, useRef, useCallback, useState } from 'react';
 import type { StakeInfo } from '@/hooks/useUserStakes';
-import { usePostAction } from '@/hooks/usePostAction';
+// usePostAction removed — v29 contracts auto-compound on every action
 
 export function useStaking() {
   const { toast } = useToast();
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const [harvesting, setHarvesting] = useState(false);
-  const { runPostActionTasks } = usePostAction();
+
 
   const { writeContractAsync } = useWriteContract();
 
@@ -24,9 +24,10 @@ export function useStaking() {
   const { isSuccess: stakeSuccess, isError: stakeError } = useWaitForTransactionReceipt({ hash: stakeHash });
   const { isSuccess: unstakeSuccess, isError: unstakeError } = useWaitForTransactionReceipt({ hash: unstakeHash });
 
-  useEffect(() => { if (stakeSuccess) { toast({ type: 'success', title: 'Staked successfully!' }); runPostActionTasks(); } }, [stakeSuccess]);
+  // No post-action tasks needed: v29 contracts auto-compound inside stake/unstake/harvest
+  useEffect(() => { if (stakeSuccess) toast({ type: 'success', title: 'Staked successfully!' }); }, [stakeSuccess]);
   useEffect(() => { if (stakeError) toast({ type: 'error', title: 'Stake failed' }); }, [stakeError]);
-  useEffect(() => { if (unstakeSuccess) { toast({ type: 'success', title: 'Unstaked successfully!' }); runPostActionTasks(); } }, [unstakeSuccess]);
+  useEffect(() => { if (unstakeSuccess) toast({ type: 'success', title: 'Unstaked successfully!' }); }, [unstakeSuccess]);
   useEffect(() => { if (unstakeError) toast({ type: 'error', title: 'Unstake failed' }); }, [unstakeError]);
 
   const stake = async (amount: bigint, referrer: Address) => {
@@ -45,29 +46,13 @@ export function useStaking() {
 
   /**
    * Harvest flow:
-   * 1. Silently compound all eligible stakes (makes pending profit harvestable on-chain)
-   * 2. Then harvest all harvestable amounts from each stake
+   * v29 contract auto-compounds all stakes inside harvest(), so we just call
+   * harvest() for each stake — single sign per stake, no separate compound needed.
    */
   const harvestTier = useCallback(async (tierStakes: StakeInfo[]) => {
     if (!publicClient || !address) return;
     setHarvesting(true);
     try {
-      // Step 1: Silently compound eligible stakes to move pending profit on-chain
-      const compoundable = tierStakes.filter((s) => s.canCompound);
-      if (compoundable.length > 0) {
-        toast({ type: 'pending', title: 'Preparing harvest...', description: 'Syncing pending rewards' });
-        for (const s of compoundable) {
-          const hash = await writeContractAsync({
-            address: contracts.stakingManager,
-            abi: StakingManagerABI,
-            functionName: 'compound',
-            args: [BigInt(s.index)],
-          });
-          await publicClient.waitForTransactionReceipt({ hash });
-        }
-      }
-
-      // Step 2: Re-read harvestable amounts after compound and harvest
       const harvestable = tierStakes.filter((s) => s.harvestable > 0n || s.canCompound);
       if (harvestable.length > 0) {
         toast({ type: 'pending', title: 'Harvesting...', description: `Harvesting from ${harvestable.length} stake(s)` });
@@ -81,11 +66,10 @@ export function useStaking() {
             });
             await publicClient.waitForTransactionReceipt({ hash });
           } catch {
-            // Skip stakes that fail (e.g. nothing to harvest after compound)
+            // Skip stakes that fail (e.g. nothing to harvest)
           }
         }
         toast({ type: 'success', title: 'Harvest complete!' });
-        runPostActionTasks();
       } else {
         toast({ type: 'error', title: 'Nothing to harvest yet' });
       }
