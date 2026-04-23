@@ -14,6 +14,10 @@ async function main() {
     const systemWallet = process.env.SYSTEM_WALLET || deployer.address;
     console.log("System Wallet:", systemWallet);
 
+    // Development fund wallet (5% of staking USDT)
+    const devFundWallet = process.env.DEV_FUND_WALLET || systemWallet;
+    console.log("Dev Fund Wallet:", devFundWallet);
+
     // DAO wallets: use env vars for production, deployer address as fallback for testnet
     const daoWallets = [
         process.env.DAO_WALLET_1 || deployer.address,
@@ -107,7 +111,7 @@ async function main() {
         kairoAddress,
         liquidityPoolAddress,
         usdtAddress,
-        systemWallet,
+        devFundWallet,
         daoWallets,
         deployer.address
     );

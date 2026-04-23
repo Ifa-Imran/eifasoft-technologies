@@ -37,28 +37,20 @@ const config: HardhatUserConfig = {
     currency: "USD",
   },
   etherscan: {
-    apiKey: {
-      opbnbTestnet: process.env.OPBNB_API_KEY || "",
-      opbnbMainnet: process.env.OPBNB_API_KEY || "",
-    },
+    apiKey: "NICW8RM1VDUM6VHMZ5JWBUPR5689IT8H9H",
     customChains: [
-      {
-        network: "opbnbTestnet",
-        chainId: 5611,
-        urls: {
-          apiURL: "https://open-platform.nodereal.io/apiKey/op-bnb-testnet/contract/",
-          browserURL: "https://testnet.opbnbscan.com/",
-        },
-      },
       {
         network: "opbnbMainnet",
         chainId: 204,
         urls: {
-          apiURL: "https://open-platform.nodereal.io/apiKey/op-bnb-mainnet/contract/",
+          apiURL: "https://api-opbnb.bscscan.com/api",
           browserURL: "https://opbnbscan.com/",
         },
       },
     ],
+  },
+  sourcify: {
+    enabled: false,
   },
 };
 

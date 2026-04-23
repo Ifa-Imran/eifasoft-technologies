@@ -58,6 +58,44 @@ export default function Home() {
         </GlassCard>
       </section>
 
+      {/* Verified Contract Addresses */}
+      <section className="py-16">
+        <div className="max-w-4xl mx-auto px-4">
+          <h2 className="text-2xl md:text-3xl font-orbitron font-bold text-center text-surface-900 mb-2">
+            Verified <span className="gradient-text">Smart Contracts</span>
+          </h2>
+          <p className="text-center text-surface-500 text-sm mb-8">
+            All contracts are verified and open-source on opBNB Mainnet (Chain 204)
+          </p>
+          <div className="space-y-2">
+            {[
+              { name: 'KAIRO Token', address: '0x3DA7B98DE7085eda9b991fAD4762b274E9ADb496' },
+              { name: 'Liquidity Pool', address: '0xe3084fadF0db28F5f97162da1dde542a50cBc264' },
+              { name: 'Staking Manager', address: '0xB6724041A765e0BE0B212dB57Ff317cCEF5A1EDd' },
+              { name: 'Affiliate Distributor', address: '0xf53C1735e345dEBe19a3168BFE6AA3CC07FdBCD6' },
+              { name: 'CMS (Membership)', address: '0x04Ecd8106bEcd7FFee528F363dD2121343296F2e' },
+              { name: 'Atomic P2P Exchange', address: '0x12a2e94da17e90fa2A36F7C311c4B0A22300e46E' },
+              { name: 'USDT (opBNB)', address: '0x9e5AAC1Ba1a2e6aEd6b32689DFcF62A509Ca96f3' },
+            ].map((contract) => (
+              <a
+                key={contract.address}
+                href={`https://opbnbscan.com/address/${contract.address}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-4 px-4 py-3 rounded-xl border border-surface-200 bg-white/60 hover:border-primary-300 hover:bg-primary-50/30 transition-all group"
+              >
+                <span className="text-sm font-semibold text-surface-700 group-hover:text-primary-600 transition-colors">
+                  {contract.name}
+                </span>
+                <span className="font-mono text-xs text-surface-400 group-hover:text-primary-500 transition-colors break-all">
+                  {contract.address}
+                </span>
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <footer className="py-8 text-center border-t border-surface-200">
         <p className="text-surface-400 text-sm">
           &copy; {new Date().getFullYear()} KAIRO DAO &middot; Aurora Financial Ecosystem
