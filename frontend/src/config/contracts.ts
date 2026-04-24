@@ -12,7 +12,7 @@ export const contracts = {
   usdt: (process.env.NEXT_PUBLIC_USDT || '0x') as Address,
 } as const;
 
-export const EXPLORER_URL = 'https://opbnbscan.com';
+export const EXPLORER_URL = 'https://opbnb.bscscan.com';
 
 export function getExplorerTxUrl(hash: string) {
   return `${EXPLORER_URL}/tx/${hash}`;

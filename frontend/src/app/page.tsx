@@ -79,7 +79,7 @@ export default function Home() {
             ].map((contract) => (
               <a
                 key={contract.address}
-                href={`https://opbnbscan.com/address/${contract.address}`}
+                href={`https://opbnb.bscscan.com/address/${contract.address}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-4 px-4 py-3 rounded-xl border border-surface-200 bg-white/60 hover:border-primary-300 hover:bg-primary-50/30 transition-all group"

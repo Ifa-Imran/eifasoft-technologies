@@ -18,7 +18,7 @@ export const opBNBMainnet = defineChain({
   blockExplorers: {
     default: {
       name: 'opBNBScan',
-      url: 'https://opbnbscan.com',
+      url: 'https://opbnb.bscscan.com',
     },
   },
   contracts: {
