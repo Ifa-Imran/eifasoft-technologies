@@ -19,7 +19,7 @@ export function ReferralWidget() {
     : '';
 
   const currentRank = rankInfo ? Number(rankInfo[0] || 0) : 0;
-  const rankName = RANK_NAMES[currentRank] || 'None';
+  const rankName = RANK_NAMES[currentRank] || 'USER';
   const referralCount = ((directReferrals as any[]) || []).length;
   const teamVolumeUsd = teamVolume ? Number(formatUnits(teamVolume as bigint, USDT_DECIMALS)) : 0;
 

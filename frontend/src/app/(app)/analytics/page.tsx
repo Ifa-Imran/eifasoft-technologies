@@ -301,10 +301,10 @@ export default function AnalyticsPage() {
               <p className="text-lg font-mono font-bold text-success-700">${formatCompact(poolUsdt, 2)}</p>
             </div>
           </div>
-          {poolKairo > 0 && poolUsdt > 0 && (
+          {totalSupplyNum > 0 && (
             <div className="mt-3 p-3 rounded-xl bg-gradient-to-r from-surface-50 to-primary-50/30 border border-surface-200 text-center">
-              <p className="text-[10px] uppercase tracking-wider text-surface-400">Implied Price (Pool)</p>
-              <p className="text-lg font-mono font-bold text-surface-900">${(poolUsdt / poolKairo).toFixed(2)}</p>
+              <p className="text-[10px] uppercase tracking-wider text-surface-400">Price (USDT / Total Supply)</p>
+              <p className="text-lg font-mono font-bold text-surface-900">${(poolUsdt / totalSupplyNum).toFixed(6)}</p>
             </div>
           )}
         </GlassCard>

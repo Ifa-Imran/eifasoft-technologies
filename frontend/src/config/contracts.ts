@@ -30,7 +30,7 @@ export const STAKING_TIERS = [
 ] as const;
 
 export const RANK_NAMES = [
-  'None', 'Associate', 'Executive', 'Director', 'Vice President',
+  'USER', 'Associate', 'Executive', 'Director', 'Vice President',
   'Senior VP', 'Managing Director', 'Partner', 'Senior Partner',
   'Global Leader', 'Chairman',
 ] as const;

@@ -33,7 +33,7 @@ export default function RankDividendPage() {
   }
 
   const currentRank = liveRank;
-  const rankName = RANK_NAMES[currentRank] || 'None';
+  const rankName = RANK_NAMES[currentRank] || 'USER';
 
   // Harvestable rank salary (auto-accrues every period, includes pending)
   const harvestableRank = totalRankHarvestable || (allIncome ? BigInt(allIncome[2] || 0) : 0n);

@@ -82,34 +82,34 @@ export default function TeamDividendPage() {
       </div>
 
       {/* Overview Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
         <GlassCard padding="p-4">
           <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Unlocked Levels</p>
-          <p className="text-2xl font-mono font-bold text-primary-700">{unlockedLevels} <span className="text-sm text-surface-400">/ 15</span></p>
+          <p className="text-xl sm:text-2xl font-mono font-bold text-primary-700">{unlockedLevels} <span className="text-sm text-surface-400">/ 15</span></p>
           <ProgressBar value={unlockedLevels} max={15} variant="cyan" size="sm" className="mt-2" />
         </GlassCard>
         <GlassCard padding="p-4">
           <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Direct Referrals</p>
-          <p className="text-2xl font-mono font-bold text-secondary-700">{referralsList.length}</p>
+          <p className="text-xl sm:text-2xl font-mono font-bold text-secondary-700">{referralsList.length}</p>
           <p className="text-xs text-surface-400 mt-1">
             {activeDirects} active / {referralsList.length < 10 ? `${directsNeededForLevel(unlockedLevels + 1) - referralsList.length} more for next level` : 'Max levels unlocked'}
           </p>
         </GlassCard>
         <GlassCard padding="p-4">
           <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Direct Business</p>
-          <p className="text-2xl font-mono font-bold text-primary-700">
+          <p className="text-xl sm:text-2xl font-mono font-bold text-primary-700">
             {teamLevelLoading ? '...' : (teamAnalytics?.directBusinessFormatted || '$0')}
           </p>
           <p className="text-xs text-surface-400 mt-1">Referral stakes</p>
         </GlassCard>
         <GlassCard padding="p-4">
           <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Team Volume</p>
-          <p className="text-2xl font-mono font-bold text-surface-900">${formatCompact(teamVolumeUsd, 2)}</p>
+          <p className="text-xl sm:text-2xl font-mono font-bold text-surface-900">${formatCompact(teamVolumeUsd, 2)}</p>
           <p className="text-xs text-surface-400 mt-1">Total downline volume</p>
         </GlassCard>
         <GlassCard padding="p-4">
           <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Team Dividend</p>
-          <p className="text-2xl font-mono font-bold text-accent-700">${teamDividendBalance.toFixed(2)}</p>
+          <p className="text-xl sm:text-2xl font-mono font-bold text-accent-700">${teamDividendBalance.toFixed(2)}</p>
           <Button
             size="sm"
             onClick={() => harvestIncome(1)}
@@ -135,16 +135,16 @@ export default function TeamDividendPage() {
           Unlock levels by adding direct referrals: 1-5 directs = 1-5 levels, then each additional direct = 2 more levels (max 15 at 10 directs).
         </p>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto -mx-4 sm:mx-0">
+          <table className="w-full text-xs sm:text-sm min-w-[540px]">
             <thead>
               <tr className="border-b border-surface-200">
-                <th className="text-left py-3 px-2 text-surface-500 font-medium">Level</th>
-                <th className="text-center py-3 px-2 text-surface-500 font-medium">Rate</th>
-                <th className="text-center py-3 px-2 text-surface-500 font-medium">Members</th>
-                <th className="text-right py-3 px-2 text-surface-500 font-medium">Team Business</th>
-                <th className="text-right py-3 px-2 text-surface-500 font-medium">Earned</th>
-                <th className="text-center py-3 px-2 text-surface-500 font-medium">Status</th>
+                <th className="text-left py-2 sm:py-3 px-2 text-surface-500 font-medium">Level</th>
+                <th className="text-center py-2 sm:py-3 px-2 text-surface-500 font-medium">Rate</th>
+                <th className="text-center py-2 sm:py-3 px-2 text-surface-500 font-medium">Members</th>
+                <th className="text-right py-2 sm:py-3 px-2 text-surface-500 font-medium">Business</th>
+                <th className="text-right py-2 sm:py-3 px-2 text-surface-500 font-medium">Earned</th>
+                <th className="text-center py-2 sm:py-3 px-2 text-surface-500 font-medium">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -166,7 +166,7 @@ export default function TeamDividendPage() {
                           : ''
                     }`}
                   >
-                    <td className="py-3 px-2">
+                    <td className="py-2 sm:py-3 px-2">
                       <div className="flex items-center gap-2">
                         <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
                           isActive
@@ -185,24 +185,24 @@ export default function TeamDividendPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="py-3 px-2 text-center">
+                    <td className="py-2 sm:py-3 px-2 text-center">
                       <span className="font-mono font-bold text-accent-600">{levelPercent(i)}</span>
                     </td>
-                    <td className="py-3 px-2 text-center">
+                    <td className="py-2 sm:py-3 px-2 text-center">
                       {teamLevelLoading ? (
                         <span className="text-surface-300 animate-pulse">...</span>
                       ) : (
                         <span className="font-mono font-semibold text-surface-700">{stats?.members || 0}</span>
                       )}
                     </td>
-                    <td className="py-3 px-2 text-right">
+                    <td className="py-2 sm:py-3 px-2 text-right">
                       {teamLevelLoading ? (
                         <span className="text-surface-300 animate-pulse">...</span>
                       ) : (
                         <span className="font-mono text-surface-700">{stats?.totalBusinessFormatted || '$0'}</span>
                       )}
                     </td>
-                    <td className="py-3 px-2 text-right">
+                    <td className="py-2 sm:py-3 px-2 text-right">
                       {teamLevelLoading ? (
                         <span className="text-surface-300 animate-pulse">...</span>
                       ) : (
@@ -213,7 +213,7 @@ export default function TeamDividendPage() {
                         </span>
                       )}
                     </td>
-                    <td className="py-3 px-2 text-center">
+                    <td className="py-2 sm:py-3 px-2 text-center">
                       {isActive ? (
                         <span className="inline-flex items-center gap-1 text-success-600 text-xs font-semibold">
                           <LockOpenIcon className="w-3.5 h-3.5" /> Active
@@ -235,14 +235,14 @@ export default function TeamDividendPage() {
             {/* Totals row */}
             <tfoot>
               <tr className="border-t-2 border-surface-300 bg-surface-50">
-                <td className="py-3 px-2 font-semibold text-surface-700" colSpan={2}>Total</td>
-                <td className="py-3 px-2 text-center font-mono font-bold text-surface-800">
+                <td className="py-2 sm:py-3 px-2 font-semibold text-surface-700" colSpan={2}>Total</td>
+                <td className="py-2 sm:py-3 px-2 text-center font-mono font-bold text-surface-800">
                   {teamLevelLoading ? '...' : teamLevelStats.reduce((sum, s) => sum + s.members, 0)}
                 </td>
-                <td className="py-3 px-2 text-right font-mono font-bold text-surface-800">
+                <td className="py-2 sm:py-3 px-2 text-right font-mono font-bold text-surface-800">
                   {teamLevelLoading ? '...' : `$${teamLevelStats.reduce((sum, s) => sum + Number(formatUnits(s.totalBusiness, USDT_DECIMALS)), 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
                 </td>
-                <td className="py-3 px-2 text-right font-mono font-bold text-accent-700">
+                <td className="py-2 sm:py-3 px-2 text-right font-mono font-bold text-accent-700">
                   {teamLevelLoading ? '...' : `$${teamLevelStats.reduce((sum, s) => sum + Number(formatUnits(s.totalEarned, USDT_DECIMALS)), 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
                 </td>
                 <td></td>
@@ -259,7 +259,7 @@ export default function TeamDividendPage() {
           You have <span className="font-semibold text-primary-600">{referralsList.length}</span> direct referrals,
           unlocking <span className="font-semibold text-primary-600">{unlockedLevels} / 15</span> team dividend levels.
         </p>
-        <div className="grid grid-cols-5 sm:grid-cols-5 md:grid-cols-15 gap-2">
+        <div className="grid grid-cols-5 sm:grid-cols-5 lg:grid-cols-15 gap-1.5 sm:gap-2">
           {Array.from({ length: 15 }, (_, i) => {
             const level = i + 1;
             const isActive = level <= unlockedLevels;
@@ -308,15 +308,15 @@ export default function TeamDividendPage() {
           <p className="text-xs text-surface-500 mb-4">
             Each direct referral forms a &quot;leg&quot;. Their total downstream volume contributes to your team volume and rank qualification.
           </p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <table className="w-full text-xs sm:text-sm min-w-[480px]">
               <thead>
                 <tr className="border-b border-surface-200">
-                  <th className="text-left py-3 px-3 text-surface-500 font-medium">#</th>
-                  <th className="text-left py-3 px-3 text-surface-500 font-medium">Referral</th>
-                  <th className="text-right py-3 px-3 text-surface-500 font-medium">Self Stake</th>
-                  <th className="text-right py-3 px-3 text-surface-500 font-medium">Leg Volume</th>
-                  <th className="py-3 px-3 text-surface-500 font-medium">Share</th>
+                  <th className="text-left py-2 sm:py-3 px-2 sm:px-3 text-surface-500 font-medium">#</th>
+                  <th className="text-left py-2 sm:py-3 px-2 sm:px-3 text-surface-500 font-medium">Referral</th>
+                  <th className="text-right py-2 sm:py-3 px-2 sm:px-3 text-surface-500 font-medium">Self Stake</th>
+                  <th className="text-right py-2 sm:py-3 px-2 sm:px-3 text-surface-500 font-medium">Leg Volume</th>
+                  <th className="py-2 sm:py-3 px-2 sm:px-3 text-surface-500 font-medium">Share</th>
                 </tr>
               </thead>
               <tbody>
@@ -324,21 +324,21 @@ export default function TeamDividendPage() {
                   const share = teamVolumeUsd > 0 ? (leg.volumeUsd / teamVolumeUsd) * 100 : 0;
                   return (
                     <tr key={i} className="border-b border-surface-100 hover:bg-primary-50/30 transition-colors">
-                      <td className="py-3 px-3">
-                        <span className="w-6 h-6 rounded-full bg-gradient-to-br from-primary-400 to-secondary-400 flex items-center justify-center text-xs font-bold text-white">
+                      <td className="py-2 sm:py-3 px-2 sm:px-3">
+                        <span className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-gradient-to-br from-primary-400 to-secondary-400 flex items-center justify-center text-[10px] sm:text-xs font-bold text-white">
                           {i + 1}
                         </span>
                       </td>
-                      <td className="py-3 px-3 font-mono text-surface-600 text-xs">
+                      <td className="py-2 sm:py-3 px-2 sm:px-3 font-mono text-surface-600 text-[10px] sm:text-xs">
                         {shortenAddress(leg.address)}
                       </td>
-                      <td className="py-3 px-3 text-right font-mono font-semibold text-primary-600">
+                      <td className="py-2 sm:py-3 px-2 sm:px-3 text-right font-mono font-semibold text-primary-600">
                         ${formatCompact(leg.ownStakeUsd, 2)}
                       </td>
-                      <td className="py-3 px-3 text-right font-mono font-semibold text-surface-700">
+                      <td className="py-2 sm:py-3 px-2 sm:px-3 text-right font-mono font-semibold text-surface-700">
                         ${formatCompact(leg.volumeUsd, 2)}
                       </td>
-                      <td className="py-3 px-3">
+                      <td className="py-2 sm:py-3 px-2 sm:px-3">
                         <div className="flex items-center gap-2">
                           <div className="w-full max-w-[80px] h-2 rounded-full bg-surface-100 overflow-hidden">
                             <div

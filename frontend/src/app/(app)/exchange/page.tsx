@@ -28,7 +28,7 @@ export default function ExchangePage() {
   const { activeBuyOrders, activeSellOrders, currentPrice, createBuyOrder, createSellOrder, cancelBuyOrder, cancelSellOrder, sellToOrder, buyFromOrder, isPending } = useP2P();
   const { kairoFormatted, usdtFormatted } = useTokenBalances();
   const { price: livePrice } = useKairoPrice();
-  const { orderBookStats, p2pLiquidity } = useGlobalStats();
+  const { orderBookStats } = useGlobalStats();
   const usdtApproval = useApproval(contracts.usdt, contracts.atomicP2p);
   const kairoApproval = useApproval(contracts.kairoToken, contracts.atomicP2p);
   const pendingOrderRef = useRef<'buy' | 'sell' | null>(null);
@@ -101,8 +101,7 @@ export default function ExchangePage() {
   const totalSellVolume = activeSellOrders.reduce((sum: number, o) => sum + Number(formatUnits(o.kairoRemaining, KAIRO_DECIMALS)), 0);
   const p2pFilledTrades = orderBookStats ? Number(orderBookStats[2] || 0) : 0;
   const p2pTotalVolume = orderBookStats ? Number(formatUnits(BigInt(orderBookStats[3] || 0), USDT_DECIMALS)) : 0;
-  const p2pLockedUsdt = p2pLiquidity ? Number(formatUnits(BigInt(p2pLiquidity[0] || 0), USDT_DECIMALS)) : 0;
-  const p2pLockedKairo = p2pLiquidity ? Number(formatUnits(BigInt(p2pLiquidity[1] || 0), KAIRO_DECIMALS)) : 0;
+
 
   // My orders
   const myBuyOrders = activeBuyOrders.filter((o) => o.creator?.toLowerCase() === address?.toLowerCase());
@@ -151,7 +150,7 @@ export default function ExchangePage() {
       </div>
 
       {/* Market Overview Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <GlassCard padding="p-4" variant="cyan">
           <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Buy Orders</p>
           <p className="text-xl font-mono font-bold text-surface-900">{activeBuyOrders.length}</p>
@@ -166,11 +165,6 @@ export default function ExchangePage() {
           <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Filled Trades</p>
           <p className="text-xl font-mono font-bold text-primary-600">{p2pFilledTrades}</p>
           <p className="text-xs text-surface-500">${p2pTotalVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} vol</p>
-        </GlassCard>
-        <GlassCard padding="p-4">
-          <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Locked Liquidity</p>
-          <p className="text-xl font-mono font-bold text-accent-600">${p2pLockedUsdt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-          <p className="text-xs text-surface-500">{p2pLockedKairo.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KAIRO</p>
         </GlassCard>
       </div>
 
