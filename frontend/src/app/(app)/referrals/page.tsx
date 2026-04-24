@@ -87,46 +87,46 @@ export default function RankDividendPage() {
       <GlassCard variant="gradient" padding="p-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           {/* Current Rank */}
-          <div className="text-center p-4 rounded-2xl bg-white/60 border-2 border-primary-200/50 shadow-sm">
-            <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center mx-auto mb-3 shadow-lg shadow-primary-400/30">
-              <TrophyIcon className="w-6 h-6 text-white" />
+          <div className="text-center p-3 sm:p-4 rounded-2xl bg-white/60 border-2 border-primary-200/50 shadow-sm overflow-hidden">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl gradient-primary flex items-center justify-center mx-auto mb-2 sm:mb-3 shadow-lg shadow-primary-400/30">
+              <TrophyIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
             <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Current Rank</p>
-            <p className="text-2xl font-orbitron font-bold gradient-text">{rankName}</p>
+            <p className="text-base sm:text-xl md:text-2xl font-orbitron font-bold gradient-text truncate">{rankName}</p>
             <Badge tier="purple" size="sm">Level {currentRank} / 10</Badge>
           </div>
 
           {/* Rank Salary */}
-          <div className="text-center p-4 rounded-2xl bg-white/60 border-2 border-accent-200/50 shadow-sm">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-400 to-accent-300 flex items-center justify-center mx-auto mb-3 shadow-lg shadow-accent-300/30">
-              <CurrencyDollarIcon className="w-6 h-6 text-white" />
+          <div className="text-center p-3 sm:p-4 rounded-2xl bg-white/60 border-2 border-accent-200/50 shadow-sm overflow-hidden">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-accent-400 to-accent-300 flex items-center justify-center mx-auto mb-2 sm:mb-3 shadow-lg shadow-accent-300/30">
+              <CurrencyDollarIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
             <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Rank Salary</p>
-            <p className="text-2xl font-mono font-bold text-accent-700">
+            <p className="text-base sm:text-xl md:text-2xl font-mono font-bold text-accent-700 truncate">
               ${rankSalary ? Number(formatUnits(rankSalary, USDT_DECIMALS)).toFixed(2) : '0.00'}
             </p>
             <p className="text-[10px] text-surface-400">per period</p>
           </div>
 
           {/* Harvestable Salary */}
-          <div className="text-center p-4 rounded-2xl bg-white/60 border-2 border-success-200/50 shadow-sm">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-success-400 to-success-300 flex items-center justify-center mx-auto mb-3 shadow-lg shadow-success-300/30">
-              <ArrowTrendingUpIcon className="w-6 h-6 text-white" />
+          <div className="text-center p-3 sm:p-4 rounded-2xl bg-white/60 border-2 border-success-200/50 shadow-sm overflow-hidden">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-success-400 to-success-300 flex items-center justify-center mx-auto mb-2 sm:mb-3 shadow-lg shadow-success-300/30">
+              <ArrowTrendingUpIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
-            <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Harvestable Salary</p>
-            <p className="text-2xl font-mono font-bold text-success-700">
+            <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Harvestable</p>
+            <p className="text-base sm:text-xl md:text-2xl font-mono font-bold text-success-700 truncate">
               ${harvestableRankUsd.toFixed(2)}
             </p>
-            <p className="text-[10px] text-surface-400">auto-accumulates every period</p>
+            <p className="text-[10px] text-surface-400">auto-accumulates</p>
           </div>
 
           {/* Harvested Salary */}
-          <div className="text-center p-4 rounded-2xl bg-white/60 border-2 border-secondary-200/50 shadow-sm">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-secondary-400 to-secondary-300 flex items-center justify-center mx-auto mb-3 shadow-lg shadow-secondary-300/30">
-              <ArrowDownTrayIcon className="w-6 h-6 text-white" />
+          <div className="text-center p-3 sm:p-4 rounded-2xl bg-white/60 border-2 border-secondary-200/50 shadow-sm overflow-hidden">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-secondary-400 to-secondary-300 flex items-center justify-center mx-auto mb-2 sm:mb-3 shadow-lg shadow-secondary-300/30">
+              <ArrowDownTrayIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
-            <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Harvested Salary</p>
-            <p className="text-2xl font-mono font-bold text-secondary-700">
+            <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Harvested</p>
+            <p className="text-base sm:text-xl md:text-2xl font-mono font-bold text-secondary-700 truncate">
               ${totalHarvestedSalary ? Number(formatUnits(totalHarvestedSalary, USDT_DECIMALS)).toFixed(2) : '0.00'}
             </p>
             <p className="text-[10px] text-surface-400">total claimed</p>
@@ -260,7 +260,7 @@ export default function RankDividendPage() {
           Even if a single leg has massive volume, only 50% of the rank target will be credited from it.
         </p>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <div className="p-3 rounded-xl bg-gradient-to-br from-primary-50 to-primary-100/60 border border-primary-200/50 text-center">
             <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Total Team Volume</p>
             <p className="text-lg font-mono font-bold text-primary-700">${formatCompact(teamVolumeUsd, 2)}</p>
@@ -272,6 +272,10 @@ export default function RankDividendPage() {
           <div className="p-3 rounded-xl bg-gradient-to-br from-secondary-50 to-secondary-100/60 border border-secondary-200/50 text-center">
             <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Number of Legs</p>
             <p className="text-lg font-mono font-bold text-secondary-700">{legVolumeNumbers.length}</p>
+          </div>
+          <div className="p-3 rounded-xl bg-gradient-to-br from-success-50 to-success-100/60 border border-success-200/50 text-center">
+            <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Qualifying Volume</p>
+            <p className="text-lg font-mono font-bold text-success-700">${formatCompact(nextQualifyingVol, 2)}</p>
           </div>
         </div>
 

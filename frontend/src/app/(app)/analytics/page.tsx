@@ -44,9 +44,9 @@ export default function AnalyticsPage() {
   const p2pTotalVolume = orderBookStats ? Number(formatUnits(BigInt(orderBookStats[3] || 0), USDT_DECIMALS)) : 0;
   const p2pLockedLiquidity = p2pLiquidity ? Number(formatUnits(BigInt(p2pLiquidity[0] || 0), USDT_DECIMALS)) + Number(formatUnits(BigInt(p2pLiquidity[1] || 0), KAIRO_DECIMALS)) * price : 0;
 
-  // Pool balances
-  const poolKairo = poolBalances ? Number(formatUnits(BigInt(poolBalances[0] || 0), KAIRO_DECIMALS)) : 0;
-  const poolUsdt = poolBalances ? Number(formatUnits(BigInt(poolBalances[1] || 0), USDT_DECIMALS)) : 0;
+  // Pool balances — getBalances() returns (usdtBalance, kairoBalance)
+  const poolUsdt = poolBalances ? Number(formatUnits(BigInt(poolBalances[0] || 0), USDT_DECIMALS)) : 0;
+  const poolKairo = poolBalances ? Number(formatUnits(BigInt(poolBalances[1] || 0), KAIRO_DECIMALS)) : 0;
 
   const totalBurnedNum = Number(totalBurnedFormatted);
   const totalSupplyNum = Number(totalSupplyFormatted);
@@ -110,7 +110,7 @@ export default function AnalyticsPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="p-3 rounded-xl bg-gradient-to-br from-white/70 to-primary-50/30 border border-primary-100/50">
                 <p className="text-[10px] uppercase tracking-wider text-surface-400">Circulating</p>
-                <p className="text-lg font-mono font-bold text-surface-900">{formatCompact(totalSupplyNum, 2)}</p>
+                <p className="text-lg font-mono font-bold text-surface-900">{formatCompact(totalSupplyNum - socialLockNum, 2)}</p>
               </div>
               <div className="p-3 rounded-xl bg-gradient-to-br from-danger-100/60 to-danger-50/40 border border-danger-200/50">
                 <p className="text-[10px] uppercase tracking-wider text-danger-400">Burned</p>

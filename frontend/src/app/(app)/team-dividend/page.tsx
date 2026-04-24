@@ -107,7 +107,7 @@ export default function TeamDividendPage() {
           <p className="text-xl sm:text-2xl font-mono font-bold text-surface-900">${formatCompact(teamVolumeUsd, 2)}</p>
           <p className="text-xs text-surface-400 mt-1">Total downline volume</p>
         </GlassCard>
-        <GlassCard padding="p-4">
+        <GlassCard padding="p-4" className="col-span-2 sm:col-span-1">
           <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Team Dividend</p>
           <p className="text-xl sm:text-2xl font-mono font-bold text-accent-700">${teamDividendBalance.toFixed(2)}</p>
           <Button
