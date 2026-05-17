@@ -9,6 +9,7 @@ import { HeroSection } from '@/components/landing/HeroSection';
 
 import { FeatureGrid } from '@/components/landing/FeatureGrid';
 import { GlassCard } from '@/components/ui';
+import { CHAIN_ID, IS_TESTNET, contracts, getExplorerAddressUrl } from '@/config/contracts';
 
 export default function Home() {
   const router = useRouter();
@@ -65,21 +66,20 @@ export default function Home() {
             Verified <span className="gradient-text">Smart Contracts</span>
           </h2>
           <p className="text-center text-surface-500 text-sm mb-8">
-            All contracts are verified and open-source on opBNB Mainnet (Chain 204)
+            All contracts are verified and open-source on {IS_TESTNET ? `opBNB Testnet (Chain ${CHAIN_ID})` : `opBNB Mainnet (Chain ${CHAIN_ID})`}
           </p>
           <div className="space-y-2">
             {[
-              { name: 'KAIRO Token', address: '0x3DA7B98DE7085eda9b991fAD4762b274E9ADb496' },
-              { name: 'Liquidity Pool', address: '0xe3084fadF0db28F5f97162da1dde542a50cBc264' },
-              { name: 'Staking Manager', address: '0xB6724041A765e0BE0B212dB57Ff317cCEF5A1EDd' },
-              { name: 'Affiliate Distributor', address: '0xf53C1735e345dEBe19a3168BFE6AA3CC07FdBCD6' },
-              { name: 'CMS (Membership)', address: '0x04Ecd8106bEcd7FFee528F363dD2121343296F2e' },
-              { name: 'Atomic P2P Exchange', address: '0x12a2e94da17e90fa2A36F7C311c4B0A22300e46E' },
-              { name: 'USDT (opBNB)', address: '0x9e5AAC1Ba1a2e6aEd6b32689DFcF62A509Ca96f3' },
+              { name: 'KAIRO Token', address: contracts.kairoToken },
+              { name: 'Liquidity Pool', address: contracts.liquidityPool },
+              { name: 'Staking Manager', address: contracts.stakingManager },
+              { name: 'Affiliate Distributor', address: contracts.affiliateDistributor },
+              { name: 'Atomic P2P Exchange', address: contracts.atomicP2p },
+              { name: IS_TESTNET ? 'USDT (opBNB Testnet)' : 'USDT (opBNB)', address: contracts.usdt },
             ].map((contract) => (
               <a
                 key={contract.address}
-                href={`https://opbnb.bscscan.com/address/${contract.address}`}
+                href={getExplorerAddressUrl(contract.address)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-4 px-4 py-3 rounded-xl border border-surface-200 bg-white/60 hover:border-primary-300 hover:bg-primary-50/30 transition-all group"
