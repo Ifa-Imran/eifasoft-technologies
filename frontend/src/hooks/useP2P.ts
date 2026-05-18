@@ -117,6 +117,22 @@ export function useP2P() {
     query: { enabled: !!address && contracts.atomicP2p !== '0x', refetchInterval: 10000 },
   });
 
+  // ── Order book statistics ──
+  const { data: orderBookStats } = useReadContract({
+    address: contracts.atomicP2p,
+    abi: AtomicP2pABI,
+    functionName: 'getOrderBookStats',
+    query: { enabled: contracts.atomicP2p !== '0x', refetchInterval: 10000 },
+  });
+
+  // ── Total liquidity (USDT buy side + KAIRO sell side) ──
+  const { data: totalLiquidity } = useReadContract({
+    address: contracts.atomicP2p,
+    abi: AtomicP2pABI,
+    functionName: 'getTotalLiquidity',
+    query: { enabled: contracts.atomicP2p !== '0x', refetchInterval: 10000 },
+  });
+
   // Dust threshold: hide orders with remaining value < 1 USDT
   const DUST_THRESHOLD = BigInt(10 ** 18); // 1 USDT (18 decimals)
 
@@ -286,6 +302,27 @@ export function useP2P() {
     } catch { return 0n; }
   };
 
+  /** Simulate a trade between two orders before executing (returns net amounts, fees, and feasibility). */
+  const simulateTrade = async (buyOrderId: bigint, sellOrderId: bigint, kairoAmount: bigint) => {
+    if (!publicClient) return null;
+    try {
+      const result = await publicClient.readContract({
+        address: contracts.atomicP2p,
+        abi: AtomicP2pABI,
+        functionName: 'simulateTrade',
+        args: [buyOrderId, sellOrderId, kairoAmount],
+      });
+      const r = result as readonly [bigint, bigint, bigint, bigint, boolean];
+      return {
+        netKairoToBuyer: r[0],
+        netUsdtToSeller: r[1],
+        kairoFee: r[2],
+        usdtFee: r[3],
+        canExecute: r[4],
+      };
+    } catch { return null; }
+  };
+
   const refetch = () => {
     refetchBuys();
     refetchSells();
@@ -301,6 +338,8 @@ export function useP2P() {
     bestSellPrice: bestSellPrice as bigint | undefined,
     userOrders: userOrders as any,
     userTrades: userTrades as any,
+    orderBookStats: orderBookStats as any,
+    totalLiquidity: totalLiquidity as any,
     createBuyOrder,
     createSellOrder,
     sellToOrder,
@@ -308,6 +347,7 @@ export function useP2P() {
     cancelBuyOrder,
     cancelSellOrder,
     executeTrade,
+    simulateTrade,
     calculateKAIROForUSDT,
     calculateUSDTForKAIRO,
     refetch,

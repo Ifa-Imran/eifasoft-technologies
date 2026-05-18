@@ -32,12 +32,30 @@ export function useSwap() {
     },
   });
 
+  const { data: totalValueLocked } = useReadContract({
+    address: contracts.liquidityPool,
+    abi: LiquidityPoolABI,
+    functionName: 'getTotalValueLocked',
+    query: { enabled: contracts.liquidityPool !== '0x', refetchInterval: 30000 },
+  });
+
+  const { data: livePrice } = useReadContract({
+    address: contracts.liquidityPool,
+    abi: LiquidityPoolABI,
+    functionName: 'getLivePrice',
+    query: { enabled: contracts.liquidityPool !== '0x', refetchInterval: 10000 },
+  });
+
   const { writeContract: writeSwap, isPending, data: swapHash } = useWriteContract();
+  const { writeContract: writeSwapUSDT, isPending: swapUSDTPending, data: swapUSDTHash } = useWriteContract();
 
   const { isSuccess: swapSuccess, isError: swapError } = useWaitForTransactionReceipt({ hash: swapHash });
+  const { isSuccess: swapUSDTSuccess, isError: swapUSDTError } = useWaitForTransactionReceipt({ hash: swapUSDTHash });
 
   useEffect(() => { if (swapSuccess) toast({ type: 'success', title: 'Swap completed!' }); }, [swapSuccess]);
   useEffect(() => { if (swapError) toast({ type: 'error', title: 'Swap failed' }); }, [swapError]);
+  useEffect(() => { if (swapUSDTSuccess) toast({ type: 'success', title: 'Swap completed!' }); }, [swapUSDTSuccess]);
+  useEffect(() => { if (swapUSDTError) toast({ type: 'error', title: 'Swap failed' }); }, [swapUSDTError]);
 
   const swap = (kairoAmount: bigint, minUsdtOut: bigint) => {
     writeSwap({
@@ -47,6 +65,17 @@ export function useSwap() {
       args: [kairoAmount, minUsdtOut, address!],
     });
     toast({ type: 'pending', title: 'Swapping KAIRO for USDT...', description: 'Confirming transaction' });
+  };
+
+  /** Swap USDT for KAIRO (reverse direction). */
+  const swapUSDTForKAIRO = (usdtAmount: bigint, minKairoOut: bigint) => {
+    writeSwapUSDT({
+      address: contracts.liquidityPool,
+      abi: LiquidityPoolABI,
+      functionName: 'swapUSDTForKAIRO',
+      args: [usdtAmount, minKairoOut, address!],
+    });
+    toast({ type: 'pending', title: 'Swapping USDT for KAIRO...', description: 'Confirming transaction' });
   };
 
   /** On-chain: calculate minimum USDT output for a given KAIRO input (accounts for 10% fee+slippage). */
@@ -80,10 +109,13 @@ export function useSwap() {
   return {
     poolBalances: balances as any,
     swapStats: swapStats as any,
+    totalValueLocked: totalValueLocked as bigint | undefined,
+    livePrice: livePrice as bigint | undefined,
     swap,
+    swapUSDTForKAIRO,
     calculateMinOutput,
     calculatePriceImpact,
-    isPending,
+    isPending: isPending || swapUSDTPending,
     swapHash,
   };
 }

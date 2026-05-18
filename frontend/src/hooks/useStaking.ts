@@ -1,6 +1,6 @@
 'use client';
 
-import { useWriteContract, useWaitForTransactionReceipt, useAccount, usePublicClient } from 'wagmi';
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount, usePublicClient } from 'wagmi';
 import { contracts } from '@/config/contracts';
 import { StakingManagerABI } from '@/config/abis/StakingManager';
 import { useToast } from '@/components/ui/Toast';
@@ -22,15 +22,28 @@ export function useStaking() {
 
   const { writeContract: writeStake, data: stakeHash, isPending: stakePending } = useWriteContract();
   const { writeContract: writeUnstake, data: unstakeHash, isPending: unstakePending } = useWriteContract();
+  const { writeContract: writeSetAutoCompound, data: setAutoCompoundHash, isPending: setAutoCompoundPending } = useWriteContract();
+
+  // Read current auto-compound preference
+  const { data: autoCompoundEnabled } = useReadContract({
+    address: contracts.stakingManager,
+    abi: StakingManagerABI,
+    functionName: 'autoCompoundEnabled',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address && contracts.stakingManager !== '0x', refetchInterval: 30000 },
+  });
 
   const { isSuccess: stakeSuccess, isError: stakeError } = useWaitForTransactionReceipt({ hash: stakeHash });
   const { isSuccess: unstakeSuccess, isError: unstakeError } = useWaitForTransactionReceipt({ hash: unstakeHash });
+  const { isSuccess: setAutoCompoundSuccess, isError: setAutoCompoundError } = useWaitForTransactionReceipt({ hash: setAutoCompoundHash });
 
   // Compounding is manual — user clicks "Compound" button per tier card.
   useEffect(() => { if (stakeSuccess) toast({ type: 'success', title: 'Staked successfully!' }); }, [stakeSuccess]);
   useEffect(() => { if (stakeError) toast({ type: 'error', title: 'Stake failed' }); }, [stakeError]);
   useEffect(() => { if (unstakeSuccess) toast({ type: 'success', title: 'Unstaked successfully!' }); }, [unstakeSuccess]);
   useEffect(() => { if (unstakeError) toast({ type: 'error', title: 'Unstake failed' }); }, [unstakeError]);
+  useEffect(() => { if (setAutoCompoundSuccess) toast({ type: 'success', title: 'Auto-compound updated!' }); }, [setAutoCompoundSuccess]);
+  useEffect(() => { if (setAutoCompoundError) toast({ type: 'error', title: 'Auto-compound toggle failed' }); }, [setAutoCompoundError]);
 
   const stake = async (amount: bigint, referrer: Address) => {
     try {
@@ -202,6 +215,21 @@ export function useStaking() {
     }
   };
 
+  /** Toggle auto-compound on/off for the connected user. */
+  const setAutoCompound = (enabled: boolean) => {
+    try {
+      writeSetAutoCompound({
+        address: contracts.stakingManager,
+        abi: StakingManagerABI,
+        functionName: 'setAutoCompound',
+        args: [enabled],
+      });
+      toast({ type: 'pending', title: enabled ? 'Enabling auto-compound...' : 'Disabling auto-compound...' });
+    } catch (err: any) {
+      toast({ type: 'error', title: 'Auto-compound toggle failed', description: err?.message?.slice(0, 100) });
+    }
+  };
+
   return {
     stake,
     compound,
@@ -210,7 +238,9 @@ export function useStaking() {
     harvest,
     harvestTier,
     unstake,
-    isPending: stakePending || unstakePending || harvesting || compounding,
+    setAutoCompound,
+    autoCompoundEnabled: autoCompoundEnabled === true,
+    isPending: stakePending || unstakePending || setAutoCompoundPending || harvesting || compounding,
     isCompounding: compounding,
     stakeHash,
     unstakeHash,
