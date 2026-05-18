@@ -120,8 +120,10 @@ services:
         git clone --branch testnet-dev --depth 1 https://github.com/Ifa-Imran/eifasoft-technologies.git /tmp/repo &&
         cp -a /tmp/repo/frontend/. /app/ &&
         rm -f /app/.env /app/.env.local /app/.env.production /app/.env.production.local &&
+        rm -rf /app/.next /app/node_modules/.cache &&
         npm ci --legacy-peer-deps &&
         npm run build &&
+        rm -rf /app/.next/standalone/.next/static /app/.next/standalone/public &&
         cp -r .next/static .next/standalone/.next/static &&
         cp -r public .next/standalone/public &&
         NODE_ENV=production node .next/standalone/server.js
