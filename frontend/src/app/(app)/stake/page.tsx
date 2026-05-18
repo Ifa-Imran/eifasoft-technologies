@@ -25,7 +25,7 @@ function getTier(amount: number) {
 const COMPOUND_TIERS = [
   { name: 'Bronze', min: 10, max: 499, interval: 480 },    // 8h
   { name: 'Silver', min: 500, max: 1999, interval: 360 },   // 6h
-  { name: 'Gold', min: 2000, max: Infinity, interval: 240 }, // 4h
+  { name: 'Gold', min: 2000, max: Infinity, interval: 300 }, // 5h
 ] as const;
 
 function getCompoundTier(amount: number) {
