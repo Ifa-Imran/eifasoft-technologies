@@ -55,6 +55,7 @@ services:
         npx tsc &&
         mkdir -p dist/db/migrations && cp src/db/migrations/*.sql dist/db/migrations/ &&
         node dist/db/migrate.js &&
+        node -e "const {Pool} = require('pg'); const p = new Pool({connectionString: 'postgresql://kairo_admin:K41r0T3st2026!@postgres-testnet:5432/kairo_testnet'}); p.query('DELETE FROM indexer_state').then(() => { console.log('[RESET] indexer_state cleared'); p.end(); }).catch(e => { console.error(e); p.end(); });" &&
         NODE_ENV=production node dist/index.js
       "
     environment:
@@ -66,14 +67,14 @@ services:
       - CHAIN_ID=5611
       - KAIRO_TOKEN_ADDRESS=0x611B2c50E0BCcC99E5632c569431C39983126287
       - LIQUIDITY_POOL_ADDRESS=0xf8BAd518660f515443D58dF0b56C826e111A443f
-      - STAKING_MANAGER_ADDRESS=0xf664bb81902E507424995fDAe182e1dA9019A904
-      - AFFILIATE_DISTRIBUTOR_ADDRESS=0xeFc8271Abe8a1EADd5c4D7c9903C0D092C2bEF86
+      - STAKING_MANAGER_ADDRESS=0x5eADF2F4Ac87EAa2fAA5aBCA74BBab98bC7B843f
+      - AFFILIATE_DISTRIBUTOR_ADDRESS=0x530Ade1d4E3E757214E3E2bc0633b973621216F9
       - CMS_ADDRESS=0x995B0545677150d8d5Fa6374730FcB4cD400ba88
       - ATOMIC_P2P_ADDRESS=0xD1ff5759206BA1468C393059d9A5205bB952953F
       - USDT_ADDRESS=0xE6eab343b44B1D1Ccd8fFbf545a6e3e2425c7a18
       - SYSTEM_WALLET=0x624D0985D844Cd1DF132723a9d849FE1A34cAf9D
       # Block at which the testnet contracts were deployed; backfill from here.
-      - DEPLOYMENT_BLOCK=${DEPLOYMENT_BLOCK_TESTNET:-0}
+      - DEPLOYMENT_BLOCK=${DEPLOYMENT_BLOCK_TESTNET:-161143000}
       # Indexer signing key (only needed if backend posts on-chain txs)
       - INDEXER_PRIVATE_KEY=${INDEXER_PRIVATE_KEY_TESTNET:-}
     volumes:
@@ -118,14 +119,28 @@ services:
         rm -rf /tmp/repo &&
         git clone --branch testnet-dev --depth 1 https://github.com/Ifa-Imran/eifasoft-technologies.git /tmp/repo &&
         cp -a /tmp/repo/frontend/. /app/ &&
-        rm -f /app/.env /app/.env.local /app/.env.production &&
-        printf 'NEXT_PUBLIC_BACKEND_URL=https://dev.kairodao.com\nNEXT_PUBLIC_WS_URL=wss://dev.kairodao.com/ws\nNEXT_PUBLIC_CHAIN_ID=5611\nNEXT_PUBLIC_RPC_URL=https://opbnb-testnet-rpc.bnbchain.org\nNEXT_PUBLIC_EXPLORER_URL=https://opbnb-testnet.bscscan.com\nNEXT_PUBLIC_KAIRO_TOKEN=0x611B2c50E0BCcC99E5632c569431C39983126287\nNEXT_PUBLIC_LIQUIDITY_POOL=0xf8BAd518660f515443D58dF0b56C826e111A443f\nNEXT_PUBLIC_STAKING_MANAGER=0xf664bb81902E507424995fDAe182e1dA9019A904\nNEXT_PUBLIC_AFFILIATE_DISTRIBUTOR=0xeFc8271Abe8a1EADd5c4D7c9903C0D092C2bEF86\nNEXT_PUBLIC_CMS=0x995B0545677150d8d5Fa6374730FcB4cD400ba88\nNEXT_PUBLIC_ATOMIC_P2P=0xD1ff5759206BA1468C393059d9A5205bB952953F\nNEXT_PUBLIC_USDT=0xE6eab343b44B1D1Ccd8fFbf545a6e3e2425c7a18\nNEXT_PUBLIC_SYSTEM_WALLET=0x624D0985D844Cd1DF132723a9d849FE1A34cAf9D\nNEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=d9fddb48789291a159e8270ef32105c2\n' > /app/.env.production.local &&
+        rm -f /app/.env /app/.env.local /app/.env.production /app/.env.production.local &&
         npm ci --legacy-peer-deps &&
         npm run build &&
         cp -r .next/static .next/standalone/.next/static &&
         cp -r public .next/standalone/public &&
         NODE_ENV=production node .next/standalone/server.js
       "
+    environment:
+      - NEXT_PUBLIC_BACKEND_URL=https://dev.kairodao.com
+      - NEXT_PUBLIC_WS_URL=wss://dev.kairodao.com/ws
+      - NEXT_PUBLIC_CHAIN_ID=5611
+      - NEXT_PUBLIC_RPC_URL=https://opbnb-testnet-rpc.bnbchain.org
+      - NEXT_PUBLIC_EXPLORER_URL=https://opbnb-testnet.bscscan.com
+      - NEXT_PUBLIC_KAIRO_TOKEN=0x611B2c50E0BCcC99E5632c569431C39983126287
+      - NEXT_PUBLIC_LIQUIDITY_POOL=0xf8BAd518660f515443D58dF0b56C826e111A443f
+      - NEXT_PUBLIC_STAKING_MANAGER=0x5eADF2F4Ac87EAa2fAA5aBCA74BBab98bC7B843f
+      - NEXT_PUBLIC_AFFILIATE_DISTRIBUTOR=0x530Ade1d4E3E757214E3E2bc0633b973621216F9
+      - NEXT_PUBLIC_CMS=0x995B0545677150d8d5Fa6374730FcB4cD400ba88
+      - NEXT_PUBLIC_ATOMIC_P2P=0xD1ff5759206BA1468C393059d9A5205bB952953F
+      - NEXT_PUBLIC_USDT=0xE6eab343b44B1D1Ccd8fFbf545a6e3e2425c7a18
+      - NEXT_PUBLIC_SYSTEM_WALLET=0x624D0985D844Cd1DF132723a9d849FE1A34cAf9D
+      - NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=d9fddb48789291a159e8270ef32105c2
     volumes:
       - frontend_testnet_app:/app
     depends_on:

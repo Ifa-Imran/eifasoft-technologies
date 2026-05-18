@@ -54,12 +54,28 @@ const chainWithRpc = {
   },
 } as const;
 
+// Batched transport — fixes the viem "duplicate request id" warning.
+// Root cause: React StrictMode double-mounts in dev + many simultaneous
+// useReadContract hooks fire concurrent JSON-RPC calls through one transport.
+// `batch: { batchSize, wait }` buffers concurrent requests for `wait` ms and
+// flushes them in a single HTTP body with unique sequential ids, eliminating
+// the id collision.  Stable `key`/`name` keeps the transport identity stable
+// across re-renders.  Retries are tamed so transient blips don't amplify.
+const transport = http(RPC_HTTP, {
+  key: `kairo-${chainWithRpc.id}`,
+  name: `KAIRO opBNB ${IS_TESTNET ? 'Testnet' : 'Mainnet'}`,
+  batch: { batchSize: 1024, wait: 16 },
+  retryCount: 2,
+  retryDelay: 200,
+  timeout: 20_000,
+});
+
 export const config = getDefaultConfig({
   appName: IS_TESTNET ? 'KAIRO DAO (Testnet)' : 'KAIRO DAO',
   projectId:
     process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ||
     'd9fddb48789291a159e8270ef32105c2',
   chains: [chainWithRpc],
-  transports: { [chainWithRpc.id]: http(RPC_HTTP) },
+  transports: { [chainWithRpc.id]: transport },
   ssr: true,
 });
