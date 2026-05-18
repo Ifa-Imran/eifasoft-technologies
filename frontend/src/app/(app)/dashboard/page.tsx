@@ -7,6 +7,7 @@ import { PortfolioOverview } from '@/components/dashboard/PortfolioOverview';
 import { ActiveStakesTable } from '@/components/dashboard/ActiveStakesTable';
 import { IncomeSummary } from '@/components/dashboard/IncomeSummary';
 import { ReferralWidget } from '@/components/dashboard/ReferralWidget';
+import { MockUsdtFaucet } from '@/components/dashboard/MockUsdtFaucet';
 import Link from 'next/link';
 
 export default function DashboardPage() {
@@ -36,6 +37,7 @@ export default function DashboardPage() {
       </div>
 
       <ReferralWidget />
+      <MockUsdtFaucet />
       <PortfolioOverview />
       <ActiveStakesTable />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
