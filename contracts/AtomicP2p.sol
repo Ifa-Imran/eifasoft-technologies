@@ -195,7 +195,7 @@ contract AtomicP2p is ReentrancyGuard, AccessControl {
     {
         // Global auto-compound: sync all stakers before P2P action
         if (address(stakingManager) != address(0)) {
-            stakingManager.compoundAllFor(msg.sender);
+            try stakingManager.compoundAllFor(msg.sender) {} catch {}
         }
         require(usdtAmount > 0, "Amount must be positive");
 
@@ -228,7 +228,7 @@ contract AtomicP2p is ReentrancyGuard, AccessControl {
     {
         // Global auto-compound: sync all stakers before P2P action
         if (address(stakingManager) != address(0)) {
-            stakingManager.compoundAllFor(msg.sender);
+            try stakingManager.compoundAllFor(msg.sender) {} catch {}
         }
         require(kairoAmount > 0, "Amount must be positive");
 
@@ -257,7 +257,7 @@ contract AtomicP2p is ReentrancyGuard, AccessControl {
     function cancelBuyOrder(uint256 orderId) external nonReentrant {
         // Global auto-compound: sync all stakers before P2P action
         if (address(stakingManager) != address(0)) {
-            stakingManager.compoundAllFor(msg.sender);
+            try stakingManager.compoundAllFor(msg.sender) {} catch {}
         }
         OrderBuy storage order = buyOrders[orderId];
         require(order.creator == msg.sender, "Not order creator");
@@ -281,7 +281,7 @@ contract AtomicP2p is ReentrancyGuard, AccessControl {
     function cancelSellOrder(uint256 orderId) external nonReentrant {
         // Global auto-compound: sync all stakers before P2P action
         if (address(stakingManager) != address(0)) {
-            stakingManager.compoundAllFor(msg.sender);
+            try stakingManager.compoundAllFor(msg.sender) {} catch {}
         }
         OrderSell storage order = sellOrders[orderId];
         require(order.creator == msg.sender, "Not order creator");
@@ -314,7 +314,7 @@ contract AtomicP2p is ReentrancyGuard, AccessControl {
     {
         // Global auto-compound: sync all stakers before P2P trade
         if (address(stakingManager) != address(0)) {
-            stakingManager.compoundAllFor(msg.sender);
+            try stakingManager.compoundAllFor(msg.sender) {} catch {}
         }
 
         // ==========================================
@@ -438,7 +438,7 @@ contract AtomicP2p is ReentrancyGuard, AccessControl {
     {
         // Global auto-compound: sync all stakers before P2P trade
         if (address(stakingManager) != address(0)) {
-            stakingManager.compoundAllFor(msg.sender);
+            try stakingManager.compoundAllFor(msg.sender) {} catch {}
         }
 
         // ==========================================
@@ -566,7 +566,7 @@ contract AtomicP2p is ReentrancyGuard, AccessControl {
     ) external nonReentrant returns (uint256 tradeId) {
         // Global auto-compound: sync all stakers before P2P trade
         if (address(stakingManager) != address(0)) {
-            stakingManager.compoundAllFor(msg.sender);
+            try stakingManager.compoundAllFor(msg.sender) {} catch {}
         }
 
         OrderBuy storage buyOrder = buyOrders[buyOrderId];
