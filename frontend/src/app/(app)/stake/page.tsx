@@ -458,7 +458,16 @@ function StakePageInner() {
                         </span>
                       </td>
                       <td className="py-2.5 px-2 text-center">
-                        {s.active ? (
+                        {!s.active ? (
+                          <span className="text-[10px] text-surface-300">—</span>
+                        ) : s.isMigrated ? (
+                          <span
+                            className="inline-flex items-center gap-1 text-[10px] text-surface-300 italic"
+                            title="Migrated stakes are locked and cannot be unstaked"
+                          >
+                            🔒 Locked
+                          </span>
+                        ) : (
                           <Button
                             size="sm"
                             variant="danger"
@@ -468,8 +477,6 @@ function StakePageInner() {
                           >
                             Unstake
                           </Button>
-                        ) : (
-                          <span className="text-[10px] text-surface-300">—</span>
                         )}
                       </td>
                     </tr>
