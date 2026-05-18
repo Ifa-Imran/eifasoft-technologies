@@ -55,5 +55,9 @@ export const BASIS_POINTS = 10000;
 export const SWAP_FEE_BPS = 1000; // 10%
 export const P2P_FEE_BPS = 500; // 5%
 
+// CMS (Core Membership Subscription) constants — match on-chain CMS_PRICE / max supply
+export const CMS_PRICE_USDT = 10; // 10 USDT per subscription
+export const CMS_MAX_SUBSCRIPTIONS = 10_000; // global cap of 10,000 memberships
+
 // System wallet used as referrer for the first-ever (genesis) registration
 export const SYSTEM_WALLET = (process.env.NEXT_PUBLIC_SYSTEM_WALLET || '0x') as Address;
