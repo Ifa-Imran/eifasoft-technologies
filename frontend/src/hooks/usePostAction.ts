@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react';
 import { useAccount, usePublicClient, useWriteContract } from 'wagmi';
-import { contracts } from '@/config/contracts';
+import { contracts, IS_TESTNET } from '@/config/contracts';
 import { StakingManagerABI } from '@/config/abis/StakingManager';
 import { AffiliateDistributorABI } from '@/config/abis/AffiliateDistributor';
 import { useToast } from '@/components/ui/Toast';
@@ -37,8 +37,10 @@ export function usePostAction() {
       if (!stakes || stakes.length === 0) return;
 
       const now = Math.floor(Date.now() / 1000);
-      // Production intervals: Tier0=28800s (8h), Tier1=21600s (6h), Tier2=14400s (4h)
-      const intervals = [28800, 21600, 14400];
+      // Compound intervals must match the on-chain Tier.compoundInterval.
+      // Testnet: Tier0=180s (3m), Tier1=120s (2m), Tier2=60s (1m)
+      // Mainnet: Tier0=28800s (8h), Tier1=21600s (6h), Tier2=14400s (4h)
+      const intervals = IS_TESTNET ? [180, 120, 60] : [28800, 21600, 14400];
 
       let compounded = 0;
       for (let i = 0; i < stakes.length; i++) {
