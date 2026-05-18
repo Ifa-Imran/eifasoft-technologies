@@ -37,10 +37,11 @@ export function usePostAction() {
       if (!stakes || stakes.length === 0) return;
 
       const now = Math.floor(Date.now() / 1000);
-      // Compound intervals must match the on-chain Tier.compoundInterval.
+      // Compound intervals must match the on-chain Tier.compoundInterval
+      // and STAKING_TIERS in config/contracts.ts.
       // Testnet: Tier0=180s (3m), Tier1=120s (2m), Tier2=60s (1m)
-      // Mainnet: Tier0=28800s (8h), Tier1=21600s (6h), Tier2=14400s (4h)
-      const intervals = IS_TESTNET ? [180, 120, 60] : [28800, 21600, 14400];
+      // Mainnet: Tier0=28800s (8h), Tier1=21600s (6h), Tier2=18000s (5h)
+      const intervals = IS_TESTNET ? [180, 120, 60] : [28800, 21600, 18000];
 
       let compounded = 0;
       for (let i = 0; i < stakes.length; i++) {

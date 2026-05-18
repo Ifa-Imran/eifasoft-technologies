@@ -150,7 +150,7 @@ export default function RankDividendPage() {
               <CurrencyDollarIcon className="w-5 h-5 text-accent-500" />
               <span className="text-sm text-surface-600">Earning <span className="font-semibold text-accent-700">${rankSalary ? Number(formatUnits(rankSalary, USDT_DECIMALS)).toFixed(2) : '0'}</span> / period</span>
             </div>
-            <p className="text-xs text-surface-400">Auto-accumulates every hour (test) / 7 days (prod)</p>
+            <p className="text-xs text-surface-400">Auto-accumulates every 15 minutes (test) / 7 days (prod)</p>
           </div>
         )}
 
