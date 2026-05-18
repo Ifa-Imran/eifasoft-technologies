@@ -112,10 +112,10 @@ export function ActiveStakesTable() {
                       size="sm"
                       onClick={() => harvestTier(tg.stakes)}
                       loading={isPending && !isCompounding}
-                      disabled={tg.displayHarvestable < minHarvest || isCompounding}
+                      disabled={tg.harvestable < minHarvest || isCompounding}
                       icon={<ArrowDownTrayIcon className="w-3.5 h-3.5" />}
                     >
-                      {tg.displayHarvestable >= minHarvest ? `Harvest $${tg.displayHarvestableFormatted}` : 'Min $10'}
+                      {tg.harvestable >= minHarvest ? `Harvest $${tg.harvestableFormatted}` : 'Min $10'}
                     </Button>
                   </div>
                 );

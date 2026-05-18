@@ -429,12 +429,12 @@ function StakePageInner() {
                           <Button
                             onClick={() => harvestTier(tg.stakes)}
                             loading={isPending && !isCompounding}
-                            disabled={tg.displayHarvestable < BigInt(10) * BigInt(10 ** 18) || isCompounding}
+                            disabled={tg.harvestable < BigInt(10) * BigInt(10 ** 18) || isCompounding}
                             className="w-full"
                             size="sm"
                             icon={<ArrowDownTrayIcon className="w-4 h-4" />}
                           >
-                            {tg.displayHarvestable >= BigInt(10) * BigInt(10 ** 18) ? `Harvest $${tg.displayHarvestableFormatted}` : 'Min $10'}
+                            {tg.harvestable >= BigInt(10) * BigInt(10 ** 18) ? `Harvest $${tg.harvestableFormatted}` : 'Min $10'}
                           </Button>
                         </div>
                       );
