@@ -147,7 +147,7 @@ function StakePageInner() {
   const { isConnected } = useAccount();
   const [amount, setAmount] = useState('');
   const { stake, harvestTier, compoundTier, unstake, isPending, isCompounding } = useStaking();
-  const { tierGroups, activeStakes, stakes, isLoading } = useUserStakes();
+  const { tierGroups, activeStakes, stakes, isLoading, outstandingClaimedUsd } = useUserStakes();
   const { usdtFormatted } = useTokenBalances();
   const { storedReferrer, hasOnChainReferrer } = useRegistration();
   const { remainingSubscriptions, isSubscriptionEnded, subscribeDeadline } = useCMS();
@@ -208,15 +208,16 @@ function StakePageInner() {
 
   /**
    * Confirm + trigger unstake for a single stake.
-   * The contract returns 80% of the ORIGINAL stake amount as KAIRO (less any
-   * outstanding income that hasn't been deducted yet). Stake is closed.
+   * Uses the contract's previewUnstake() which returns the actual KAIRO amount
+   * after deducting outstanding claimed income (80% principal - deductions).
    */
-  const handleUnstake = (stakeIndex: number, originalUsdt: number) => {
-    const principalBack = (originalUsdt * 0.8).toFixed(2);
+  const handleUnstake = (stakeIndex: number, originalUsdt: number, previewKairo: number) => {
+    const previewUsd = previewKairo; // previewUnstake returns KAIRO (18 decimals, same as USDT)
     const ok = typeof window !== 'undefined' && window.confirm(
       `Unstake #${stakeIndex + 1}?\n\n` +
       `You staked $${originalUsdt.toFixed(2)} USDT.\n` +
-      `On unstake you receive 80% (~$${principalBack}) as KAIRO, MINUS any outstanding harvested income.\n\n` +
+      `You will receive ~$${previewUsd.toFixed(2)} in KAIRO\n` +
+      `(80% of principal, minus any outstanding harvested income).\n\n` +
       `This action is irreversible. Continue?`
     );
     if (!ok) return;
@@ -518,7 +519,7 @@ function StakePageInner() {
                           <Button
                             size="sm"
                             variant="danger"
-                            onClick={() => handleUnstake(s.index, Number(formatUnits(s.originalAmount, USDT_DECIMALS)))}
+                            onClick={() => handleUnstake(s.index, Number(formatUnits(s.originalAmount, USDT_DECIMALS)), Number(formatUnits(s.previewUnstakeAmount, USDT_DECIMALS)))}
                             disabled={isPending}
                             icon={<ArrowUturnLeftIcon className="w-3.5 h-3.5" />}
                           >

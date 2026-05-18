@@ -115,6 +115,22 @@ export function useStaking() {
     }
   }, [publicClient, writeContractAsync]);
 
+  /** Compound a stake on behalf of another user (requires operator/dao role) */
+  const compoundFor = useCallback(async (user: Address, stakeIndex: bigint) => {
+    if (!publicClient) return;
+    try {
+      const hash = await writeContractAsync({
+        address: contracts.stakingManager,
+        abi: StakingManagerABI,
+        functionName: 'compoundFor',
+        args: [user, stakeIndex],
+      });
+      await publicClient.waitForTransactionReceipt({ hash });
+    } catch (err: any) {
+      // CompoundFor may fail if caller lacks role
+    }
+  }, [publicClient, writeContractAsync]);
+
   /**
    * Manually compound every eligible stake in a tier.
    * One signature per stake (the contract has no batch compound for arbitrary
@@ -189,6 +205,7 @@ export function useStaking() {
   return {
     stake,
     compound,
+    compoundFor,
     compoundTier,
     harvest,
     harvestTier,

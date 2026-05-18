@@ -482,6 +482,18 @@ export function useAffiliate() {
     },
   });
 
+  // On-chain rank salary calculation for preview
+  const { data: calculatedRankSalary } = useReadContract({
+    address: contracts.affiliateDistributor,
+    abi: AffiliateDistributorABI,
+    functionName: 'calculateRankSalary',
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address && contracts.affiliateDistributor !== '0x',
+      refetchInterval: 30000,
+    },
+  });
+
   // Write operations
   const { writeContract: writeHarvest, isPending: harvestPending, data: harvestHash } = useWriteContract();
   const { writeContract: writeCheckRank, isPending: checkRankPending, data: checkRankHash } = useWriteContract();
@@ -634,6 +646,7 @@ export function useAffiliate() {
     teamAnalytics,
     lifetimeHarvested,
     totalHarvestable: totalHarvestable as bigint | undefined,
+    calculatedRankSalary: calculatedRankSalary as bigint | undefined,
     activeDirects: teamAnalytics?.directActive || 0,
     totalHarvestedSalary: harvestHistory.reduce((sum, h) => sum + h.amount, 0n),
     isLoading: incomeLoading || rankLoading,

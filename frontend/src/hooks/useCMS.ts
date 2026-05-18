@@ -147,6 +147,18 @@ export function useCMS() {
     },
   });
 
+  // Aggregated can-claim check (considers deadlines, stake requirement, already claimed)
+  const { data: canClaimRewards } = useReadContract({
+    address: contracts.cms,
+    abi: CoreMembershipSubscriptionABI,
+    functionName: 'canClaim',
+    args: address ? [address] : undefined,
+    query: {
+      enabled: !!address && contracts.cms !== '0x',
+      refetchInterval: 15000,
+    },
+  });
+
   // Per-level leadership details (subs + rewards per level)
   const { data: levelDetails, queryKey: levelDetailsKey } = useReadContract({
     address: contracts.cms,
@@ -218,6 +230,7 @@ export function useCMS() {
     excessToBeDeletedFormatted: excessToBeDeleted ? formatUnits(excessToBeDeleted as bigint, KAIRO_DECIMALS) : '0',
     cmsDirectCount: cmsDirects != null ? Number(cmsDirects) : 0,
     hasAlreadyClaimed: hasAlreadyClaimed === true,
+    canClaimRewards: (canClaimRewards as any)?.[0] === true,
     claimableRewards: claimable as any,
     maxClaimable: maxClaimable as bigint | undefined,
     // Total available rewards from subscriptions (loyalty + leadership)

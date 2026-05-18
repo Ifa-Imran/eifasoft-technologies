@@ -473,13 +473,6 @@ export const AffiliateDistributorABI = [
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "accrueAllRanks",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
         "internalType": "address",

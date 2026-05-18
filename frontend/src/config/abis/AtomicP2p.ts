@@ -1314,6 +1314,19 @@ export const AtomicP2pABI = [
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "_stakingManager",
+        "type": "address"
+      }
+    ],
+    "name": "setStakingManager",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "buyOrderId",
         "type": "uint256"
@@ -1355,6 +1368,19 @@ export const AtomicP2pABI = [
         "internalType": "bool",
         "name": "canExecute",
         "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "stakingManager",
+    "outputs": [
+      {
+        "internalType": "contract IStakingManager",
+        "name": "",
+        "type": "address"
       }
     ],
     "stateMutability": "view",

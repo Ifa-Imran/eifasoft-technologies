@@ -1,6 +1,6 @@
 'use client';
 
-import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount, usePublicClient } from 'wagmi';
 import { contracts } from '@/config/contracts';
 import { AtomicP2pABI } from '@/config/abis/AtomicP2p';
 import { useToast } from '@/components/ui/Toast';
@@ -27,6 +27,7 @@ export interface P2PSellOrder {
 export function useP2P() {
   const { address } = useAccount();
   const { toast } = useToast();
+  const publicClient = usePublicClient();
 
   // Fetch order structs
   const { data: rawBuyOrders, isLoading: buyLoading, refetch: refetchBuys } = useReadContract({
@@ -84,6 +85,38 @@ export function useP2P() {
     },
   });
 
+  // ── Price calculation helpers & best prices ──
+  const { data: bestBuyPrice } = useReadContract({
+    address: contracts.atomicP2p,
+    abi: AtomicP2pABI,
+    functionName: 'getBestBuyPrice',
+    query: { enabled: contracts.atomicP2p !== '0x', refetchInterval: 5000 },
+  });
+
+  const { data: bestSellPrice } = useReadContract({
+    address: contracts.atomicP2p,
+    abi: AtomicP2pABI,
+    functionName: 'getBestSellPrice',
+    query: { enabled: contracts.atomicP2p !== '0x', refetchInterval: 5000 },
+  });
+
+  // ── User-specific views ──
+  const { data: userOrders } = useReadContract({
+    address: contracts.atomicP2p,
+    abi: AtomicP2pABI,
+    functionName: 'getUserOrders',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address && contracts.atomicP2p !== '0x', refetchInterval: 10000 },
+  });
+
+  const { data: userTrades } = useReadContract({
+    address: contracts.atomicP2p,
+    abi: AtomicP2pABI,
+    functionName: 'getUserTrades',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address && contracts.atomicP2p !== '0x', refetchInterval: 10000 },
+  });
+
   // Dust threshold: hide orders with remaining value < 1 USDT
   const DUST_THRESHOLD = BigInt(10 ** 18); // 1 USDT (18 decimals)
 
@@ -129,6 +162,7 @@ export function useP2P() {
   const { writeContract: writeBuyFrom, isPending: buyFromPending, data: buyFromHash } = useWriteContract();
   const { writeContract: writeCancelBuy, isPending: cancelBuyPending, data: cancelBuyHash } = useWriteContract();
   const { writeContract: writeCancelSell, isPending: cancelSellPending, data: cancelSellHash } = useWriteContract();
+  const { writeContract: writeExecuteTrade, isPending: executeTradePending, data: executeTradeHash } = useWriteContract();
 
   const { isSuccess: createBuyOk, isError: createBuyFail } = useWaitForTransactionReceipt({ hash: createBuyHash });
   const { isSuccess: createSellOk, isError: createSellFail } = useWaitForTransactionReceipt({ hash: createSellHash });
@@ -136,6 +170,7 @@ export function useP2P() {
   const { isSuccess: buyFromOk, isError: buyFromFail } = useWaitForTransactionReceipt({ hash: buyFromHash });
   const { isSuccess: cancelBuyOk, isError: cancelBuyFail } = useWaitForTransactionReceipt({ hash: cancelBuyHash });
   const { isSuccess: cancelSellOk, isError: cancelSellFail } = useWaitForTransactionReceipt({ hash: cancelSellHash });
+  const { isSuccess: executeTradeOk, isError: executeTradeFail } = useWaitForTransactionReceipt({ hash: executeTradeHash });
 
   useEffect(() => { if (createBuyOk) { toast({ type: 'success', title: 'Buy order created!' }); refetch(); } }, [createBuyOk]);
   useEffect(() => { if (createBuyFail) toast({ type: 'error', title: 'Buy order failed' }); }, [createBuyFail]);
@@ -149,6 +184,8 @@ export function useP2P() {
   useEffect(() => { if (cancelBuyFail) toast({ type: 'error', title: 'Cancel failed' }); }, [cancelBuyFail]);
   useEffect(() => { if (cancelSellOk) { toast({ type: 'success', title: 'Sell order cancelled!' }); refetch(); } }, [cancelSellOk]);
   useEffect(() => { if (cancelSellFail) toast({ type: 'error', title: 'Cancel failed' }); }, [cancelSellFail]);
+  useEffect(() => { if (executeTradeOk) { toast({ type: 'success', title: 'Trade executed!' }); refetch(); } }, [executeTradeOk]);
+  useEffect(() => { if (executeTradeFail) toast({ type: 'error', title: 'Trade execution failed' }); }, [executeTradeFail]);
 
   const createBuyOrder = (usdtAmount: bigint) => {
     writeCreateBuy({
@@ -210,6 +247,45 @@ export function useP2P() {
     toast({ type: 'pending', title: 'Cancelling sell order...' });
   };
 
+  /** Atomically execute trade between a buy order and sell order (fills both sides). */
+  const executeTrade = (buyOrderId: bigint, sellOrderId: bigint, kairoFillAmount: bigint) => {
+    writeExecuteTrade({
+      address: contracts.atomicP2p,
+      abi: AtomicP2pABI,
+      functionName: 'executeTrade',
+      args: [buyOrderId, sellOrderId, kairoFillAmount],
+    });
+    toast({ type: 'pending', title: 'Executing trade...' });
+  };
+
+  /** On-chain: calculate KAIRO needed for a given USDT amount (includes 5% fee). */
+  const calculateKAIROForUSDT = async (usdtAmount: bigint): Promise<bigint> => {
+    if (!publicClient) return 0n;
+    try {
+      const result = await publicClient.readContract({
+        address: contracts.atomicP2p,
+        abi: AtomicP2pABI,
+        functionName: 'calculateKAIROForUSDT',
+        args: [usdtAmount],
+      });
+      return result as bigint;
+    } catch { return 0n; }
+  };
+
+  /** On-chain: calculate USDT needed for a given KAIRO amount (includes 5% fee). */
+  const calculateUSDTForKAIRO = async (kairoAmount: bigint): Promise<bigint> => {
+    if (!publicClient) return 0n;
+    try {
+      const result = await publicClient.readContract({
+        address: contracts.atomicP2p,
+        abi: AtomicP2pABI,
+        functionName: 'calculateUSDTForKAIRO',
+        args: [kairoAmount],
+      });
+      return result as bigint;
+    } catch { return 0n; }
+  };
+
   const refetch = () => {
     refetchBuys();
     refetchSells();
@@ -221,14 +297,21 @@ export function useP2P() {
     activeBuyOrders,
     activeSellOrders,
     currentPrice: currentPrice as bigint | undefined,
+    bestBuyPrice: bestBuyPrice as bigint | undefined,
+    bestSellPrice: bestSellPrice as bigint | undefined,
+    userOrders: userOrders as any,
+    userTrades: userTrades as any,
     createBuyOrder,
     createSellOrder,
     sellToOrder,
     buyFromOrder,
     cancelBuyOrder,
     cancelSellOrder,
+    executeTrade,
+    calculateKAIROForUSDT,
+    calculateUSDTForKAIRO,
     refetch,
     isLoading: buyLoading || sellLoading,
-    isPending: createBuyPending || createSellPending || sellToPending || buyFromPending || cancelBuyPending || cancelSellPending,
+    isPending: createBuyPending || createSellPending || sellToPending || buyFromPending || cancelBuyPending || cancelSellPending || executeTradePending,
   };
 }
