@@ -55,7 +55,6 @@ services:
         npx tsc &&
         mkdir -p dist/db/migrations && cp src/db/migrations/*.sql dist/db/migrations/ &&
         node dist/db/migrate.js &&
-        node -e "const {Pool} = require('pg'); const p = new Pool({connectionString: 'postgresql://kairo_admin:K41r0T3st2026!@postgres-testnet:5432/kairo_testnet'}); p.query('DELETE FROM indexer_state').then(() => { console.log('[RESET] indexer_state cleared'); p.end(); }).catch(e => { console.error(e); p.end(); });" &&
         NODE_ENV=production node dist/index.js
       "
     environment:
