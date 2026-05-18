@@ -919,6 +919,11 @@ export const StakingManagerABI = [
             "internalType": "uint8",
             "name": "tier",
             "type": "uint8"
+          },
+          {
+            "internalType": "bool",
+            "name": "isMigrated",
+            "type": "bool"
           }
         ],
         "internalType": "struct StakingManager.Stake",
@@ -1036,6 +1041,11 @@ export const StakingManagerABI = [
             "internalType": "uint8",
             "name": "tier",
             "type": "uint8"
+          },
+          {
+            "internalType": "bool",
+            "name": "isMigrated",
+            "type": "bool"
           }
         ],
         "internalType": "struct StakingManager.Stake[]",
@@ -1565,6 +1575,11 @@ export const StakingManagerABI = [
         "internalType": "uint8",
         "name": "tier",
         "type": "uint8"
+      },
+      {
+        "internalType": "bool",
+        "name": "isMigrated",
+        "type": "bool"
       }
     ],
     "stateMutability": "view",

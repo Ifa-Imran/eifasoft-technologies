@@ -63,6 +63,7 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
         uint256 compoundEarned;
         bool active;
         uint8 tier;
+        bool isMigrated;
     }
 
     mapping(address => Stake[]) public userStakes;
@@ -188,7 +189,8 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
             totalEarned: 0,
             compoundEarned: 0,
             active: true,
-            tier: 0
+            tier: 0,
+            isMigrated: false
         }));
 
         totalActiveStakeValue[msg.sender] += _usdtAmount;
@@ -310,6 +312,7 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
         require(_stakeId < userStakes[msg.sender].length, "StakingManager: Invalid stake ID");
         Stake storage stk = userStakes[msg.sender][_stakeId];
         require(stk.active, "StakingManager: Stake not active");
+        require(!stk.isMigrated, "StakingManager: Migrated stakes are locked");
 
         uint256 gross = (stk.originalAmount * RETURN_PERCENT) / 100;
 
@@ -423,7 +426,8 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
                 totalEarned: 0,
                 compoundEarned: 0,
                 active: true,
-                tier: t
+                tier: t,
+                isMigrated: true
             }));
 
             totalActiveStakeValue[u] += p;
@@ -486,6 +490,7 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
         if (_stakeId >= userStakes[_user].length) return 0;
         Stake memory stk = userStakes[_user][_stakeId];
         if (!stk.active) return 0;
+        if (stk.isMigrated) return 0;
         uint256 gross = (stk.originalAmount * RETURN_PERCENT) / 100;
         uint256 outstanding = totalIncomeClaimedUsd[_user] > totalIncomeDeductedUsd[_user]
             ? totalIncomeClaimedUsd[_user] - totalIncomeDeductedUsd[_user]

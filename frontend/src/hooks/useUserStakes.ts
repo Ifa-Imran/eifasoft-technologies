@@ -1,10 +1,10 @@
 'use client';
 
-import { useReadContract, useReadContracts, useAccount, usePublicClient } from 'wagmi';
+import { useReadContract, useReadContracts, useAccount } from 'wagmi';
 import { contracts, STAKING_TIERS, USDT_DECIMALS } from '@/config/contracts';
 import { StakingManagerABI } from '@/config/abis/StakingManager';
-import { formatUnits, parseAbiItem } from 'viem';
-import { useEffect, useMemo, useState } from 'react';
+import { formatUnits } from 'viem';
+import { useMemo } from 'react';
 
 // ─── Individual stake (raw on-chain data + derived) ──────────────────────────
 export interface StakeInfo {
@@ -83,46 +83,6 @@ function calcPendingProfit(
 
 export function useUserStakes() {
   const { address } = useAccount();
-  const publicClient = usePublicClient();
-  const [migratedIndexes, setMigratedIndexes] = useState<Set<number>>(new Set());
-
-  // ── Fetch StakeMigrated events to identify which stake indexes are migrated.
-  //    Migrated stakes cannot be unstaked (locked principal carried over from old contract).
-  useEffect(() => {
-    if (!publicClient || !address || contracts.stakingManager === '0x') return;
-    let cancelled = false;
-    (async () => {
-      try {
-        // Use a safe fromBlock range (some RPCs reject fromBlock:0n)
-        let safeFrom = 0n;
-        try {
-          const latestBlock = await publicClient.getBlockNumber();
-          safeFrom = latestBlock > 500_000n ? latestBlock - 500_000n : 0n;
-        } catch {}
-
-        const logs = await publicClient.getLogs({
-          address: contracts.stakingManager,
-          event: parseAbiItem('event StakeMigrated(address indexed user, uint256 stakeId, uint256 principal)'),
-          args: { user: address },
-          fromBlock: safeFrom,
-          toBlock: 'latest',
-        });
-
-        if (cancelled) return;
-        const indexes = new Set<number>();
-        for (const log of logs) {
-          const stakeId = (log.args as any)?.stakeId;
-          if (stakeId !== undefined && stakeId !== null) {
-            indexes.add(Number(stakeId));
-          }
-        }
-        setMigratedIndexes(indexes);
-      } catch (e) {
-        console.warn('Failed to fetch StakeMigrated logs:', e);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [publicClient, address]);
 
   const { data: stakeCount, isLoading: countLoading } = useReadContract({
     address: contracts.stakingManager,
@@ -234,7 +194,7 @@ export function useUserStakes() {
           hardCap,
           harvestable,
           previewUnstakeAmount,
-          isMigrated: migratedIndexes.has(i),
+          isMigrated: Boolean(s.isMigrated),
         };
       })
     : [];
