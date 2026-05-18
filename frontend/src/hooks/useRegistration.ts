@@ -77,7 +77,7 @@ export function useRegistration() {
     toast({ type: 'pending', title: 'Registering on blockchain...' });
   };
 
-  // Stored referrer from on-chain data (for CMS/staking referrer param)
+  // Stored referrer from on-chain data (for staking referrer param)
   const storedReferrer = hasOnChainReferrer ? (onChainReferrer as string) : '';
 
   return {

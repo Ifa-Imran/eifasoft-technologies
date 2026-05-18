@@ -193,11 +193,11 @@ function RegisterPageInner() {
               </li>
               <li className="flex items-start gap-3">
                 <span className="w-5 h-5 rounded-full bg-secondary-100 text-secondary-600 flex items-center justify-center flex-shrink-0 text-[10px] font-bold">2</span>
-                <span>Purchase CMS subscriptions to earn loyalty rewards</span>
+                <span>Stake USDT to start earning compound rewards</span>
               </li>
               <li className="flex items-start gap-3">
                 <span className="w-5 h-5 rounded-full bg-accent-100 text-accent-600 flex items-center justify-center flex-shrink-0 text-[10px] font-bold">3</span>
-                <span>Staking opens after CMS phase completes</span>
+                <span>Build your team and unlock referral income levels</span>
               </li>
             </ul>
           </div>

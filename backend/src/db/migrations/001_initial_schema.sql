@@ -55,20 +55,6 @@ CREATE TABLE IF NOT EXISTS income_ledger (
 CREATE INDEX IF NOT EXISTS idx_income_user ON income_ledger(user_address);
 CREATE INDEX IF NOT EXISTS idx_income_type ON income_ledger(income_type);
 
--- CMS subscriptions
-CREATE TABLE IF NOT EXISTS cms_subscriptions (
-    id SERIAL PRIMARY KEY,
-    buyer VARCHAR(42) NOT NULL,
-    referrer VARCHAR(42),
-    amount INTEGER NOT NULL,
-    loyalty_reward DECIMAL(36,18) DEFAULT 0,
-    leadership_rewards JSONB DEFAULT '{}',
-    claimed BOOLEAN DEFAULT FALSE,
-    tx_hash VARCHAR(66),
-    created_at TIMESTAMP DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_cms_buyer ON cms_subscriptions(buyer);
-
 -- P2P Orders
 CREATE TABLE IF NOT EXISTS p2p_orders (
     id SERIAL PRIMARY KEY,

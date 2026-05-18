@@ -383,74 +383,6 @@ async function handleAffiliateHarvested(
     await setLastIndexedBlock('AffiliateDistributor', blockNumber);
 }
 
-// ============ CMS Event Handlers ============
-
-async function handleSubscriptionPurchased(
-    buyer: string, amount: bigint, referrer: string,
-    txHash: string, blockNumber: number
-): Promise<void> {
-    const client = await getClient();
-    const buyerAddr = toLower(buyer);
-    const refAddr = referrer === ethers.ZeroAddress ? null : toLower(referrer);
-    try {
-        await client.query('BEGIN');
-
-        await client.query(
-            `INSERT INTO users (wallet_address, created_at, updated_at) VALUES ($1, NOW(), NOW()) ON CONFLICT (wallet_address) DO NOTHING`,
-            [buyerAddr]
-        );
-
-        await client.query(
-            `INSERT INTO cms_subscriptions (buyer, referrer, amount, tx_hash, created_at)
-             VALUES ($1, $2, $3, $4, NOW())`,
-            [buyerAddr, refAddr, Number(amount), txHash]
-        );
-
-        await client.query('COMMIT');
-        console.log(`[CMS] SubscriptionPurchased indexed: buyer=${buyerAddr}, amount=${amount}`);
-    } catch (err) {
-        await client.query('ROLLBACK');
-        console.error('[CMS] Error handling SubscriptionPurchased:', err);
-    } finally {
-        client.release();
-    }
-    await setLastIndexedBlock('CMS', blockNumber);
-}
-
-async function handleRewardsClaimed(
-    user: string, userAmount: bigint, systemAmount: bigint, excessDeleted: bigint,
-    txHash: string, blockNumber: number
-): Promise<void> {
-    const client = await getClient();
-    const addr = toLower(user);
-    try {
-        await client.query('BEGIN');
-
-        // Mark all subscriptions for this user as claimed
-        await client.query(
-            `UPDATE cms_subscriptions SET claimed = TRUE WHERE buyer = $1`,
-            [addr]
-        );
-
-        // Record in income ledger
-        await client.query(
-            `INSERT INTO income_ledger (user_address, income_type, amount_kairo, tx_hash, created_at)
-             VALUES ($1, 'CMS_CLAIM', $2, $3, NOW())
-             ON CONFLICT (user_address, income_type, tx_hash) DO NOTHING`,
-            [addr, formatUnits(userAmount), txHash]
-        );
-
-        await client.query('COMMIT');
-        console.log(`[CMS] RewardsClaimed indexed: user=${addr}, userAmount=${formatUnits(userAmount)}, excess=${formatUnits(excessDeleted)}`);
-    } catch (err) {
-        await client.query('ROLLBACK');
-        console.error('[CMS] Error handling RewardsClaimed:', err);
-    } finally {
-        client.release();
-    }
-    await setLastIndexedBlock('CMS', blockNumber);
-}
-
 // ============ AtomicP2p Event Handlers ============
 
 async function handleBuyOrderCreated(
@@ -685,20 +617,6 @@ function setupRealtimeListeners(contracts: NonNullable<ReturnType<typeof getWsCo
         await handleAffiliateHarvested(user, incomeType, usdAmount, kairoAmount, txHash, blockNumber);
     });
 
-    // CMS
-    contracts.cms.on('SubscriptionPurchased', async (buyer: string, amount: bigint, referrer: string, event: any) => {
-        const txHash = event.log?.transactionHash || '';
-        const blockNumber = event.log?.blockNumber || 0;
-        await handleSubscriptionPurchased(buyer, amount, referrer, txHash, blockNumber);
-        triggerClosingCheck();
-    });
-
-    contracts.cms.on('RewardsClaimed', async (user: string, userAmount: bigint, systemAmount: bigint, excessDeleted: bigint, event: any) => {
-        const txHash = event.log?.transactionHash || '';
-        const blockNumber = event.log?.blockNumber || 0;
-        await handleRewardsClaimed(user, userAmount, systemAmount, excessDeleted, txHash, blockNumber);
-    });
-
     // AtomicP2p
     contracts.atomicP2p.on('BuyOrderCreated', async (orderId: bigint, creator: string, usdtAmount: bigint, timestamp: bigint, event: any) => {
         const txHash = event.log?.transactionHash || '';
@@ -746,7 +664,6 @@ async function startPollingLoop(
     httpContracts: {
         stakingManager: ethers.Contract;
         affiliateDistributor: ethers.Contract;
-        cms: ethers.Contract;
         atomicP2p: ethers.Contract;
     },
     contractConfigs: Array<{
@@ -814,7 +731,6 @@ export async function startIndexer(): Promise<void> {
     const httpContracts = {
         stakingManager: contracts.stakingManager.connect(provider) as ethers.Contract,
         affiliateDistributor: contracts.affiliateDistributor.connect(provider) as ethers.Contract,
-        cms: contracts.cms.connect(provider) as ethers.Contract,
         atomicP2p: contracts.atomicP2p.connect(provider) as ethers.Contract,
     };
 
@@ -840,14 +756,6 @@ export async function startIndexer(): Promise<void> {
                 DirectEarned: handleDirectEarned,
                 TeamEarned: handleTeamEarned,
                 Harvested: handleAffiliateHarvested,
-            },
-        },
-        {
-            name: 'CMS',
-            contract: httpContracts.cms,
-            handlers: {
-                SubscriptionPurchased: handleSubscriptionPurchased,
-                RewardsClaimed: handleRewardsClaimed,
             },
         },
         {

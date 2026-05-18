@@ -9,7 +9,6 @@ import { useUserStakes } from '@/hooks/useUserStakes';
 import { useApproval } from '@/hooks/useApproval';
 import { useTokenBalances } from '@/hooks/useTokenBalances';
 import { useRegistration } from '@/hooks/useRegistration';
-import { useCMS } from '@/hooks/useCMS';
 import { contracts, STAKING_TIERS, USDT_DECIMALS } from '@/config/contracts';
 import { parseUnits, isAddress, zeroAddress, formatUnits } from 'viem';
 import { useAffiliate } from '@/hooks/useAffiliate';
@@ -150,20 +149,9 @@ function StakePageInner() {
   const { tierGroups, activeStakes, stakes, isLoading, outstandingClaimedUsd } = useUserStakes();
   const { usdtFormatted } = useTokenBalances();
   const { storedReferrer, hasOnChainReferrer } = useRegistration();
-  const { remainingSubscriptions, isSubscriptionEnded, subscribeDeadline } = useCMS();
   const { unlockedLevels, directReferrals: directRefs } = useAffiliate();
   const approval = useApproval(contracts.usdt, contracts.stakingManager);
   const [now, setNow] = useState(Math.floor(Date.now() / 1000));
-
-  // CMS phase is active only if subscriptions remain AND deadline hasn't passed
-  const cmsActive = remainingSubscriptions > 0 && !isSubscriptionEnded;
-
-  // CMS countdown
-  const cmsTimeLeft = subscribeDeadline > 0 ? Math.max(0, subscribeDeadline - now) : 0;
-  const cmsDays = Math.floor(cmsTimeLeft / 86400);
-  const cmsHours = Math.floor((cmsTimeLeft % 86400) / 3600);
-  const cmsMinutes = Math.floor((cmsTimeLeft % 3600) / 60);
-  const cmsSeconds = cmsTimeLeft % 60;
 
   // Real-time tick every second for accruing earnings display
   useEffect(() => {
@@ -196,7 +184,6 @@ function StakePageInner() {
   }, [approval.allowance]);
 
   const handleStake = () => {
-    if (cmsActive) return;
     if (needsApproval) {
       pendingStakeRef.current = true;
       approval.approve(stakeAmountBigInt);
@@ -228,48 +215,6 @@ function StakePageInner() {
     <div className="space-y-6">
       <h1 className="text-3xl font-orbitron font-bold gradient-text">Staking</h1>
 
-      {cmsActive && (
-        <GlassCard variant="gradient">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="flex items-center gap-3 flex-1">
-              <div className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-accent-400 to-accent-300 flex items-center justify-center shadow-md shadow-accent-300/30">
-                <ClockIcon className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-surface-900">CMS Phase Active</h3>
-                <p className="text-xs text-surface-500">
-                  Staking opens after all {remainingSubscriptions.toLocaleString()} remaining CMS subscriptions are sold or the deadline passes.
-                </p>
-              </div>
-            </div>
-            {cmsTimeLeft > 0 && (
-              <div className="flex items-center justify-center gap-1.5">
-                {cmsDays > 0 && (
-                  <div className="text-center px-2 py-1.5 rounded-lg bg-white/70 border border-accent-200">
-                    <p className="text-lg font-mono font-bold text-accent-700">{cmsDays}</p>
-                    <p className="text-[9px] text-surface-400">DAYS</p>
-                  </div>
-                )}
-                <div className="text-center px-2 py-1.5 rounded-lg bg-white/70 border border-accent-200">
-                  <p className="text-lg font-mono font-bold text-accent-700">{String(cmsHours).padStart(2, '0')}</p>
-                  <p className="text-[9px] text-surface-400">HRS</p>
-                </div>
-                <span className="text-accent-400 font-bold">:</span>
-                <div className="text-center px-2 py-1.5 rounded-lg bg-white/70 border border-accent-200">
-                  <p className="text-lg font-mono font-bold text-accent-700">{String(cmsMinutes).padStart(2, '0')}</p>
-                  <p className="text-[9px] text-surface-400">MIN</p>
-                </div>
-                <span className="text-accent-400 font-bold">:</span>
-                <div className="text-center px-2 py-1.5 rounded-lg bg-white/70 border border-accent-200">
-                  <p className="text-lg font-mono font-bold text-accent-700">{String(cmsSeconds).padStart(2, '0')}</p>
-                  <p className="text-[9px] text-surface-400">SEC</p>
-                </div>
-              </div>
-            )}
-          </div>
-        </GlassCard>
-      )}
-
       {/* Tier Comparison */}
       <div className="grid grid-cols-3 gap-4">
         {STAKING_TIERS.map((t, i) => {
@@ -295,7 +240,7 @@ function StakePageInner() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Stake Form */}
-        <GlassCard className={`lg:col-span-1 ${cmsActive ? 'opacity-50 pointer-events-none' : ''}`}>
+        <GlassCard className="lg:col-span-1">
           <h3 className="text-xl font-semibold text-surface-900">New Stake</h3>
 
           <div className="space-y-4">
@@ -321,10 +266,10 @@ function StakePageInner() {
             <Button
               onClick={handleStake}
               loading={isPending || approval.isPending}
-              disabled={numAmount < 10 || cmsActive}
+              disabled={numAmount < 10}
               className="w-full"
             >
-              {cmsActive ? 'Staking Not Yet Available' : needsApproval ? `Approve & Stake $${numAmount}` : `Stake $${numAmount}`}
+              {needsApproval ? `Approve & Stake $${numAmount}` : `Stake $${numAmount}`}
             </Button>
           </div>
         </GlassCard>
@@ -343,9 +288,7 @@ function StakePageInner() {
                   <BoltIcon className="w-8 h-8 text-white" />
                 </div>
                 <p className="text-surface-500 text-sm">
-                  {cmsActive
-                    ? 'Staking will be available after the CMS phase completes.'
-                    : 'No active stakes yet. Create your first stake to start earning!'}
+                  No active stakes yet. Create your first stake to start earning!
                 </p>
               </div>
             </GlassCard>

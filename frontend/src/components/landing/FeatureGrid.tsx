@@ -7,7 +7,7 @@ import {
   ArrowsRightLeftIcon,
   UserGroupIcon,
   TrophyIcon,
-  CreditCardIcon,
+  FireIcon,
   ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 
@@ -45,9 +45,9 @@ const features = [
     cardVariant: 'gold' as const,
   },
   {
-    title: 'CMS Subscriptions',
-    description: '10,000 limited membership slots with 5 KAIRO loyalty per subscription.',
-    icon: CreditCardIcon,
+    title: 'Deflationary Burn',
+    description: 'Continuous KAIRO burn from swap and trading fees reduces supply over time.',
+    icon: FireIcon,
     iconBg: 'from-danger-500 to-danger-300',
     iconColor: 'text-white',
     cardVariant: 'purple' as const,

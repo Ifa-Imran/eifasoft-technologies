@@ -14,7 +14,6 @@ interface Config {
         liquidityPool: string;
         stakingManager: string;
         affiliateDistributor: string;
-        cms: string;
         atomicP2p: string;
     };
     systemWallet: string;
@@ -42,7 +41,6 @@ export const config: Config = {
         liquidityPool: process.env.LIQUIDITY_POOL_ADDRESS || '',
         stakingManager: process.env.STAKING_MANAGER_ADDRESS || '',
         affiliateDistributor: process.env.AFFILIATE_DISTRIBUTOR_ADDRESS || '',
-        cms: process.env.CMS_ADDRESS || '',
         atomicP2p: process.env.ATOMIC_P2P_ADDRESS || '',
     },
     systemWallet: process.env.SYSTEM_WALLET || '',

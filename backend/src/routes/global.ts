@@ -6,7 +6,6 @@ import {
     getLivePrice,
     getKAIROToken,
     getLiquidityPool,
-    getCMS,
     getCurrentBlock,
 } from '../services/blockchain';
 import { getConnectedClients } from '../services/websocket';
@@ -24,7 +23,6 @@ router.get('/global/stats', async (_req: Request, res: Response) => {
             const [
                 tvlResult,
                 stakingCountsResult,
-                cmsResult,
                 p2pOrdersResult,
                 p2pTradesResult,
                 p2pVolume24hResult,
@@ -41,11 +39,6 @@ router.get('/global/stats', async (_req: Request, res: Response) => {
                         COUNT(DISTINCT user_address)::int AS total_stakers,
                         COALESCE(AVG(amount), 0) AS average_stake
                      FROM stakes WHERE is_active = TRUE`
-                ),
-                query(
-                    `SELECT
-                        COUNT(*)::int AS total_subscriptions
-                     FROM cms_subscriptions`
                 ),
                 query(
                     `SELECT
@@ -71,8 +64,6 @@ router.get('/global/stats', async (_req: Request, res: Response) => {
             let effectiveSupply = '0';
             let socialLock = '0';
             let change24h = '0';
-            let cmsDeadline = 0;
-            let cmsRemaining = 0;
 
             // Price
             try {
@@ -100,23 +91,8 @@ router.get('/global/stats', async (_req: Request, res: Response) => {
                 // fall back to global_stats table
             }
 
-            // CMS info
-            try {
-                const cmsContract = getCMS();
-                if (!cmsContract) throw new Error('Contracts not configured');
-                const [deadline, remaining] = await Promise.all([
-                    cmsContract.deadline().catch(() => BigInt(0)),
-                    cmsContract.getRemainingSubscriptions().catch(() => BigInt(0)),
-                ]);
-                cmsDeadline = Number(deadline);
-                cmsRemaining = Number(remaining);
-            } catch {
-                // best-effort
-            }
-
             const tvlRow = tvlResult.rows[0];
             const stakingRow = stakingCountsResult.rows[0];
-            const cmsRow = cmsResult.rows[0];
             const p2pRow = p2pOrdersResult.rows[0];
             const p2pTradesRow = p2pTradesResult.rows[0];
             const p2pVol = p2pVolume24hResult.rows[0];
@@ -141,11 +117,6 @@ router.get('/global/stats', async (_req: Request, res: Response) => {
                     activeStakes: stakingRow?.active_stakes || 0,
                     totalStakers: stakingRow?.total_stakers || 0,
                     averageStake: stakingRow?.average_stake?.toString() || '0',
-                },
-                cms: {
-                    totalSubscriptions: cmsRow?.total_subscriptions || 0,
-                    remainingSubscriptions: cmsRemaining,
-                    deadlineTimestamp: cmsDeadline,
                 },
                 p2p: {
                     activeBuyOrders: p2pRow?.active_buy || 0,

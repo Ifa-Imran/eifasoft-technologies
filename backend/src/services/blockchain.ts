@@ -3,7 +3,6 @@ import { config } from '../config';
 import {
     StakingManagerABI,
     AffiliateDistributorABI,
-    CoreMembershipSubscriptionABI,
     AtomicP2pABI,
     KAIROTokenABI,
     LiquidityPoolABI,
@@ -58,7 +57,7 @@ export function getWsProvider(): WebSocketProvider | null {
  */
 export function areContractsConfigured(): boolean {
     const c = config.contracts;
-    return !!(c.kairoToken && c.liquidityPool && c.stakingManager && c.affiliateDistributor && c.cms && c.atomicP2p);
+    return !!(c.kairoToken && c.liquidityPool && c.stakingManager && c.affiliateDistributor && c.atomicP2p);
 }
 
 export function getStakingManager(): Contract | null {
@@ -69,11 +68,6 @@ export function getStakingManager(): Contract | null {
 export function getAffiliateDistributor(): Contract | null {
     if (!config.contracts.affiliateDistributor) return null;
     return new Contract(config.contracts.affiliateDistributor, AffiliateDistributorABI, getHttpProvider());
-}
-
-export function getCMS(): Contract | null {
-    if (!config.contracts.cms) return null;
-    return new Contract(config.contracts.cms, CoreMembershipSubscriptionABI, getHttpProvider());
 }
 
 export function getAtomicP2p(): Contract | null {
@@ -94,14 +88,13 @@ export function getLiquidityPool(): Contract | null {
 /**
  * Get contracts connected to the WebSocket provider for event listening
  */
-export function getWsContracts(): { stakingManager: Contract; affiliateDistributor: Contract; cms: Contract; atomicP2p: Contract } | null {
+export function getWsContracts(): { stakingManager: Contract; affiliateDistributor: Contract; atomicP2p: Contract } | null {
     if (!areContractsConfigured()) return null;
     const provider = wsProvider || getHttpProvider();
 
     return {
         stakingManager: new Contract(config.contracts.stakingManager, StakingManagerABI, provider),
         affiliateDistributor: new Contract(config.contracts.affiliateDistributor, AffiliateDistributorABI, provider),
-        cms: new Contract(config.contracts.cms, CoreMembershipSubscriptionABI, provider),
         atomicP2p: new Contract(config.contracts.atomicP2p, AtomicP2pABI, provider),
     };
 }

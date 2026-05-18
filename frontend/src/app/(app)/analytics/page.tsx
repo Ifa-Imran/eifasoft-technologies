@@ -3,8 +3,7 @@
 import { GlassCard, StatCard, ProgressBar } from '@/components/ui';
 import { useGlobalStats } from '@/hooks/useGlobalStats';
 import { useKairoPrice } from '@/hooks/useKairoPrice';
-import { useCMS } from '@/hooks/useCMS';
-import { USDT_DECIMALS, KAIRO_DECIMALS, CMS_MAX_SUBSCRIPTIONS } from '@/config/contracts';
+import { USDT_DECIMALS, KAIRO_DECIMALS } from '@/config/contracts';
 import { formatUnits } from 'viem';
 import { formatPrice, formatCompact } from '@/lib/utils';
 import {
@@ -23,7 +22,6 @@ import {
 export default function AnalyticsPage() {
   const { tvlFormatted, totalBurnedFormatted, totalSupplyFormatted, effectiveSupplyFormatted, socialLockFormatted, swapStats, globalCap, orderBookStats, p2pLiquidity, poolBalances } = useGlobalStats();
   const { price } = useKairoPrice();
-  const { totalSubscriptions, remainingSubscriptions } = useCMS();
   const marketCap = price * Number(totalSupplyFormatted);
 
   // Parse swap stats
@@ -175,7 +173,7 @@ export default function AnalyticsPage() {
         </GlassCard>
       </div>
 
-      {/* DEX & CMS Stats */}
+      {/* DEX Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <GlassCard>
           <div className="flex items-center gap-3 mb-5">
@@ -210,78 +208,6 @@ export default function AnalyticsPage() {
 
         <GlassCard>
           <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-400 to-accent-300 flex items-center justify-center shadow-md shadow-accent-300/30">
-              <TicketIcon className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-surface-900">CMS Membership</h3>
-              <p className="text-xs text-surface-500">Limited to {CMS_MAX_SUBSCRIPTIONS.toLocaleString()} total</p>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-accent-50/60 to-white border border-accent-100/50">
-                <p className="text-[10px] uppercase tracking-wider text-surface-400">Total Sold</p>
-                <p className="text-lg font-mono font-bold text-surface-900">{totalSubscriptions.toLocaleString()}</p>
-              </div>
-              <div className="p-3 rounded-xl bg-gradient-to-br from-primary-100/60 to-primary-50/40 border border-primary-200/50">
-                <p className="text-[10px] uppercase tracking-wider text-surface-400">Remaining</p>
-                <p className="text-lg font-mono font-bold text-primary-600">{remainingSubscriptions.toLocaleString()}</p>
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between text-xs text-surface-500 mb-1">
-                <span>Subscription Progress</span>
-                <span className="font-mono">{CMS_MAX_SUBSCRIPTIONS > 0 ? ((totalSubscriptions / CMS_MAX_SUBSCRIPTIONS) * 100).toFixed(2) : 0}%</span>
-              </div>
-              <ProgressBar value={totalSubscriptions} max={CMS_MAX_SUBSCRIPTIONS} variant="purple" size="sm" />
-            </div>
-          </div>
-        </GlassCard>
-      </div>
-
-      {/* P2P Exchange & Pool Balances */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <GlassCard>
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-400 to-secondary-400 flex items-center justify-center shadow-md shadow-primary-300/30">
-              <ArrowsRightLeftIcon className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-surface-900">P2P Exchange</h3>
-              <p className="text-xs text-surface-500">Atomic peer-to-peer trading</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-success-50/60 to-white border border-success-100/50">
-              <p className="text-[10px] uppercase tracking-wider text-surface-400">Buy Orders</p>
-              <p className="text-lg font-mono font-bold text-success-700">{p2pTotalBuys}</p>
-            </div>
-            <div className="p-3 rounded-xl bg-gradient-to-br from-danger-50/60 to-white border border-danger-100/50">
-              <p className="text-[10px] uppercase tracking-wider text-surface-400">Sell Orders</p>
-              <p className="text-lg font-mono font-bold text-danger-700">{p2pTotalSells}</p>
-            </div>
-            <div className="p-3 rounded-xl bg-gradient-to-br from-primary-50/60 to-white border border-primary-100/50">
-              <p className="text-[10px] uppercase tracking-wider text-surface-400">Filled Trades</p>
-              <p className="text-lg font-mono font-bold text-primary-700">{p2pFilledTrades}</p>
-            </div>
-            <div className="p-3 rounded-xl bg-gradient-to-br from-accent-100/60 to-accent-50/40 border border-accent-200/50">
-              <p className="text-[10px] uppercase tracking-wider text-surface-400">P2P Volume</p>
-              <p className="text-lg font-mono font-bold text-accent-600">${formatCompact(p2pTotalVolume, 2)}</p>
-            </div>
-          </div>
-          {p2pLockedLiquidity > 0 && (
-            <div className="mt-3 p-3 rounded-xl bg-gradient-to-r from-primary-100/50 to-secondary-100/50 border border-primary-200/50 text-center">
-              <p className="text-[10px] uppercase tracking-wider text-surface-400">Locked Liquidity (P2P)</p>
-              <p className="text-lg font-mono font-bold text-primary-700">${formatCompact(p2pLockedLiquidity, 2)}</p>
-            </div>
-          )}
-        </GlassCard>
-
-        <GlassCard>
-          <div className="flex items-center gap-3 mb-5">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-success-400 to-success-300 flex items-center justify-center shadow-md shadow-success-300/30">
               <CubeIcon className="w-5 h-5 text-white" />
             </div>
@@ -305,6 +231,46 @@ export default function AnalyticsPage() {
             <div className="mt-3 p-3 rounded-xl bg-gradient-to-r from-surface-50 to-primary-50/30 border border-surface-200 text-center">
               <p className="text-[10px] uppercase tracking-wider text-surface-400">Price (USDT / Total Supply)</p>
               <p className="text-lg font-mono font-bold text-surface-900">${(poolUsdt / totalSupplyNum).toFixed(6)}</p>
+            </div>
+          )}
+        </GlassCard>
+      </div>
+
+      {/* P2P Exchange */}
+      <div className="grid grid-cols-1 gap-6">
+        <GlassCard>
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-400 to-secondary-400 flex items-center justify-center shadow-md shadow-primary-300/30">
+              <ArrowsRightLeftIcon className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-surface-900">P2P Exchange</h3>
+              <p className="text-xs text-surface-500">Atomic peer-to-peer trading</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-success-50/60 to-white border border-success-100/50">
+              <p className="text-[10px] uppercase tracking-wider text-surface-400">Buy Orders</p>
+              <p className="text-lg font-mono font-bold text-success-700">{p2pTotalBuys}</p>
+            </div>
+            <div className="p-3 rounded-xl bg-gradient-to-br from-danger-50/60 to-white border border-danger-100/50">
+              <p className="text-[10px] uppercase tracking-wider text-surface-400">Sell Orders</p>
+              <p className="text-lg font-mono font-bold text-danger-700">{p2pTotalSells}</p>
+            </div>
+            <div className="p-3 rounded-xl bg-gradient-to-br from-primary-50/60 to-white border border-primary-100/50">
+              <p className="text-[10px] uppercase tracking-wider text-surface-400">Filled Trades</p>
+              <p className="text-lg font-mono font-bold text-primary-700">{p2pFilledTrades}</p>
+            </div>
+            <div className="p-3 rounded-xl bg-gradient-to-br from-accent-100/60 to-accent-50/40 border border-accent-200/50">
+              <p className="text-[10px] uppercase tracking-wider text-surface-400">P2P Volume</p>
+              <p className="text-lg font-mono font-bold text-accent-600">${formatCompact(p2pTotalVolume, 2)}</p>
+            </div>
+          </div>
+          {p2pLockedLiquidity > 0 && (
+            <div className="mt-3 p-3 rounded-xl bg-gradient-to-r from-primary-100/50 to-secondary-100/50 border border-primary-200/50 text-center">
+              <p className="text-[10px] uppercase tracking-wider text-surface-400">Locked Liquidity (P2P)</p>
+              <p className="text-lg font-mono font-bold text-primary-700">${formatCompact(p2pLockedLiquidity, 2)}</p>
             </div>
           )}
         </GlassCard>

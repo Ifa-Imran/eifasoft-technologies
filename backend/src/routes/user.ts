@@ -3,7 +3,7 @@ import { ethers } from 'ethers';
 import { query } from '../db/connection';
 import { validateAddressParam } from '../utils/validation';
 import { cache, TTL } from '../utils/cache';
-import { getAffiliateDistributor, getCMS, getLivePrice } from '../services/blockchain';
+import { getAffiliateDistributor, getLivePrice } from '../services/blockchain';
 import { getDownline, getTeamVolume, getLargestLeg, getDirectReferralCount } from '../utils/referral-tree';
 
 const router = Router();
@@ -26,7 +26,7 @@ router.get('/user/:address/dashboard', validateAddressParam, async (req: Request
         const walletAddress = req.params.address.toLowerCase();
 
         // ---------- DB queries (parallel) ----------
-        const [userResult, stakesResult, cmsResult, incomeAggResult] = await Promise.all([
+        const [userResult, stakesResult, incomeAggResult] = await Promise.all([
             query(
                 'SELECT * FROM users WHERE wallet_address = $1',
                 [walletAddress]
@@ -34,14 +34,6 @@ router.get('/user/:address/dashboard', validateAddressParam, async (req: Request
             query(
                 `SELECT * FROM stakes WHERE user_address = $1 AND is_active = TRUE
                  ORDER BY created_at DESC`,
-                [walletAddress]
-            ),
-            query(
-                `SELECT
-                    COUNT(*)::int AS subscription_count,
-                    COALESCE(SUM(loyalty_reward), 0) AS loyalty_rewards,
-                    bool_or(claimed) AS any_claimed
-                 FROM cms_subscriptions WHERE buyer = $1`,
                 [walletAddress]
             ),
             query(
@@ -115,40 +107,6 @@ router.get('/user/:address/dashboard', validateAddressParam, async (req: Request
             // Contract call failed – fall back to DB aggregates
         }
 
-        // ---------- CMS data ----------
-        const cmsRow = cmsResult.rows[0] || {};
-        let cmsClaimable = '0';
-        let cmsLoyalty = '0';
-        let cmsLeadership = '0';
-        let cmsExcessToDelete = '0';
-        try {
-            const cmsContract = getCMS();
-            if (!cmsContract) throw new Error('Contracts not configured');
-            const [loyalty, leadership, total] = await cmsContract.getClaimableRewards(walletAddress);
-            cmsClaimable = ethers.formatEther(total);
-            cmsLoyalty = ethers.formatEther(loyalty);
-            cmsLeadership = ethers.formatEther(leadership);
-        } catch {
-            // best-effort
-        }
-
-        // max claimable is based on active stake value
-        const maxClaimable = totalActiveValue;
-        const claimableNum = parseFloat(cmsClaimable);
-        const maxNum = parseFloat(maxClaimable);
-        if (claimableNum > maxNum) {
-            cmsExcessToDelete = (claimableNum - maxNum).toString();
-        }
-
-        const cms = {
-            subscriptionCount: cmsRow.subscription_count || 0,
-            loyaltyRewards: cmsLoyalty,
-            leadershipRewards: cmsLeadership,
-            claimed: cmsRow.any_claimed || false,
-            maxClaimable,
-            excessToDelete: cmsExcessToDelete,
-        };
-
         // ---------- Team stats (parallel) ----------
         const [directCount, teamVolume, largestLegData] = await Promise.all([
             getDirectReferralCount(walletAddress),
@@ -182,7 +140,6 @@ router.get('/user/:address/dashboard', validateAddressParam, async (req: Request
                     totalActiveValue,
                 },
                 income: liveIncome,
-                cms,
                 teamStats,
             },
         });

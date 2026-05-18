@@ -9,7 +9,6 @@ import {
   CurrencyDollarIcon,
   ArrowsRightLeftIcon,
   UserGroupIcon,
-  CreditCardIcon,
   ArrowPathIcon,
   ChartBarIcon,
   ChevronLeftIcon,
@@ -22,7 +21,6 @@ const navItems = [
   { href: '/exchange', label: 'Atomic P2P', icon: ArrowsRightLeftIcon },
   { href: '/referrals', label: 'Rank Dividend', icon: UserGroupIcon },
   { href: '/team-dividend', label: 'Team Dividend', icon: UsersIcon },
-  { href: '/cms', label: 'CMS', icon: CreditCardIcon },
   { href: '/swap', label: 'Swap', icon: ArrowPathIcon },
   { href: '/analytics', label: 'Analytics', icon: ChartBarIcon },
 ];

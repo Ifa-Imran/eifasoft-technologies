@@ -2,13 +2,11 @@
 
 import { useAccount } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { Button } from '@/components/ui';
 import { PortfolioOverview } from '@/components/dashboard/PortfolioOverview';
 import { ActiveStakesTable } from '@/components/dashboard/ActiveStakesTable';
 import { IncomeSummary } from '@/components/dashboard/IncomeSummary';
 import { ReferralWidget } from '@/components/dashboard/ReferralWidget';
 import { MockUsdtFaucet } from '@/components/dashboard/MockUsdtFaucet';
-import Link from 'next/link';
 
 export default function DashboardPage() {
   const { isConnected } = useAccount();
@@ -29,11 +27,6 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-orbitron font-bold gradient-text">Dashboard</h1>
-        <Link href="/cms">
-          <Button variant="primary" size="sm">
-            Buy CMS
-          </Button>
-        </Link>
       </div>
 
       <ReferralWidget />

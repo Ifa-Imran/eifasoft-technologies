@@ -60,30 +60,6 @@ export const AffiliateDistributorABI = [
     "function teamVolume(address) external view returns (uint256)",
 ];
 
-// ============ CoreMembershipSubscription ABI ============
-export const CoreMembershipSubscriptionABI = [
-    // Events
-    "event SubscriptionPurchased(address indexed buyer, uint256 amount, address indexed referrer)",
-    "event RewardsClaimed(address indexed user, uint256 userAmount, uint256 systemAmount, uint256 excessDeleted)",
-    "event DeadlineExtended(uint256 oldDeadline, uint256 newDeadline)",
-    // Key functions
-    "function subscribe(uint256 _amount, address _referrer) external",
-    "function claimCMSRewards() external",
-    "function getClaimableRewards(address _user) external view returns (uint256 loyalty, uint256 leadership, uint256 total)",
-    "function getMaxClaimable(address _user) external view returns (uint256)",
-    "function getExcessToBeDeleted(address _user) external view returns (uint256)",
-    "function getSubscriptionCount(address _user) external view returns (uint256)",
-    "function getRemainingSubscriptions() external view returns (uint256)",
-    "function isDeadlinePassed() external view returns (bool)",
-    "function canClaim(address _user) external view returns (bool eligible, string reason)",
-    "function totalSubscriptions() external view returns (uint256)",
-    "function deadline() external view returns (uint256)",
-    "function subscriptionCount(address) external view returns (uint256)",
-    "function loyaltyRewards(address) external view returns (uint256)",
-    "function leadershipRewards(address) external view returns (uint256)",
-    "function hasClaimed(address) external view returns (bool)",
-];
-
 // ============ AtomicP2p ABI ============
 export const AtomicP2pABI = [
     // Events
