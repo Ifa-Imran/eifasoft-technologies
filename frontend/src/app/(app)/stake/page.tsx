@@ -13,7 +13,7 @@ import { useCMS } from '@/hooks/useCMS';
 import { contracts, STAKING_TIERS, USDT_DECIMALS } from '@/config/contracts';
 import { parseUnits, isAddress, zeroAddress, formatUnits } from 'viem';
 import { useAffiliate } from '@/hooks/useAffiliate';
-import { ArrowDownTrayIcon, ClockIcon, LockClosedIcon, LockOpenIcon, BoltIcon, CheckCircleIcon, XCircleIcon, FireIcon, CalculatorIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, ArrowPathIcon, ArrowUturnLeftIcon, ClockIcon, LockClosedIcon, LockOpenIcon, BoltIcon, CheckCircleIcon, XCircleIcon, FireIcon, CalculatorIcon } from '@heroicons/react/24/outline';
 
 function getTier(amount: number) {
   if (amount >= 2000) return STAKING_TIERS[2];
@@ -146,7 +146,7 @@ function CompoundingCalculator() {
 function StakePageInner() {
   const { isConnected } = useAccount();
   const [amount, setAmount] = useState('');
-  const { stake, harvestTier, isPending } = useStaking();
+  const { stake, harvestTier, compoundTier, unstake, isPending, isCompounding } = useStaking();
   const { tierGroups, activeStakes, stakes, isLoading } = useUserStakes();
   const { usdtFormatted } = useTokenBalances();
   const { storedReferrer, hasOnChainReferrer } = useRegistration();
@@ -204,6 +204,23 @@ function StakePageInner() {
     }
     const ref = storedReferrer && isAddress(storedReferrer) ? (storedReferrer as `0x${string}`) : zeroAddress;
     stake(stakeAmountBigInt, ref);
+  };
+
+  /**
+   * Confirm + trigger unstake for a single stake.
+   * The contract returns 80% of the ORIGINAL stake amount as KAIRO (less any
+   * outstanding income that hasn't been deducted yet). Stake is closed.
+   */
+  const handleUnstake = (stakeIndex: number, originalUsdt: number) => {
+    const principalBack = (originalUsdt * 0.8).toFixed(2);
+    const ok = typeof window !== 'undefined' && window.confirm(
+      `Unstake #${stakeIndex + 1}?\n\n` +
+      `You staked $${originalUsdt.toFixed(2)} USDT.\n` +
+      `On unstake you receive 80% (~$${principalBack}) as KAIRO, MINUS any outstanding harvested income.\n\n` +
+      `This action is irreversible. Continue?`
+    );
+    if (!ok) return;
+    unstake(BigInt(stakeIndex));
   };
 
   return (
@@ -294,7 +311,7 @@ function StakePageInner() {
               <div className="flex items-center gap-2 p-3 rounded-xl bg-gradient-to-r from-primary-50 to-secondary-50 border border-primary-100">
                 <Badge tier={tier.name.toLowerCase() as any}>{tier.name}</Badge>
                 <span className="text-xs text-surface-500">
-                  Auto-compound every {tier.compoundInterval >= 3600 ? `${tier.compoundInterval / 3600}h` : `${tier.compoundInterval / 60}m`} &middot; 3X FIFO Cap
+                  Compound every {tier.compoundInterval >= 3600 ? `${tier.compoundInterval / 3600}h` : `${tier.compoundInterval / 60}m`} (manual) &middot; 3X FIFO Cap
                 </span>
               </div>
             )}
@@ -345,9 +362,9 @@ function StakePageInner() {
                           {tg.stakeCount} stake{tg.stakeCount > 1 ? 's' : ''}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1.5 text-xs text-success-600 font-medium">
-                        <div className="w-2 h-2 rounded-full bg-success-500 animate-pulse" />
-                        Auto-Compounding
+                      <div className="flex items-center gap-1.5 text-xs text-surface-500 font-medium">
+                        <ClockIcon className="w-3.5 h-3.5" />
+                        Manual compound &middot; {tg.compoundInterval >= 3600 ? `${tg.compoundInterval / 3600}h` : `${tg.compoundInterval / 60}m`}
                       </div>
                     </div>
 
@@ -384,17 +401,44 @@ function StakePageInner() {
                       </div>
                     </div>
 
-                    {/* Harvest Button — enabled when displayHarvestable >= $10 */}
-                    <Button
-                      onClick={() => harvestTier(tg.stakes)}
-                      loading={isPending}
-                      disabled={tg.displayHarvestable < BigInt(10) * BigInt(10 ** 18)}
-                      className="w-full"
-                      size="sm"
-                      icon={<ArrowDownTrayIcon className="w-4 h-4" />}
-                    >
-                      {tg.displayHarvestable >= BigInt(10) * BigInt(10 ** 18) ? `Harvest $${tg.displayHarvestableFormatted}` : 'Min $10 to Harvest'}
-                    </Button>
+                    {/* Pending compound (claimable on next compound() call) */}
+                    {tg.pendingProfit > 0n && (
+                      <div className="flex items-center justify-between p-2.5 rounded-lg bg-primary-50/60 border border-primary-200/60 mb-3">
+                        <span className="text-[11px] text-surface-500">Pending compound profit</span>
+                        <span className="font-mono font-semibold text-primary-700 text-sm">+${tg.pendingProfitFormatted}</span>
+                      </div>
+                    )}
+
+                    {/* Action buttons: Compound (left) + Harvest (right) */}
+                    {(() => {
+                      const eligibleCount = tg.stakes.filter((s) => s.canCompound).length;
+                      const canCompound = eligibleCount > 0;
+                      return (
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            onClick={() => compoundTier(tg.stakes)}
+                            loading={isCompounding}
+                            disabled={!canCompound || isPending}
+                            className="w-full"
+                            size="sm"
+                            variant="secondary"
+                            icon={<ArrowPathIcon className="w-4 h-4" />}
+                          >
+                            {canCompound ? `Compound (${eligibleCount})` : 'Wait for interval'}
+                          </Button>
+                          <Button
+                            onClick={() => harvestTier(tg.stakes)}
+                            loading={isPending && !isCompounding}
+                            disabled={tg.displayHarvestable < BigInt(10) * BigInt(10 ** 18) || isCompounding}
+                            className="w-full"
+                            size="sm"
+                            icon={<ArrowDownTrayIcon className="w-4 h-4" />}
+                          >
+                            {tg.displayHarvestable >= BigInt(10) * BigInt(10 ** 18) ? `Harvest $${tg.displayHarvestableFormatted}` : 'Min $10'}
+                          </Button>
+                        </div>
+                      );
+                    })()}
                   </GlassCard>
                 );
               })}
@@ -422,6 +466,7 @@ function StakePageInner() {
                   <th className="text-right py-2 px-2 text-xs font-semibold text-surface-500">3X Cap</th>
                   <th className="text-left py-2 px-2 text-xs font-semibold text-surface-500">Started</th>
                   <th className="text-center py-2 px-2 text-xs font-semibold text-surface-500">Status</th>
+                  <th className="text-center py-2 px-2 text-xs font-semibold text-surface-500">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -467,6 +512,21 @@ function StakePageInner() {
                           <StatusIcon className="w-3 h-3" />
                           {statusLabel}
                         </span>
+                      </td>
+                      <td className="py-2.5 px-2 text-center">
+                        {s.active ? (
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={() => handleUnstake(s.index, Number(formatUnits(s.originalAmount, USDT_DECIMALS)))}
+                            disabled={isPending}
+                            icon={<ArrowUturnLeftIcon className="w-3.5 h-3.5" />}
+                          >
+                            Unstake
+                          </Button>
+                        ) : (
+                          <span className="text-[10px] text-surface-300">—</span>
+                        )}
                       </td>
                     </tr>
                   );

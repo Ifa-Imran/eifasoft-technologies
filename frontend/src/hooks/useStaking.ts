@@ -7,13 +7,15 @@ import { useToast } from '@/components/ui/Toast';
 import { Address } from 'viem';
 import { useEffect, useRef, useCallback, useState } from 'react';
 import type { StakeInfo } from '@/hooks/useUserStakes';
-// usePostAction removed — v29 contracts auto-compound on every action
+// Compounding is MANUAL — the user must explicitly click "Compound" per tier.
+// The contract no longer auto-compounds on stake/unstake/harvest.
 
 export function useStaking() {
   const { toast } = useToast();
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const [harvesting, setHarvesting] = useState(false);
+  const [compounding, setCompounding] = useState(false);
 
 
   const { writeContractAsync } = useWriteContract();
@@ -24,7 +26,7 @@ export function useStaking() {
   const { isSuccess: stakeSuccess, isError: stakeError } = useWaitForTransactionReceipt({ hash: stakeHash });
   const { isSuccess: unstakeSuccess, isError: unstakeError } = useWaitForTransactionReceipt({ hash: unstakeHash });
 
-  // No post-action tasks needed: v29 contracts auto-compound inside stake/unstake/harvest
+  // Compounding is manual — user clicks "Compound" button per tier card.
   useEffect(() => { if (stakeSuccess) toast({ type: 'success', title: 'Staked successfully!' }); }, [stakeSuccess]);
   useEffect(() => { if (stakeError) toast({ type: 'error', title: 'Stake failed' }); }, [stakeError]);
   useEffect(() => { if (unstakeSuccess) toast({ type: 'success', title: 'Unstaked successfully!' }); }, [unstakeSuccess]);
@@ -46,8 +48,8 @@ export function useStaking() {
 
   /**
    * Harvest flow:
-   * v29 contract auto-compounds all stakes inside harvest(), so we just call
-   * harvest() for each stake — single sign per stake, no separate compound needed.
+   * Compounding is now manual — harvest() pulls accrued (already-compounded)
+   * profit only. Use compoundTier() first if there is unclaimed pending profit.
    */
   const harvestTier = useCallback(async (tierStakes: StakeInfo[]) => {
     if (!publicClient || !address) return;
@@ -96,6 +98,48 @@ export function useStaking() {
     }
   }, [publicClient, writeContractAsync]);
 
+  /**
+   * Manually compound every eligible stake in a tier.
+   * One signature per stake (the contract has no batch compound for arbitrary
+   * users). Stakes whose interval has not yet elapsed are skipped silently.
+   */
+  const compoundTier = useCallback(async (tierStakes: StakeInfo[]) => {
+    if (!publicClient || !address) return;
+    setCompounding(true);
+    try {
+      const eligible = tierStakes.filter((s) => s.active && s.canCompound);
+      if (eligible.length === 0) {
+        toast({ type: 'error', title: 'Nothing to compound yet', description: 'Wait for the next interval to elapse.' });
+        return;
+      }
+      toast({ type: 'pending', title: 'Compounding...', description: `Compounding ${eligible.length} stake(s)` });
+      let success = 0;
+      for (const s of eligible) {
+        try {
+          const hash = await writeContractAsync({
+            address: contracts.stakingManager,
+            abi: StakingManagerABI,
+            functionName: 'compound',
+            args: [BigInt(s.index)],
+          });
+          await publicClient.waitForTransactionReceipt({ hash });
+          success++;
+        } catch {
+          // Skip — stake may have just been compounded or not yet eligible
+        }
+      }
+      if (success > 0) {
+        toast({ type: 'success', title: 'Compound complete!', description: `${success} stake(s) compounded` });
+      } else {
+        toast({ type: 'error', title: 'Compound failed', description: 'No stakes were compounded.' });
+      }
+    } catch (err: any) {
+      toast({ type: 'error', title: 'Compound Failed', description: err?.message?.slice(0, 100) });
+    } finally {
+      setCompounding(false);
+    }
+  }, [publicClient, address, writeContractAsync, toast]);
+
   const harvest = async (stakeIndex: bigint, amount: bigint) => {
     try {
       const hash = await writeContractAsync({
@@ -128,10 +172,12 @@ export function useStaking() {
   return {
     stake,
     compound,
+    compoundTier,
     harvest,
     harvestTier,
     unstake,
-    isPending: stakePending || unstakePending || harvesting,
+    isPending: stakePending || unstakePending || harvesting || compounding,
+    isCompounding: compounding,
     stakeHash,
     unstakeHash,
   };

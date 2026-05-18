@@ -14,7 +14,7 @@ import {
 const features = [
   {
     title: '3-Tier Staking',
-    description: 'Bronze, Silver, Gold tiers with auto-compounding and 3X FIFO hard cap returns.',
+    description: 'Bronze, Silver, Gold tiers with manual compounding and 3X FIFO hard cap returns.',
     icon: CurrencyDollarIcon,
     iconBg: 'from-primary-500 to-primary-300',
     iconColor: 'text-white',

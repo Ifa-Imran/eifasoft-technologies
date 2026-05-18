@@ -17,6 +17,7 @@ import {
   ScaleIcon,
   ExclamationTriangleIcon,
   ArrowDownTrayIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 
 export default function RankDividendPage() {
@@ -35,9 +36,11 @@ export default function RankDividendPage() {
   const currentRank = liveRank;
   const rankName = RANK_NAMES[currentRank] || 'USER';
 
-  // Harvestable rank salary (auto-accrues every period, includes pending)
+  // Harvestable rank salary (crystallized — already accrued into rankDividends).
+  // Live unsynced amount lives in pendingRankSalaryBn; user must click Sync to crystallize it.
   const harvestableRank = totalRankHarvestable || (allIncome ? BigInt(allIncome[2] || 0) : 0n);
   const harvestableRankUsd = Number(formatUnits(harvestableRank, USDT_DECIMALS));
+  const pendingRankUsd = pendingRankSalaryBn ? Number(formatUnits(pendingRankSalaryBn, USDT_DECIMALS)) : 0;
 
   const referralsList = (directReferrals as any[]) || [];
   const teamVolumeUsd = teamVolume ? Number(formatUnits(teamVolume, USDT_DECIMALS)) : 0;
@@ -117,7 +120,7 @@ export default function RankDividendPage() {
             <p className="text-base sm:text-xl md:text-2xl font-mono font-bold text-success-700 truncate">
               ${harvestableRankUsd.toFixed(2)}
             </p>
-            <p className="text-[10px] text-surface-400">auto-accumulates</p>
+            <p className="text-[10px] text-surface-400">crystallized</p>
           </div>
 
           {/* Harvested Salary */}
@@ -143,19 +146,36 @@ export default function RankDividendPage() {
           className="mb-4"
         />
 
-        {/* Salary Info & Harvest Button */}
+        {/* Salary Info & Pending Sync */}
         {currentRank > 0 && (
           <div className="flex items-center justify-between p-3 rounded-xl bg-white/50 border border-surface-200 mb-4">
             <div className="flex items-center gap-2">
               <CurrencyDollarIcon className="w-5 h-5 text-accent-500" />
-              <span className="text-sm text-surface-600">Earning <span className="font-semibold text-accent-700">${rankSalary ? Number(formatUnits(rankSalary, USDT_DECIMALS)).toFixed(2) : '0'}</span> / period</span>
+              <span className="text-sm text-surface-600">
+                Earning <span className="font-semibold text-accent-700">${rankSalary ? Number(formatUnits(rankSalary, USDT_DECIMALS)).toFixed(2) : '0'}</span> / period
+              </span>
             </div>
-            <p className="text-xs text-surface-400">Auto-accumulates every 15 minutes (test) / 7 days (prod)</p>
+            <p className="text-xs text-surface-400">
+              Pending: <span className="font-mono font-semibold text-primary-600">${pendingRankUsd.toFixed(2)}</span> &middot; click Sync to crystallize
+            </p>
           </div>
         )}
 
-        {/* Harvest Button */}
-        <div className="grid grid-cols-1 gap-3">
+        {/* Action buttons: Sync (manual rank salary accrual) + Harvest */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Button
+            onClick={checkRankChange}
+            loading={isPending}
+            disabled={pendingRankSalaryBn === 0n && !isRankChangePending}
+            variant="secondary"
+            icon={<ArrowPathIcon className="w-4 h-4" />}
+          >
+            {isRankChangePending
+              ? 'Sync Rank Change'
+              : pendingRankSalaryBn > 0n
+                ? `Sync Rank Salary (+$${pendingRankUsd.toFixed(2)})`
+                : 'Nothing to Sync'}
+          </Button>
           <Button
             onClick={() => harvestIncome(2)}
             loading={isPending}
