@@ -4,11 +4,11 @@ import { GlassCard, Badge, ProgressBar, Button } from '@/components/ui';
 import { useUserStakes } from '@/hooks/useUserStakes';
 import { useStaking } from '@/hooks/useStaking';
 import { useEffect, useState } from 'react';
-import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
 export function ActiveStakesTable() {
   const { tierGroups, isLoading } = useUserStakes();
-  const { harvestTier, isPending } = useStaking();
+  const { harvestTier, compoundTier, isPending, isCompounding } = useStaking();
   const [now, setNow] = useState(Math.floor(Date.now() / 1000));
 
   useEffect(() => {
@@ -56,9 +56,8 @@ export function ActiveStakesTable() {
                   <Badge tier={tg.tierName.toLowerCase() as 'bronze' | 'silver' | 'gold'}>{tg.tierName}</Badge>
                   <span className="text-xs text-surface-400">{tg.stakeCount} stake{tg.stakeCount > 1 ? 's' : ''}</span>
                 </div>
-                <div className="flex items-center gap-1.5 text-[10px] text-success-600 font-medium">
-                  <div className="w-1.5 h-1.5 rounded-full bg-success-500 animate-pulse" />
-                  Auto
+                <div className="flex items-center gap-1.5 text-[10px] text-surface-500 font-medium">
+                  Manual &middot; {tg.compoundInterval >= 3600 ? `${tg.compoundInterval / 3600}h` : `${tg.compoundInterval / 60}m`}
                 </div>
               </div>
 
@@ -86,17 +85,41 @@ export function ActiveStakesTable() {
                 </div>
               </div>
 
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={tg.displayHarvestable < BigInt(10) * BigInt(10 ** 18)}
-                onClick={() => harvestTier(tg.stakes)}
-                loading={isPending}
-                className="w-full"
-                icon={<ArrowDownTrayIcon className="w-3.5 h-3.5" />}
-              >
-                {tg.displayHarvestable >= BigInt(10) * BigInt(10 ** 18) ? `Harvest $${tg.displayHarvestableFormatted}` : 'Min $10 to Harvest'}
-              </Button>
+              {tg.pendingProfit > 0n && (
+                <div className="flex items-center justify-between p-2 rounded-lg bg-primary-50/60 border border-primary-200/60">
+                  <span className="text-[11px] text-surface-500">Pending compound profit</span>
+                  <span className="font-mono font-semibold text-primary-700 text-xs">+${tg.pendingProfitFormatted}</span>
+                </div>
+              )}
+
+              {(() => {
+                const eligibleCount = tg.stakes.filter((s) => s.canCompound).length;
+                const canCompound = eligibleCount > 0;
+                const minHarvest = BigInt(10) * BigInt(10 ** 18);
+                return (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => compoundTier(tg.stakes)}
+                      loading={isCompounding}
+                      disabled={!canCompound || isPending}
+                      icon={<ArrowPathIcon className="w-3.5 h-3.5" />}
+                    >
+                      {canCompound ? `Compound (${eligibleCount})` : 'Wait'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => harvestTier(tg.stakes)}
+                      loading={isPending && !isCompounding}
+                      disabled={tg.displayHarvestable < minHarvest || isCompounding}
+                      icon={<ArrowDownTrayIcon className="w-3.5 h-3.5" />}
+                    >
+                      {tg.displayHarvestable >= minHarvest ? `Harvest $${tg.displayHarvestableFormatted}` : 'Min $10'}
+                    </Button>
+                  </div>
+                );
+              })()}
             </div>
           );
         })}
