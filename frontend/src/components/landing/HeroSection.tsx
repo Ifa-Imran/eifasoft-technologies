@@ -6,6 +6,7 @@ import { AnimatedCounter } from '@/components/ui';
 import { useKairoPrice } from '@/hooks/useKairoPrice';
 import { useGlobalStats } from '@/hooks/useGlobalStats';
 import { formatPrice } from '@/lib/utils';
+import { IS_TESTNET } from '@/config/contracts';
 
 export function HeroSection() {
   const { price } = useKairoPrice();
@@ -29,7 +30,7 @@ export function HeroSection() {
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-primary-50 to-secondary-50 backdrop-blur-sm border-2 border-primary-300/50 mb-8 shadow-sm shadow-primary-200/30">
             <div className="w-2 h-2 rounded-full bg-success-500 animate-pulse" />
-            <span className="text-sm text-surface-600 font-medium">Live on opBNB Mainnet</span>
+            <span className="text-sm text-surface-600 font-medium">Live on opBNB {IS_TESTNET ? 'Testnet' : 'Mainnet'}</span>
           </div>
 
           <h1 className="font-orbitron text-6xl md:text-8xl lg:text-9xl font-bold mb-6 leading-tight">

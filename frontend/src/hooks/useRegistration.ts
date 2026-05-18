@@ -37,25 +37,13 @@ export function useRegistration() {
     },
   });
 
-  // Check how many direct referrals the genesis account has (0 = no users registered yet)
-  const { data: genesisDirectCount } = useReadContract({
-    address: contracts.affiliateDistributor,
-    abi: AffiliateDistributorABI,
-    functionName: 'directCount',
-    args: genesisAccount && (genesisAccount as string) !== zeroAddress ? [genesisAccount as `0x${string}`] : undefined,
-    query: {
-      enabled: !!genesisAccount && (genesisAccount as string) !== zeroAddress && contracts.affiliateDistributor !== '0x',
-      refetchInterval: 30000,
-    },
-  });
-
   const hasOnChainReferrer = onChainReferrer !== undefined && onChainReferrer !== zeroAddress;
   const isRegistered = hasOnChainReferrer;
-  // True genesis: no genesis account set at all
+  // True genesis: no genesis account set at all (only triggers on a brand-new contract)
   const isGenesisMode = genesisAccount !== undefined && (genesisAccount as string) === zeroAddress;
-  // First-user mode: genesis exists but no one else has registered yet (directCount === 0)
-  const isFirstUserMode = !isGenesisMode && genesisAccount !== undefined && (genesisAccount as string) !== zeroAddress
-    && genesisDirectCount !== undefined && BigInt(genesisDirectCount as any) === 0n;
+  // First-user mode is disabled: contracts are pre-seeded with snapshot data,
+  // so a valid referrer is always required.
+  const isFirstUserMode = false;
   const isLoading = referrerLoading || (isConnected && !address);
 
   // On-chain register transaction
