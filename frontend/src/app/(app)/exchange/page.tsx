@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { GlassCard, Button, Input, Tabs, TabContent } from '@/components/ui';
+import { FillOrderModal } from '@/components/p2p/FillOrderModal';
 import { useP2P, P2PBuyOrder, P2PSellOrder } from '@/hooks/useP2P';
 import { useApproval } from '@/hooks/useApproval';
 import { useTokenBalances } from '@/hooks/useTokenBalances';
@@ -26,7 +27,7 @@ export default function ExchangePage() {
   const [orderType, setOrderType] = useState<'buy' | 'sell'>('buy');
   const [amount, setAmount] = useState('');
   const { activeBuyOrders, activeSellOrders, currentPrice, createBuyOrder, createSellOrder, cancelBuyOrder, cancelSellOrder, sellToOrder, buyFromOrder, isPending } = useP2P();
-  const { kairoFormatted, usdtFormatted } = useTokenBalances();
+  const { kairoFormatted, usdtFormatted, kairoBalance, usdtBalance } = useTokenBalances();
   const { price: livePrice } = useKairoPrice();
   const { orderBookStats } = useGlobalStats();
   const usdtApproval = useApproval(contracts.usdt, contracts.atomicP2p);
@@ -36,6 +37,19 @@ export default function ExchangePage() {
   const pendingFillRef = useRef<'sellTo' | 'buyFrom' | null>(null);
   const pendingFillIdRef = useRef<bigint>(0n);
   const pendingFillAmountRef = useRef<bigint>(0n);
+
+  // ── Partial-fill modal state ──
+  const [fillModalOpen, setFillModalOpen] = useState(false);
+  const [fillModalSide, setFillModalSide] = useState<'buy' | 'sell'>('buy');
+  const [fillModalOrderId, setFillModalOrderId] = useState<bigint>(0n);
+  const [fillModalRemaining, setFillModalRemaining] = useState<bigint>(0n);
+
+  const openFillModal = (side: 'buy' | 'sell', orderId: bigint, remaining: bigint) => {
+    setFillModalSide(side);
+    setFillModalOrderId(orderId);
+    setFillModalRemaining(remaining);
+    setFillModalOpen(true);
+  };
 
   // Auto-create order after approval succeeds (one-click flow)
   useEffect(() => {
@@ -209,17 +223,7 @@ export default function ExchangePage() {
                           <p className="text-xs text-surface-400 truncate">{order.creator}</p>
                         </div>
                         {order.creator?.toLowerCase() !== address?.toLowerCase() && priceVal > 0 && (
-                          <Button size="sm" variant="success" onClick={() => {
-                            const kairoWei = order.usdtRemaining * BigInt(10 ** KAIRO_DECIMALS) / (currentPrice ?? 1n);
-                            if (!kairoApproval.hasAllowance(kairoWei)) {
-                              pendingFillRef.current = 'sellTo';
-                              pendingFillIdRef.current = order.id;
-                              pendingFillAmountRef.current = kairoWei;
-                              kairoApproval.approve(kairoWei);
-                              return;
-                            }
-                            sellToOrder(order.id, kairoWei);
-                          }}>
+                          <Button size="sm" variant="success" onClick={() => openFillModal('buy', order.id, order.usdtRemaining)}>
                             Fill
                           </Button>
                         )}
@@ -259,17 +263,7 @@ export default function ExchangePage() {
                           <p className="text-xs text-surface-400 truncate">{order.creator}</p>
                         </div>
                         {order.creator?.toLowerCase() !== address?.toLowerCase() && (
-                          <Button size="sm" onClick={() => {
-                            const usdtNeeded = order.kairoRemaining * (currentPrice ?? 1n) / BigInt(10 ** KAIRO_DECIMALS);
-                            if (!usdtApproval.hasAllowance(usdtNeeded)) {
-                              pendingFillRef.current = 'buyFrom';
-                              pendingFillIdRef.current = order.id;
-                              pendingFillAmountRef.current = order.kairoRemaining;
-                              usdtApproval.approve(usdtNeeded);
-                              return;
-                            }
-                            buyFromOrder(order.id, order.kairoRemaining);
-                          }}>
+                          <Button size="sm" onClick={() => openFillModal('sell', order.id, order.kairoRemaining)}>
                             Fill
                           </Button>
                         )}
@@ -391,17 +385,29 @@ export default function ExchangePage() {
                     {myBuyOrders.map((order, i: number) => {
                       const usdtVal = Number(formatUnits(order.usdtRemaining, USDT_DECIMALS));
                       const totalUsdt = Number(formatUnits(order.usdtAmount, USDT_DECIMALS));
+                      const filledUsdt = Math.max(0, totalUsdt - usdtVal);
+                      const pct = totalUsdt > 0 ? Math.min(100, (filledUsdt / totalUsdt) * 100) : 0;
                       return (
-                        <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-success-50/40 border border-success-100">
-                          <div>
-                            <p className="text-sm font-mono font-semibold text-surface-900">
-                              ${usdtVal.toFixed(2)} remaining
-                            </p>
-                            <p className="text-xs text-surface-400">of ${totalUsdt.toFixed(2)} USDT total</p>
+                        <div key={i} className="p-3 rounded-xl bg-success-50/40 border border-success-100 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-mono font-semibold text-surface-900">
+                                ${usdtVal.toFixed(2)} remaining
+                              </p>
+                              <p className="text-xs text-surface-400">
+                                ${filledUsdt.toFixed(2)} filled of ${totalUsdt.toFixed(2)} total
+                              </p>
+                            </div>
+                            <Button size="sm" variant="ghost" onClick={() => cancelBuyOrder(order.id)} icon={<XMarkIcon className="w-4 h-4" />}>
+                              Cancel
+                            </Button>
                           </div>
-                          <Button size="sm" variant="ghost" onClick={() => cancelBuyOrder(order.id)} icon={<XMarkIcon className="w-4 h-4" />}>
-                            Cancel
-                          </Button>
+                          <div className="h-1.5 w-full bg-surface-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-success-500 transition-all"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
                         </div>
                       );
                     })}
@@ -417,17 +423,29 @@ export default function ExchangePage() {
                     {mySellOrders.map((order, i: number) => {
                       const kairoVal = Number(formatUnits(order.kairoRemaining, KAIRO_DECIMALS));
                       const totalKairo = Number(formatUnits(order.kairoAmount, KAIRO_DECIMALS));
+                      const filledKairo = Math.max(0, totalKairo - kairoVal);
+                      const pct = totalKairo > 0 ? Math.min(100, (filledKairo / totalKairo) * 100) : 0;
                       return (
-                        <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-danger-50/40 border border-danger-100">
-                          <div>
-                            <p className="text-sm font-mono font-semibold text-surface-900">
-                              {kairoVal.toFixed(2)} KAIRO remaining
-                            </p>
-                            <p className="text-xs text-surface-400">of {totalKairo.toFixed(2)} KAIRO total</p>
+                        <div key={i} className="p-3 rounded-xl bg-danger-50/40 border border-danger-100 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-mono font-semibold text-surface-900">
+                                {kairoVal.toFixed(2)} KAIRO remaining
+                              </p>
+                              <p className="text-xs text-surface-400">
+                                {filledKairo.toFixed(2)} filled of {totalKairo.toFixed(2)} total
+                              </p>
+                            </div>
+                            <Button size="sm" variant="ghost" onClick={() => cancelSellOrder(order.id)} icon={<XMarkIcon className="w-4 h-4" />}>
+                              Cancel
+                            </Button>
                           </div>
-                          <Button size="sm" variant="ghost" onClick={() => cancelSellOrder(order.id)} icon={<XMarkIcon className="w-4 h-4" />}>
-                            Cancel
-                          </Button>
+                          <div className="h-1.5 w-full bg-surface-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-danger-500 transition-all"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
                         </div>
                       );
                     })}
@@ -438,6 +456,28 @@ export default function ExchangePage() {
           )}
         </TabContent>
       </Tabs>
+
+      <FillOrderModal
+        open={fillModalOpen}
+        onClose={() => setFillModalOpen(false)}
+        side={fillModalSide}
+        orderId={fillModalOrderId}
+        orderRemainingRaw={fillModalRemaining}
+        currentPrice={(currentPrice as bigint) ?? 0n}
+        kairoBalanceRaw={(kairoBalance as bigint) ?? 0n}
+        usdtBalanceRaw={(usdtBalance as bigint) ?? 0n}
+        hasAllowance={(raw) => (fillModalSide === 'buy' ? kairoApproval.hasAllowance(raw) : usdtApproval.hasAllowance(raw))}
+        approve={(raw) => (fillModalSide === 'buy' ? kairoApproval.approve(raw) : usdtApproval.approve(raw))}
+        onFill={(orderId, kairoAmountRaw) => {
+          if (fillModalSide === 'buy') {
+            sellToOrder(orderId, kairoAmountRaw);
+          } else {
+            buyFromOrder(orderId, kairoAmountRaw);
+          }
+          setFillModalOpen(false);
+        }}
+        isPending={isPending}
+      />
     </div>
   );
 }
