@@ -38,24 +38,24 @@ export function Modal({ open, onOpenChange, title, description, children, classN
             </Dialog.Overlay>
             <Dialog.Content asChild>
               <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                initial={{ opacity: 0, scale: 0.95, x: '-50%', y: 'calc(-50% + 20px)' }}
+                animate={{ opacity: 1, scale: 1, x: '-50%', y: '-50%' }}
+                exit={{ opacity: 0, scale: 0.95, x: '-50%', y: 'calc(-50% + 20px)' }}
                 transition={{ duration: 0.2 }}
                 className={cn(
-                  'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50',
+                  'fixed top-1/2 left-1/2 z-50',
                   'card p-6 shadow-elevated w-[90vw]',
                   sizes[size],
                   className
                 )}
               >
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-start justify-between gap-3 mb-4">
                   {title && (
-                    <Dialog.Title className="text-lg font-space-grotesk font-bold text-surface-900">
+                    <Dialog.Title className="text-base sm:text-lg font-space-grotesk font-bold text-surface-900 leading-snug min-w-0 break-words">
                       {title}
                     </Dialog.Title>
                   )}
-                  <Dialog.Close className="text-surface-400 hover:text-surface-700 transition-colors p-1 rounded-lg hover:bg-surface-100">
+                  <Dialog.Close className="shrink-0 text-surface-400 hover:text-surface-700 transition-colors p-1 rounded-lg hover:bg-surface-100">
                     <XMarkIcon className="w-5 h-5" />
                   </Dialog.Close>
                 </div>
