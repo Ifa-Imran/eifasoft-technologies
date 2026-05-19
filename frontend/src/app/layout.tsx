@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter, Space_Grotesk, Orbitron, JetBrains_Mono } from 'next/font/google';
 import { Providers } from '@/providers';
+import { AnnouncementPopup } from '@/components/ui/AnnouncementPopup';
 import './globals.css';
 
 const inter = Inter({
@@ -46,7 +47,10 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${spaceGrotesk.variable} ${orbitron.variable} ${jetbrainsMono.variable} font-inter min-h-screen bg-surface-50`}
       >
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <AnnouncementPopup />
+        </Providers>
       </body>
     </html>
   );
