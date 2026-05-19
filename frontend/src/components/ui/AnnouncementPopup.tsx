@@ -39,8 +39,11 @@ export function AnnouncementPopup() {
       onOpenChange={setOpen}
       size="lg"
       title="Important Project Update & Transition Plan"
+      className="p-4 sm:p-6 w-[94vw] sm:w-[90vw] max-w-[640px] rounded-2xl"
     >
-      <div className="max-h-[70vh] overflow-y-auto pr-2 space-y-5 text-surface-700 text-sm leading-relaxed">
+      <div
+        className="max-h-[70svh] sm:max-h-[70vh] overflow-y-auto overscroll-contain pr-1 sm:pr-2 space-y-4 sm:space-y-5 text-surface-700 text-[13px] sm:text-sm leading-relaxed break-words"
+      >
         <p>Dear Community Members,</p>
 
         <p>
@@ -52,7 +55,7 @@ export function AnnouncementPopup() {
         </p>
 
         <div>
-          <h3 className="text-surface-900 font-space-grotesk font-bold text-base mb-2">
+          <h3 className="text-surface-900 font-space-grotesk font-bold text-sm sm:text-base mb-2">
             Seamless Migration to New Contracts
           </h3>
           <p className="mb-3">
@@ -60,7 +63,7 @@ export function AnnouncementPopup() {
             that mirror the exact same mechanics as before. The new contracts will go live
             within the next 24 hours.
           </p>
-          <ul className="space-y-2 list-disc pl-5">
+          <ul className="space-y-2 list-disc pl-4 sm:pl-5 marker:text-primary-500">
             <li>
               <span className="font-semibold text-surface-900">Automated Migration:</span>{' '}
               Your entire team structure, referrals, and account data remain intact. No
@@ -76,7 +79,7 @@ export function AnnouncementPopup() {
         </div>
 
         <div>
-          <h3 className="text-surface-900 font-space-grotesk font-bold text-base mb-2">
+          <h3 className="text-surface-900 font-space-grotesk font-bold text-sm sm:text-base mb-2">
             Rebuilding Liquidity Together
           </h3>
           <p>
@@ -94,8 +97,12 @@ export function AnnouncementPopup() {
         </p>
       </div>
 
-      <div className="mt-6 flex justify-end">
-        <Button variant="primary" onClick={() => setOpen(false)}>
+      <div className="mt-5 sm:mt-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+        <Button
+          variant="primary"
+          onClick={() => setOpen(false)}
+          className="w-full sm:w-auto"
+        >
           Got it
         </Button>
       </div>
