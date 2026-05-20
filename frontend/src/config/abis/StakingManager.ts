@@ -685,6 +685,19 @@ export const StakingManagerABI = [
         "internalType": "address",
         "name": "_user",
         "type": "address"
+      }
+    ],
+    "name": "compoundAllFor",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_user",
+        "type": "address"
       },
       {
         "internalType": "uint256",

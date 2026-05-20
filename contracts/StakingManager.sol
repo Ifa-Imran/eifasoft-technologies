@@ -222,6 +222,10 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
         _compound(_user, _stakeId);
     }
 
+    function compoundAllFor(address _user) external nonReentrant whenNotPaused {
+        _autoCompoundAll(_user);
+    }
+
     function setAutoCompound(bool _enabled) external {
         autoCompoundEnabled[msg.sender] = _enabled;
         emit AutoCompoundToggled(msg.sender, _enabled);
