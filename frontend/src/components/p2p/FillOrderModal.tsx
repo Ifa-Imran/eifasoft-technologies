@@ -134,8 +134,8 @@ export function FillOrderModal(props: FillOrderModalProps) {
 
   return (
     <Modal open={open} onOpenChange={(o) => { if (!o) onClose(); }} title={side === 'buy' ? 'Fill Buy Order' : 'Fill Sell Order'}>
-      <div className="space-y-4">
-        <div className="text-xs text-surface-500 -mt-2">
+      <div className="space-y-4 min-w-0">
+        <div className="text-xs text-surface-500 -mt-2 break-words">
           Order #{orderId.toString()} · {side === 'buy' ? 'has' : 'sells'}{' '}
           <span className="font-mono font-semibold text-surface-700">
             {side === 'buy'
@@ -148,10 +148,10 @@ export function FillOrderModal(props: FillOrderModalProps) {
           </span>
         </div>
 
-        <div>
-          <div className="flex justify-between items-center mb-1.5">
-            <label className="text-sm font-medium text-surface-600">{tokenLabel}</label>
-            <span className="text-xs text-surface-400">
+        <div className="min-w-0">
+          <div className="flex justify-between items-center mb-1.5 gap-2">
+            <label className="text-sm font-medium text-surface-600 truncate">{tokenLabel}</label>
+            <span className="text-xs text-surface-400 truncate">
               Max: <button
                 type="button"
                 onClick={() => setPct(100)}
@@ -169,21 +169,22 @@ export function FillOrderModal(props: FillOrderModalProps) {
             className="input-field w-full"
             min="0"
             step="any"
+            inputMode="decimal"
           />
-          <div className="flex gap-1.5 mt-2">
+          <div className="grid grid-cols-4 gap-1.5 mt-2">
             {[25, 50, 75, 100].map((pct) => (
               <button
                 key={pct}
                 type="button"
                 onClick={() => setPct(pct)}
-                className="flex-1 py-1.5 px-2 text-[11px] rounded-lg bg-surface-100 hover:bg-surface-200 text-surface-600 font-medium transition-colors"
+                className="py-1.5 px-1 text-[11px] rounded-lg bg-surface-100 hover:bg-surface-200 text-surface-600 font-medium transition-colors"
               >
                 {pct === 100 ? 'MAX' : `${pct}%`}
               </button>
             ))}
           </div>
           {overMax && (
-            <p className="mt-1.5 text-xs text-danger-500">
+            <p className="mt-1.5 text-xs text-danger-500 break-words">
               Exceeds max ({maxFillKairoNum.toFixed(4)} KAIRO) — capped by{' '}
               {side === 'buy' ? 'order liquidity / your KAIRO balance' : 'order liquidity / your USDT balance'}.
             </p>
@@ -191,22 +192,22 @@ export function FillOrderModal(props: FillOrderModalProps) {
         </div>
 
         {amountNum > 0 && !overMax && (
-          <div className="p-3 rounded-xl bg-surface-50 border border-surface-200 space-y-1.5 text-xs">
-            <div className="flex justify-between text-surface-500">
-              <span>{counterToken}</span>
-              <span className="font-mono">${preview.usdt.toFixed(4)}</span>
+          <div className="p-3 rounded-xl bg-surface-50 border border-surface-200 space-y-1.5 text-xs min-w-0">
+            <div className="flex justify-between gap-2 text-surface-500">
+              <span className="truncate">{counterToken}</span>
+              <span className="font-mono flex-shrink-0">${preview.usdt.toFixed(4)}</span>
             </div>
-            <div className="flex justify-between text-surface-500">
-              <span>KAIRO fee (5%, burned)</span>
-              <span className="font-mono">{preview.kairoFee.toFixed(4)} KAIRO</span>
+            <div className="flex justify-between gap-2 text-surface-500">
+              <span className="truncate">KAIRO fee (5%, burned)</span>
+              <span className="font-mono flex-shrink-0">{preview.kairoFee.toFixed(4)} KAIRO</span>
             </div>
-            <div className="flex justify-between text-surface-500">
-              <span>USDT fee (5%, to LP)</span>
-              <span className="font-mono">${preview.usdtFee.toFixed(4)}</span>
+            <div className="flex justify-between gap-2 text-surface-500">
+              <span className="truncate">USDT fee (5%, to LP)</span>
+              <span className="font-mono flex-shrink-0">${preview.usdtFee.toFixed(4)}</span>
             </div>
-            <div className="border-t border-surface-200 pt-1.5 flex justify-between font-semibold text-surface-900">
-              <span>You {side === 'buy' ? 'receive' : 'get'}</span>
-              <span className="font-mono">
+            <div className="border-t border-surface-200 pt-1.5 flex justify-between gap-2 font-semibold text-surface-900">
+              <span className="truncate">You {side === 'buy' ? 'receive' : 'get'}</span>
+              <span className="font-mono flex-shrink-0">
                 {side === 'buy'
                   ? `$${preview.netUsdt.toFixed(4)}`
                   : `${preview.netKairo.toFixed(4)} KAIRO`}
@@ -215,14 +216,14 @@ export function FillOrderModal(props: FillOrderModalProps) {
           </div>
         )}
 
-        <div className="flex gap-2">
-          <Button variant="ghost" onClick={onClose} className="flex-1">Cancel</Button>
+        <div className="flex flex-col-reverse sm:flex-row gap-2 pt-1">
+          <Button variant="ghost" onClick={onClose} className="sm:flex-1 w-full">Cancel</Button>
           <Button
             variant={side === 'buy' ? 'success' : 'primary'}
             onClick={handleSubmit}
             disabled={!canSubmit}
             loading={isPending}
-            className="flex-1"
+            className="sm:flex-1 w-full"
           >
             {amountRaw === 0n
               ? 'Enter amount'

@@ -17,20 +17,30 @@ interface ModalProps {
 }
 
 const sizes = {
-  sm: 'max-w-sm',
-  md: 'max-w-lg',
-  lg: 'max-w-2xl',
+  sm: 'sm:max-w-sm',
+  md: 'sm:max-w-lg',
+  lg: 'sm:max-w-2xl',
 };
 
-// Responsive container: scrolls vertically on short viewports so the
-// modal body (e.g. P2P FillOrderModal with header + input + buttons +
-// preview + footer) is always reachable on phones, tablets, and laptops.
+// Responsive container:
+// - On mobile (<640px): full-width (with 8px outer gutter), bottom-anchored
+//   sheet-style so users on small phones can still tap the action buttons
+//   without having to scroll past the keyboard.
+// - On sm+ (>=640px): centered card with capped width.
+// - Always: scrollable inner overflow so any modal body is reachable.
 const RESPONSIVE_CLASSES =
-  'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 ' +
+  'fixed z-50 ' +
+  // Mobile: bottom sheet, full width minus 8px gutter
+  'left-2 right-2 bottom-2 ' +
+  // sm+ : centered card
+  'sm:left-1/2 sm:right-auto sm:bottom-auto sm:top-1/2 ' +
+  'sm:-translate-x-1/2 sm:-translate-y-1/2 ' +
+  'sm:w-[92vw] ' +
+  // Visual
   'card shadow-elevated ' +
-  'w-[95vw] sm:w-[90vw] ' +
   'p-4 sm:p-6 ' +
-  'max-h-[90vh] overflow-y-auto overscroll-contain';
+  // Internal scroll on tall content
+  'max-h-[90vh] sm:max-h-[85vh] overflow-y-auto overscroll-contain';
 
 export function Modal({ open, onOpenChange, title, description, children, className, size = 'md' }: ModalProps) {
   return (
@@ -58,13 +68,13 @@ export function Modal({ open, onOpenChange, title, description, children, classN
                   className
                 )}
               >
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-4 gap-3">
                   {title && (
-                    <Dialog.Title className="text-lg font-space-grotesk font-bold text-surface-900">
+                    <Dialog.Title className="min-w-0 flex-1 truncate text-base sm:text-lg font-space-grotesk font-bold text-surface-900">
                       {title}
                     </Dialog.Title>
                   )}
-                  <Dialog.Close className="text-surface-400 hover:text-surface-700 transition-colors p-1 rounded-lg hover:bg-surface-100">
+                  <Dialog.Close className="flex-shrink-0 text-surface-400 hover:text-surface-700 transition-colors p-1 rounded-lg hover:bg-surface-100">
                     <XMarkIcon className="w-5 h-5" />
                   </Dialog.Close>
                 </div>

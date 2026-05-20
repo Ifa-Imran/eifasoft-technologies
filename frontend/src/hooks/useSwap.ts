@@ -4,7 +4,7 @@ import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAcc
 import { contracts } from '@/config/contracts';
 import { LiquidityPoolABI } from '@/config/abis/LiquidityPool';
 import { useToast } from '@/components/ui/Toast';
-import { formatUnits } from 'viem';
+import { formatUnits, BaseError, ContractFunctionRevertedError } from 'viem';
 import { useEffect } from 'react';
 
 export function useSwap() {
@@ -57,26 +57,60 @@ export function useSwap() {
   useEffect(() => { if (swapUSDTSuccess) toast({ type: 'success', title: 'Swap completed!' }); }, [swapUSDTSuccess]);
   useEffect(() => { if (swapUSDTError) toast({ type: 'error', title: 'Swap failed' }); }, [swapUSDTError]);
 
-  // Extract a human-readable revert reason from a viem ContractFunctionExecutionError.
-  // Falls back through shortMessage / cause.shortMessage / message / String(err).
-  const extractRevertReason = (err: any): string => {
+  // Extract a human-readable revert reason from a viem error.
+  //
+  // Priority order:
+  //  1. Custom Solidity error -> ErrorName(args)  (via ContractFunctionRevertedError.data)
+  //  2. Plain string revert    -> the require/revert reason
+  //  3. viem shortMessage      -> e.g. "User rejected the request"
+  //  4. Generic fallback
+  const cleanReason = (s: string): string =>
+    s
+      .replace(/^Execution reverted(?: with reason(?: string)?:)?\s*/i, '')
+      .replace(/^reverted with reason string\s*['"]?/i, '')
+      .replace(/^The contract function .*? reverted(?: with the following reason:)?\s*/i, '')
+      .replace(/^['"]/, '')
+      .replace(/['"]\s*$/, '')
+      .trim();
+
+  const extractRevertReason = (err: unknown): string => {
+    // Always log the raw error for debugging in DevTools.
+    // eslint-disable-next-line no-console
+    console.error('[swap] revert error:', err);
+
+    if (err instanceof BaseError) {
+      const revertError = err.walk(e => e instanceof ContractFunctionRevertedError);
+      if (revertError instanceof ContractFunctionRevertedError) {
+        // Custom error (e.g. ERC20InsufficientAllowance(...))
+        const errorName = revertError.data?.errorName;
+        const args = revertError.data?.args;
+        if (errorName) {
+          if (args && (args as readonly unknown[]).length > 0) {
+            return `${errorName}(${(args as readonly unknown[]).map(String).join(', ')})`;
+          }
+          return errorName;
+        }
+        // Plain string revert (LiquidityPool: ...)
+        if (revertError.reason) return cleanReason(revertError.reason);
+        if (revertError.shortMessage) return cleanReason(revertError.shortMessage);
+      }
+      if (err.shortMessage) return cleanReason(err.shortMessage);
+      if (err.message) return cleanReason(err.message);
+    }
+
+    // Non-BaseError fallback (e.g. plain RPC error)
+    const anyErr = err as any;
     const candidates = [
-      err?.cause?.cause?.reason,
-      err?.cause?.reason,
-      err?.shortMessage,
-      err?.cause?.shortMessage,
-      err?.cause?.cause?.shortMessage,
-      err?.details,
-      err?.message,
+      anyErr?.cause?.cause?.reason,
+      anyErr?.cause?.reason,
+      anyErr?.shortMessage,
+      anyErr?.cause?.shortMessage,
+      anyErr?.details,
+      anyErr?.message,
     ];
     for (const c of candidates) {
       if (typeof c === 'string' && c.trim().length > 0) {
-        // Strip viem prefix noise to keep the toast tight.
-        return c
-          .replace(/^Execution reverted(?: with reason:)?\s*/i, '')
-          .replace(/^reverted with reason string\s*['"]?/i, '')
-          .replace(/['"]\s*$/, '')
-          .trim();
+        return cleanReason(c);
       }
     }
     return 'Transaction would revert';
