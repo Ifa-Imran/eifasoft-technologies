@@ -22,6 +22,16 @@ const sizes = {
   lg: 'max-w-2xl',
 };
 
+// Responsive container: scrolls vertically on short viewports so the
+// modal body (e.g. P2P FillOrderModal with header + input + buttons +
+// preview + footer) is always reachable on phones, tablets, and laptops.
+const RESPONSIVE_CLASSES =
+  'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 ' +
+  'card shadow-elevated ' +
+  'w-[95vw] sm:w-[90vw] ' +
+  'p-4 sm:p-6 ' +
+  'max-h-[90vh] overflow-y-auto overscroll-contain';
+
 export function Modal({ open, onOpenChange, title, description, children, className, size = 'md' }: ModalProps) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -43,8 +53,7 @@ export function Modal({ open, onOpenChange, title, description, children, classN
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
                 transition={{ duration: 0.2 }}
                 className={cn(
-                  'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50',
-                  'card p-6 shadow-elevated w-[90vw]',
+                  RESPONSIVE_CLASSES,
                   sizes[size],
                   className
                 )}
