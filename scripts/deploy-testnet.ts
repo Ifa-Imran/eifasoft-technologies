@@ -17,8 +17,10 @@ async function waitTx(tx: any) {
  *   npx hardhat run scripts/deploy-testnet.ts --network opbnbTestnet
  */
 async function main() {
+    const SKIP_CMS = process.env.SKIP_CMS === "true";
     const [deployer, testUser] = await ethers.getSigners();
     console.log("=== KAIRO DeFi Ecosystem - TESTNET Deployment ===");
+    if (SKIP_CMS) console.log("  (SKIP_CMS=true: CoreMembershipSubscription will NOT be deployed)");
     console.log("Network:", (await ethers.provider.getNetwork()).name);
     console.log("Deployer:", deployer.address);
     console.log("Balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "BNB");
@@ -94,24 +96,33 @@ async function main() {
     tx = await affiliateDistributor.setStakingManager(stakingAddress);
     await waitTx(tx);
 
-    console.log("[7/8] Deploying CoreMembershipSubscription...");
-    const CMS = await ethers.getContractFactory("CoreMembershipSubscription");
     const latestBlock = await ethers.provider.getBlock("latest");
+    const deploymentBlockNumber = latestBlock!.number;
     const now = latestBlock!.timestamp;
-    const SUBSCRIBE_DEADLINE = now + 3 * 60 * 60;
-    const CLAIM_DEADLINE = now + 6 * 60 * 60;
-    const cms = await CMS.deploy(
-        kairoAddress, usdtAddress, liquidityPoolAddress,
-        stakingAddress, affiliateAddress, systemWallet, deployer.address,
-        SUBSCRIBE_DEADLINE, CLAIM_DEADLINE
-    );
-    await cms.waitForDeployment();
-    await sleep(DELAY);
-    const cmsAddress = await cms.getAddress();
-    console.log("  CoreMembershipSubscription:", cmsAddress);
+    let cms: any = null;
+    let cmsAddress: string = "";
+    let SUBSCRIBE_DEADLINE = 0;
+    let CLAIM_DEADLINE = 0;
+    if (!SKIP_CMS) {
+        console.log("[7/8] Deploying CoreMembershipSubscription...");
+        const CMS = await ethers.getContractFactory("CoreMembershipSubscription");
+        SUBSCRIBE_DEADLINE = now + 3 * 60 * 60;
+        CLAIM_DEADLINE = now + 6 * 60 * 60;
+        cms = await CMS.deploy(
+            kairoAddress, usdtAddress, liquidityPoolAddress,
+            stakingAddress, affiliateAddress, systemWallet, deployer.address,
+            SUBSCRIBE_DEADLINE, CLAIM_DEADLINE
+        );
+        await cms.waitForDeployment();
+        await sleep(DELAY);
+        cmsAddress = await cms.getAddress();
+        console.log("  CoreMembershipSubscription:", cmsAddress);
 
-    tx = await stakingManager.setCMS(cmsAddress);
-    await waitTx(tx);
+        tx = await stakingManager.setCMS(cmsAddress);
+        await waitTx(tx);
+    } else {
+        console.log("[7/8] SKIPPED (SKIP_CMS=true): CoreMembershipSubscription not deployed.");
+    }
 
     console.log("[8/8] Deploying AtomicP2p...");
     const AtomicP2p = await ethers.getContractFactory("AtomicP2p");
@@ -125,13 +136,19 @@ async function main() {
     const MINTER_ROLE = await kairoToken.MINTER_ROLE();
     tx = await kairoToken.grantRole(MINTER_ROLE, stakingAddress); await waitTx(tx);
     tx = await kairoToken.grantRole(MINTER_ROLE, affiliateAddress); await waitTx(tx);
-    tx = await kairoToken.grantRole(MINTER_ROLE, cmsAddress); await waitTx(tx);
+    if (!SKIP_CMS) {
+        tx = await kairoToken.grantRole(MINTER_ROLE, cmsAddress); await waitTx(tx);
+    }
 
     const STAKING_ROLE = await affiliateDistributor.STAKING_ROLE();
-    tx = await affiliateDistributor.grantRole(STAKING_ROLE, cmsAddress); await waitTx(tx);
+    if (!SKIP_CMS) {
+        tx = await affiliateDistributor.grantRole(STAKING_ROLE, cmsAddress); await waitTx(tx);
+    }
 
     tx = await liquidityPool.grantCoreRole(stakingAddress); await waitTx(tx);
-    tx = await liquidityPool.grantCoreRole(cmsAddress); await waitTx(tx);
+    if (!SKIP_CMS) {
+        tx = await liquidityPool.grantCoreRole(cmsAddress); await waitTx(tx);
+    }
     tx = await liquidityPool.grantP2PRole(p2pAddress); await waitTx(tx);
     tx = await liquidityPool.setStakingManager(stakingAddress); await waitTx(tx);
     tx = await atomicP2p.setStakingManager(stakingAddress); await waitTx(tx);
@@ -157,6 +174,7 @@ async function main() {
         const payload = {
             network: { chainId: network.chainId.toString() },
             deployedAt: new Date().toISOString(),
+            deploymentBlock: deploymentBlockNumber,
             deployer: deployer.address,
             addresses: {
                 mockUSDT: usdtAddress,
@@ -164,10 +182,10 @@ async function main() {
                 liquidityPool: liquidityPoolAddress,
                 affiliateDistributor: affiliateAddress,
                 stakingManager: stakingAddress,
-                cms: cmsAddress,
+                ...(SKIP_CMS ? {} : { cms: cmsAddress }),
                 atomicP2p: p2pAddress,
             },
-            deadlines: { subscribeDeadline: SUBSCRIBE_DEADLINE, claimDeadline: CLAIM_DEADLINE },
+            ...(SKIP_CMS ? {} : { deadlines: { subscribeDeadline: SUBSCRIBE_DEADLINE, claimDeadline: CLAIM_DEADLINE } }),
         };
         fs.writeFileSync(outPath, JSON.stringify(payload, null, 2));
         console.log(`Deployment addresses written: ${outPath}`);
@@ -183,7 +201,9 @@ async function main() {
         tx = await stakingManager.renounceRole(DEFAULT_ADMIN_ROLE, deployer.address); await waitTx(tx);
         tx = await affiliateDistributor.renounceRole(STAKING_ROLE, deployer.address); await waitTx(tx);
         tx = await affiliateDistributor.renounceRole(DEFAULT_ADMIN_ROLE, deployer.address); await waitTx(tx);
-        tx = await cms.renounceRole(DEFAULT_ADMIN_ROLE, deployer.address); await waitTx(tx);
+        if (!SKIP_CMS && cms) {
+            tx = await cms.renounceRole(DEFAULT_ADMIN_ROLE, deployer.address); await waitTx(tx);
+        }
         tx = await liquidityPool.renounceRole(DEFAULT_ADMIN_ROLE, deployer.address); await waitTx(tx);
         const P2P_ADMIN_ROLE = await atomicP2p.ADMIN_ROLE();
         tx = await atomicP2p.renounceRole(P2P_ADMIN_ROLE, deployer.address); await waitTx(tx);
@@ -199,8 +219,9 @@ async function main() {
     console.log(`  LIQUIDITY_POOL_ADDRESS=${liquidityPoolAddress}`);
     console.log(`  AFFILIATE_DISTRIBUTOR_ADDRESS=${affiliateAddress}`);
     console.log(`  STAKING_MANAGER_ADDRESS=${stakingAddress}`);
-    console.log(`  CMS_ADDRESS=${cmsAddress}`);
+    if (!SKIP_CMS) console.log(`  CMS_ADDRESS=${cmsAddress}`);
     console.log(`  ATOMIC_P2P_ADDRESS=${p2pAddress}`);
+    console.log(`  DEPLOYMENT_BLOCK=${deploymentBlockNumber}`);
     console.log(`  SYSTEM_WALLET=${systemWallet}`);
     console.log(`  DEVELOPMENT_FUND_WALLET=${developmentFundWallet}`);
     console.log(`  DAO_WALLETS=${daoWallets.join(', ')}`);
