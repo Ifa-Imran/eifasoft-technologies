@@ -46,12 +46,14 @@ async function main() {
     const affiliateDistributor = await ethers.getContractAt("AffiliateDistributor", AFFILIATE_DIST);
     const atomicP2p           = await ethers.getContractAt("AtomicP2p", ATOMIC_P2P);
 
-    const DEFAULT_ADMIN_ROLE = await kairoToken.DEFAULT_ADMIN_ROLE();
-    const MINTER_ROLE        = await kairoToken.MINTER_ROLE();
-    const CORE_ROLE          = await liquidityPool.CORE_ROLE();
-    const P2P_ROLE           = await liquidityPool.P2P_ROLE();
-    const STAKING_ROLE       = await affiliateDistributor.STAKING_ROLE();
-    const P2P_ADMIN_ROLE     = await atomicP2p.ADMIN_ROLE();
+    const DEFAULT_ADMIN_ROLE    = await kairoToken.DEFAULT_ADMIN_ROLE();
+    const MINTER_ROLE            = await kairoToken.MINTER_ROLE();
+    const CORE_ROLE              = await liquidityPool.CORE_ROLE();
+    const P2P_ROLE               = await liquidityPool.P2P_ROLE();
+    const STAKING_ROLE           = await affiliateDistributor.STAKING_ROLE();
+    const INCOME_RECORDER_ROLE   = await stakingManager.INCOME_RECORDER_ROLE();
+    const P2P_ADMIN_ROLE         = await atomicP2p.ADMIN_ROLE();
+    const P2P_OPERATOR_ROLE      = await atomicP2p.OPERATOR_ROLE();
 
     // ══════════════════════════════════════════════════════════════════
     //  PRE-FLIGHT VERIFICATION — abort if anything is wrong
@@ -141,6 +143,38 @@ async function main() {
         console.log("  OK: Deployer has admin on KAIROToken");
     }
 
+    // 9. AffiliateDistributor has INCOME_RECORDER_ROLE on StakingManager
+    const adHasRecorder = await stakingManager.hasRole(INCOME_RECORDER_ROLE, AFFILIATE_DIST);
+    if (!adHasRecorder) { console.error("  FAIL: AffiliateDistributor missing INCOME_RECORDER_ROLE on SM"); failed = true; }
+    else { console.log("  OK: AffiliateDistributor has INCOME_RECORDER_ROLE on SM"); }
+
+    // 10. Deployer MUST NOT hold dangerous operational roles
+    console.log("");
+    console.log("── Deployer operational role safety checks ──");
+    const deployerHasMinter = await kairoToken.hasRole(MINTER_ROLE, deployer.address);
+    if (deployerHasMinter) { console.error("  DANGER: Deployer has MINTER_ROLE on KAIROToken — revoke it!"); failed = true; }
+    else { console.log("  OK: Deployer does NOT have MINTER_ROLE on KAIROToken"); }
+
+    const deployerHasRecorder = await stakingManager.hasRole(INCOME_RECORDER_ROLE, deployer.address);
+    if (deployerHasRecorder) { console.error("  DANGER: Deployer has INCOME_RECORDER_ROLE on SM — revoke it!"); failed = true; }
+    else { console.log("  OK: Deployer does NOT have INCOME_RECORDER_ROLE on SM"); }
+
+    const deployerHasStaking = await affiliateDistributor.hasRole(STAKING_ROLE, deployer.address);
+    if (deployerHasStaking) { console.warn("  WARN: Deployer has STAKING_ROLE on AD — will be revoked before burn"); }
+    else { console.log("  OK: Deployer does NOT have STAKING_ROLE on AD"); }
+
+    const deployerHasCore = await liquidityPool.hasRole(CORE_ROLE, deployer.address);
+    if (deployerHasCore) { console.error("  DANGER: Deployer has CORE_ROLE on LP — revoke it!"); failed = true; }
+    else { console.log("  OK: Deployer does NOT have CORE_ROLE on LP"); }
+
+    const deployerHasP2PRole = await liquidityPool.hasRole(P2P_ROLE, deployer.address);
+    if (deployerHasP2PRole) { console.error("  DANGER: Deployer has P2P_ROLE on LP — revoke it!"); failed = true; }
+    else { console.log("  OK: Deployer does NOT have P2P_ROLE on LP"); }
+
+    const deployerHasOperator = await atomicP2p.hasRole(P2P_OPERATOR_ROLE, deployer.address);
+    if (deployerHasOperator) { console.error("  DANGER: Deployer has OPERATOR_ROLE on AtomicP2p — revoke it!"); failed = true; }
+    else { console.log("  OK: Deployer does NOT have OPERATOR_ROLE on AtomicP2p"); }
+
     console.log("");
 
     if (failed) {
@@ -152,6 +186,23 @@ async function main() {
     }
 
     console.log("  ALL PRE-FLIGHT CHECKS PASSED");
+    console.log("");
+
+    // ══════════════════════════════════════════════════════════════════
+    //  REVOKE DANGEROUS OPERATIONAL ROLES FROM DEPLOYER
+    // ══════════════════════════════════════════════════════════════════
+    console.log("── Revoking operational roles from deployer ──");
+
+    // Check and revoke STAKING_ROLE if deployer has it (from seeding scripts)
+    const deployerHasStakingPre = await affiliateDistributor.hasRole(STAKING_ROLE, deployer.address);
+    if (deployerHasStakingPre) {
+        let tx = await affiliateDistributor.revokeRole(STAKING_ROLE, deployer.address);
+        await tx.wait();
+        await delay(WAIT);
+        console.log("  [REVOKED] STAKING_ROLE from deployer on AffiliateDistributor");
+    } else {
+        console.log("  OK: Deployer does not have STAKING_ROLE (skip)");
+    }
     console.log("");
 
     // ══════════════════════════════════════════════════════════════════
@@ -208,10 +259,12 @@ async function main() {
         { name: "LiquidityPool",       contract: liquidityPool,       role: DEFAULT_ADMIN_ROLE },
     ];
 
+    let postFailed = false;
     for (const c of checks) {
         const still = await c.contract.hasRole(c.role, deployer.address);
         if (still) {
             console.error(`  WARNING: ${c.name} — deployer STILL has admin!`);
+            postFailed = true;
         } else {
             console.log(`  CONFIRMED: ${c.name} — deployer has NO admin`);
         }
@@ -223,13 +276,45 @@ async function main() {
         console.log("  CONFIRMED: AtomicP2p — deployer has NO admin (both roles burned)");
     } else {
         console.error("  WARNING: AtomicP2p — deployer still has admin role(s)!");
+        postFailed = true;
+    }
+
+    // Full role sweep — confirm deployer has ZERO roles anywhere
+    console.log("");
+    console.log("── Full role sweep ──");
+    const roleSweep = [
+        { name: "KAIROToken MINTER_ROLE",       contract: kairoToken,          role: MINTER_ROLE },
+        { name: "SM INCOME_RECORDER_ROLE",      contract: stakingManager,      role: INCOME_RECORDER_ROLE },
+        { name: "AD STAKING_ROLE",              contract: affiliateDistributor, role: STAKING_ROLE },
+        { name: "LP CORE_ROLE",                 contract: liquidityPool,       role: CORE_ROLE },
+        { name: "LP P2P_ROLE",                  contract: liquidityPool,       role: P2P_ROLE },
+        { name: "AtomicP2p OPERATOR_ROLE",      contract: atomicP2p,           role: P2P_OPERATOR_ROLE },
+    ];
+
+    for (const r of roleSweep) {
+        const has = await r.contract.hasRole(r.role, deployer.address);
+        if (has) {
+            console.error(`  WARNING: Deployer STILL has ${r.name}!`);
+            postFailed = true;
+        } else {
+            console.log(`  CONFIRMED: Deployer has NO ${r.name}`);
+        }
     }
 
     console.log("");
+    if (postFailed) {
+        console.error("══════════════════════════════════════════");
+        console.error("  WARNING: Some roles were NOT burned!");
+        console.error("  Review output above before revealing key.");
+        console.error("══════════════════════════════════════════");
+        process.exit(1);
+    }
+
     console.log("══════════════════════════════════════════");
     console.log("  ALL ADMIN ROLES BURNED SUCCESSFULLY");
     console.log("  System is now fully decentralized.");
     console.log("  Deployer key has ZERO on-chain powers.");
+    console.log("  SAFE TO REVEAL PRIVATE KEY.");
     console.log("══════════════════════════════════════════");
 }
 

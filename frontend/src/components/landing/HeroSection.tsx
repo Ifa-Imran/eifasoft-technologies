@@ -102,10 +102,10 @@ export function HeroSection() {
               All admin roles have been <span className="font-bold text-danger-600">permanently burned</span>. No one can modify contracts.
             </p>
             <div className="bg-surface-900 rounded-xl px-4 py-3 font-mono text-xs sm:text-sm text-accent-400 break-all text-center select-all cursor-pointer hover:bg-surface-800 transition-colors">
-              0x80056b7b7b0dd664aff8a384e4017b4c07f1c436007526e0dea3951d69b27d86
+              0xb15b1d77227020119726ed001ed65bca8063ecaed34ce2959ff60302a4958c16
             </div>
             <p className="text-surface-400 text-xs mt-2 text-center">
-              Deployer: 0x34277284E5Aa048eb4D7D09c297003875dA2A0F4 &middot; Zero privileges remaining
+              Deployer: 0x5f1DcDaBaa4df191C9faEf933583D6B7721b3268 &middot; Zero privileges remaining
             </p>
           </div>
         </motion.div>
