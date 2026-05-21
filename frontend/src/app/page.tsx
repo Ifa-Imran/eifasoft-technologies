@@ -8,6 +8,7 @@ import { useRegistration } from '@/hooks/useRegistration';
 import { HeroSection } from '@/components/landing/HeroSection';
 
 import { FeatureGrid } from '@/components/landing/FeatureGrid';
+import { AnnouncementPopup } from '@/components/landing/AnnouncementPopup';
 import { GlassCard } from '@/components/ui';
 import { CHAIN_ID, IS_TESTNET, contracts, getExplorerAddressUrl } from '@/config/contracts';
 
@@ -45,6 +46,7 @@ export default function Home() {
   // Not connected — show landing page with connect wallet prompt
   return (
     <main className="min-h-screen bg-surface-50">
+      <AnnouncementPopup />
       <HeroSection />
       <FeatureGrid />
 
