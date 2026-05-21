@@ -1,5 +1,5 @@
 # =====================================================================
-# KAIRO DAO — Testnet stack for dev.kairodao.com (opBNB chainId 5611)
+# KAIRO DAO — Dev stack for dev.kairodao.com (opBNB mainnet chainId 204)
 # =====================================================================
 # Runs SIDE-BY-SIDE with the existing kairo-dev mainnet stack.
 # - Joins the existing external network `kairo-dev_kairo_network` so the
@@ -62,19 +62,18 @@ services:
       - PORT=4000
       - DATABASE_URL=postgresql://kairo_admin:K41r0T3st2026!@postgres-testnet:5432/kairo_testnet
       - REDIS_URL=redis://:K41r0T3stR3d1s!@redis-testnet:6379
-      - RPC_URL=https://opbnb-testnet-rpc.bnbchain.org
-      - RPC_WS_URL=wss://opbnb-testnet-rpc.bnbchain.org
-      - CHAIN_ID=5611
-      - KAIRO_TOKEN_ADDRESS=0x3332Bdf7d4eE96CA9384d46865B4A6edd9D5ae9B
-      - LIQUIDITY_POOL_ADDRESS=0x2093d2d57E5E9E3ADd7DD85d2963a5fdc1523530
-      - STAKING_MANAGER_ADDRESS=0x44955B9fEc0EB3d7376115ffb4F09998d2264B1d
-      - AFFILIATE_DISTRIBUTOR_ADDRESS=0x15A865d75Aec61338ba7Ed4a65d7F1B6C7F614C3
-      - CMS_ADDRESS=0x61E36f5C3F65bEAdBecba075F5d31D0EA2BdEa64
-      - ATOMIC_P2P_ADDRESS=0x5968C00205E12eFc622086c3F6B00fE75dA1FbA6
-      - USDT_ADDRESS=0xf664ABe7D5fc28Df9602CB9c54578fE7563e193f
-      - SYSTEM_WALLET=0x624D0985D844Cd1DF132723a9d849FE1A34cAf9D
-      # Block at which the testnet contracts were deployed; backfill from here.
-      - DEPLOYMENT_BLOCK=${DEPLOYMENT_BLOCK_TESTNET:-161962119}
+      - RPC_URL=https://opbnb-mainnet-rpc.bnbchain.org
+      - RPC_WS_URL=wss://opbnb-mainnet-rpc.bnbchain.org
+      - CHAIN_ID=204
+      - KAIRO_TOKEN_ADDRESS=0x8D01409fB9Adc19F5f1Fb7eD47c12D5A88051AeD
+      - LIQUIDITY_POOL_ADDRESS=0x26782184F8346832a2e0c84DEe09deFFF23DBf56
+      - STAKING_MANAGER_ADDRESS=0x21c22de855e87B2124A50d76f31E79152C977090
+      - AFFILIATE_DISTRIBUTOR_ADDRESS=0x8C7FF618C0Bc7ae9b9fd2828Ba33d977edb99237
+      - ATOMIC_P2P_ADDRESS=0xD9CaCE2B7C23013E3eDFf93dbF1CeE197AC386B2
+      - USDT_TOKEN_ADDRESS=0x9e5AAC1Ba1a2e6aEd6b32689DFcF62A509Ca96f3
+      - SYSTEM_WALLET=0x5f1DcDaBaa4df191C9faEf933583D6B7721b3268
+      # Block at which the mainnet contracts were deployed; backfill from here.
+      - DEPLOYMENT_BLOCK=144922203
       # Indexer signing key (only needed if backend posts on-chain txs)
       - INDEXER_PRIVATE_KEY=${INDEXER_PRIVATE_KEY_TESTNET:-}
     volumes:
@@ -132,17 +131,16 @@ services:
     environment:
       - NEXT_PUBLIC_BACKEND_URL=https://dev.kairodao.com
       - NEXT_PUBLIC_WS_URL=wss://dev.kairodao.com/ws
-      - NEXT_PUBLIC_CHAIN_ID=5611
-      - NEXT_PUBLIC_RPC_URL=https://opbnb-testnet-rpc.bnbchain.org
-      - NEXT_PUBLIC_EXPLORER_URL=https://opbnb-testnet.bscscan.com
-      - NEXT_PUBLIC_KAIRO_TOKEN=0x3332Bdf7d4eE96CA9384d46865B4A6edd9D5ae9B
-      - NEXT_PUBLIC_LIQUIDITY_POOL=0x2093d2d57E5E9E3ADd7DD85d2963a5fdc1523530
-      - NEXT_PUBLIC_STAKING_MANAGER=0x44955B9fEc0EB3d7376115ffb4F09998d2264B1d
-      - NEXT_PUBLIC_AFFILIATE_DISTRIBUTOR=0x15A865d75Aec61338ba7Ed4a65d7F1B6C7F614C3
-      - NEXT_PUBLIC_CMS=0x61E36f5C3F65bEAdBecba075F5d31D0EA2BdEa64
-      - NEXT_PUBLIC_ATOMIC_P2P=0x5968C00205E12eFc622086c3F6B00fE75dA1FbA6
-      - NEXT_PUBLIC_USDT=0xf664ABe7D5fc28Df9602CB9c54578fE7563e193f
-      - NEXT_PUBLIC_SYSTEM_WALLET=0x624D0985D844Cd1DF132723a9d849FE1A34cAf9D
+      - NEXT_PUBLIC_CHAIN_ID=204
+      - NEXT_PUBLIC_RPC_URL=https://opbnb-mainnet-rpc.bnbchain.org
+      - NEXT_PUBLIC_EXPLORER_URL=https://opbnb.bscscan.com
+      - NEXT_PUBLIC_KAIRO_TOKEN=0x8D01409fB9Adc19F5f1Fb7eD47c12D5A88051AeD
+      - NEXT_PUBLIC_LIQUIDITY_POOL=0x26782184F8346832a2e0c84DEe09deFFF23DBf56
+      - NEXT_PUBLIC_STAKING_MANAGER=0x21c22de855e87B2124A50d76f31E79152C977090
+      - NEXT_PUBLIC_AFFILIATE_DISTRIBUTOR=0x8C7FF618C0Bc7ae9b9fd2828Ba33d977edb99237
+      - NEXT_PUBLIC_ATOMIC_P2P=0xD9CaCE2B7C23013E3eDFf93dbF1CeE197AC386B2
+      - NEXT_PUBLIC_USDT=0x9e5AAC1Ba1a2e6aEd6b32689DFcF62A509Ca96f3
+      - NEXT_PUBLIC_SYSTEM_WALLET=0x5f1DcDaBaa4df191C9faEf933583D6B7721b3268
       - NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=d9fddb48789291a159e8270ef32105c2
     volumes:
       - frontend_testnet_app:/app

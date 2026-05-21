@@ -16,6 +16,9 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       chainId: 31337,
+      // Bumped from default 20 to 25 so test fixtures (14 named signers + 6 unrelated
+      // signer slots used by AffiliateDistributor / CMS tests + genesisAccount) fit.
+      accounts: { count: 25 },
     },
     opbnbTestnet: {
       url: process.env.OPBNB_TESTNET_RPC || "https://opbnb-testnet-rpc.bnbchain.org",

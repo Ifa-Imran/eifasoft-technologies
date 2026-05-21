@@ -29,15 +29,18 @@ async function main() {
     const systemWallet = process.env.SYSTEM_WALLET || deployer.address;
 
     const daoWallets = [
+        // DAOs 1-3 receive 1% each
         '0x4465f4e53241c118a19d092d2495984f467a01a9',
         '0x3c5bB7A176F2787de0A6Ae73C6Eff4Ff5dD63295',
-        '0xA91970AcA653591fd20231ad29ecCA0c7F691ceB',
         '0xe3E3Ca6feD0F6Bd26B1E684854F2B7AFB49b2805',
+        // DAOs 4-7 receive 0.5% each
         '0x20d8cF481f06459FdFEAfF9219AD7a979eE06c32',
         '0xBDAb83d8eb19b0454648Db15897796BCFBB2F9B7',
+        '0x12f25959b654F308BC1C5224bC856fCf50529e60',
+        '0x7DdD88D53A0FEBee5035C97461fba609880311A5',
     ];
 
-    const developmentFundWallet = '0x1bdbE7e3411E6439741335f1FC9fa37Adf385E07';
+    const developmentFundWallet = '0x96c01bc3142eFB0379C96ac5157d04cA6ED1d796';
 
     console.log("--- PHASE 1: Contract Deployment ---");
 
@@ -65,16 +68,18 @@ async function main() {
     const liquidityPoolAddress = await liquidityPool.getAddress();
     console.log("  LiquidityPool:", liquidityPoolAddress);
 
-    console.log("[4/8] Configuring KAIROToken...");
+    console.log("[4/8] Configuring KAIROToken (also seeds 5 KAIRO to dev fund)...");
     let tx = await kairoToken.setLiquidityPool(liquidityPoolAddress);
     await waitTx(tx);
-    tx = await kairoToken.mintInitialSupply();
+    tx = await kairoToken.mintInitialSupply(developmentFundWallet);
     await waitTx(tx);
 
-    console.log("[5/8] Deploying AffiliateDistributor...");
+    // Testnet rank salary cycle: 15 minutes (production uses 7 days; see scripts/deploy.ts)
+    const RANK_INTERVAL_TESTNET = 15 * 60;
+    console.log("[5/8] Deploying AffiliateDistributor (RANK_INTERVAL=15 min)...");
     const AffiliateDistributor = await ethers.getContractFactory("AffiliateDistributor");
     const affiliateDistributor = await AffiliateDistributor.deploy(
-        kairoAddress, liquidityPoolAddress, deployer.address, systemWallet
+        kairoAddress, liquidityPoolAddress, deployer.address, systemWallet, RANK_INTERVAL_TESTNET
     );
     await affiliateDistributor.waitForDeployment();
     await sleep(DELAY);
@@ -95,6 +100,13 @@ async function main() {
     await waitTx(tx);
     tx = await affiliateDistributor.setStakingManager(stakingAddress);
     await waitTx(tx);
+
+    // Override production tier defaults (8h/6h/5h) with testnet seconds-scale
+    // intervals so demo flows compound visibly. Mainnet keeps the contract defaults.
+    console.log("  Overriding tier intervals for testnet (3min/2min/1min)...");
+    tx = await stakingManager.setTier(0, ethers.parseEther("10"), ethers.parseEther("499"), 180, 3); await waitTx(tx);
+    tx = await stakingManager.setTier(1, ethers.parseEther("500"), ethers.parseEther("1999"), 120, 4); await waitTx(tx);
+    tx = await stakingManager.setTier(2, ethers.parseEther("2000"), ethers.MaxUint256, 60, 4); await waitTx(tx);
 
     const latestBlock = await ethers.provider.getBlock("latest");
     const deploymentBlockNumber = latestBlock!.number;

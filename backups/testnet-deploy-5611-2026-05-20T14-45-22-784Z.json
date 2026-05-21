@@ -1,0 +1,21 @@
+{
+  "network": {
+    "chainId": "5611"
+  },
+  "deployedAt": "2026-05-20T14:45:22.784Z",
+  "deploymentBlock": 161915688,
+  "deployer": "0x34277284E5Aa048eb4D7D09c297003875dA2A0F4",
+  "addresses": {
+    "mockUSDT": "0x1be0A67cdA48049faB0b489987a24F446aeca455",
+    "kairoToken": "0x9a493c039266d73faE54a6d1fBa8826f3e9A429A",
+    "liquidityPool": "0xdfa2094c372B76C97079A8214D991b9693900798",
+    "affiliateDistributor": "0x3E9A6d714a0569cACb88f367a4F1D89858A173A8",
+    "stakingManager": "0x2d8876cccb7aa575292cA7Ce7179125A4Fff113C",
+    "cms": "0x69D973821852a346F148Efb3241b5dFa2a922572",
+    "atomicP2p": "0x6959639248d2D42bC361d00f000AD7d7ef1cEaa9"
+  },
+  "deadlines": {
+    "subscribeDeadline": 1779299048,
+    "claimDeadline": 1779309848
+  }
+}

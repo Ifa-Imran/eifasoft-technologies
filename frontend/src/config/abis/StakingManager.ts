@@ -22,9 +22,9 @@ export const StakingManagerABI = [
         "type": "address"
       },
       {
-        "internalType": "address[6]",
+        "internalType": "address[7]",
         "name": "_daoWallets",
-        "type": "address[6]"
+        "type": "address[7]"
       },
       {
         "internalType": "address",
@@ -177,9 +177,9 @@ export const StakingManagerABI = [
     "inputs": [
       {
         "indexed": false,
-        "internalType": "address[6]",
+        "internalType": "address[7]",
         "name": "wallets",
-        "type": "address[6]"
+        "type": "address[7]"
       }
     ],
     "name": "DaoWalletsSet",
@@ -421,6 +421,43 @@ export const StakingManagerABI = [
       }
     ],
     "name": "StakeMigrated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "tierId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "minStake",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "maxStake",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "compoundInterval",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "dailyClosings",
+        "type": "uint256"
+      }
+    ],
+    "name": "TierConfigured",
     "type": "event"
   },
   {
@@ -796,9 +833,9 @@ export const StakingManagerABI = [
     "name": "getDaoWallets",
     "outputs": [
       {
-        "internalType": "address[6]",
+        "internalType": "address[7]",
         "name": "",
-        "type": "address[6]"
+        "type": "address[7]"
       }
     ],
     "stateMutability": "view",
@@ -1345,9 +1382,9 @@ export const StakingManagerABI = [
   {
     "inputs": [
       {
-        "internalType": "address[6]",
+        "internalType": "address[7]",
         "name": "_daoWallets",
-        "type": "address[6]"
+        "type": "address[7]"
       }
     ],
     "name": "setDaoWallets",
@@ -1364,6 +1401,39 @@ export const StakingManagerABI = [
       }
     ],
     "name": "setDevelopmentFundWallet",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_tierId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_min",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_max",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_compoundInterval",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_dailyClosings",
+        "type": "uint256"
+      }
+    ],
+    "name": "setTier",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

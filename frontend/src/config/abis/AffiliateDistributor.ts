@@ -20,6 +20,11 @@ export const AffiliateDistributorABI = [
         "internalType": "address",
         "name": "_systemWallet",
         "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_rankInterval",
+        "type": "uint256"
       }
     ],
     "stateMutability": "nonpayable",

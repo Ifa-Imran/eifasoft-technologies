@@ -1,0 +1,8 @@
+{
+  "network": "5611",
+  "deployedAt": "2026-05-18T20:43:01.129Z",
+  "deployer": "0x34277284E5Aa048eb4D7D09c297003875dA2A0F4",
+  "newStakingManager": "0xDAF8A0211475BD441dBe0e8A8b9284eC4BFc0Ee7",
+  "seededUsers": 264,
+  "totalPrincipalUsdt": "28466.85"
+}

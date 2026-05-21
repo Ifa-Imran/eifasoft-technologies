@@ -4,12 +4,16 @@ import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { deployFullEcosystemFixture } from "./helpers/fixtures";
 
 describe("LiquidityPool", function () {
+    // After mintInitialSupply(devWallet): totalSupply = 10,000 (LP social lock) + 5 (dev) = 10,005 KAIRO
+    const KAIRO_TOTAL_SUPPLY = ethers.parseEther("10005");
+    const PRICE_PRECISION = ethers.parseEther("1");
+
     describe("Price Formula", function () {
         it("should return correct initial price (USDT_balance / KAIRO_supply)", async function () {
             const { liquidityPool } = await loadFixture(deployFullEcosystemFixture);
-            // 10,000 USDT / 10,000 KAIRO = 1 USDT/KAIRO
-            const price = await liquidityPool.getLivePrice();
-            expect(price).to.equal(ethers.parseEther("1"));
+            // 10,000 USDT / 10,005 KAIRO  (5 KAIRO go to dev wallet at genesis)
+            const expected = (ethers.parseEther("10000") * PRICE_PRECISION) / KAIRO_TOTAL_SUPPLY;
+            expect(await liquidityPool.getLivePrice()).to.equal(expected);
         });
 
         it("getCurrentPrice should equal getLivePrice", async function () {
@@ -34,8 +38,9 @@ describe("LiquidityPool", function () {
             const { liquidityPool, usdt, owner } = await loadFixture(deployFullEcosystemFixture);
             // Add more USDT to LiquidityPool
             await usdt.transfer(await liquidityPool.getAddress(), ethers.parseEther("10000"));
-            // Now: 20,000 USDT / 10,000 KAIRO = 2 USDT/KAIRO
-            expect(await liquidityPool.getLivePrice()).to.equal(ethers.parseEther("2"));
+            // Now: 20,000 USDT / 10,005 KAIRO
+            const expected = (ethers.parseEther("20000") * PRICE_PRECISION) / KAIRO_TOTAL_SUPPLY;
+            expect(await liquidityPool.getLivePrice()).to.equal(expected);
         });
     });
 
@@ -126,21 +131,6 @@ describe("LiquidityPool", function () {
     });
 
     describe("Admin Functions", function () {
-        it("should allow admin to withdrawUSDT via CORE_ROLE", async function () {
-            const { liquidityPool, usdt, owner, user1 } = await loadFixture(deployFullEcosystemFixture);
-            // Owner is not CORE_ROLE, grant it
-            await liquidityPool.grantCoreRole(owner.address);
-            const balBefore = await usdt.balanceOf(user1.address);
-            await liquidityPool.withdrawUSDT(user1.address, ethers.parseEther("100"));
-            const balAfter = await usdt.balanceOf(user1.address);
-            expect(balAfter - balBefore).to.equal(ethers.parseEther("100"));
-        });
-
-        it("should revert withdrawUSDT without CORE_ROLE", async function () {
-            const { liquidityPool, user1 } = await loadFixture(deployFullEcosystemFixture);
-            await expect(liquidityPool.connect(user1).withdrawUSDT(user1.address, ethers.parseEther("100"))).to.be.reverted;
-        });
-
         it("should return correct balances", async function () {
             const { liquidityPool, usdt } = await loadFixture(deployFullEcosystemFixture);
             const [usdtBalance, kairoBalance] = await liquidityPool.getBalances();
@@ -153,8 +143,11 @@ describe("LiquidityPool", function () {
         it("should return correct TVL", async function () {
             const { liquidityPool } = await loadFixture(deployFullEcosystemFixture);
             const tvl = await liquidityPool.getTotalValueLocked();
-            // 10,000 USDT + 10,000 KAIRO * 1 USDT/KAIRO = 20,000
-            expect(tvl).to.equal(ethers.parseEther("20000"));
+            // TVL = USDT_balance + (LP_KAIRO_balance * price)
+            // = 10,000 + 10,000 * (10000 / 10005) USDT
+            const price = (ethers.parseEther("10000") * PRICE_PRECISION) / KAIRO_TOTAL_SUPPLY;
+            const lpKairoValue = (ethers.parseEther("10000") * price) / PRICE_PRECISION;
+            expect(tvl).to.equal(ethers.parseEther("10000") + lpKairoValue);
         });
 
         it("should return deployer info", async function () {
@@ -166,8 +159,9 @@ describe("LiquidityPool", function () {
         it("should calculate min output correctly", async function () {
             const { liquidityPool } = await loadFixture(deployFullEcosystemFixture);
             const minOut = await liquidityPool.calculateMinOutput(ethers.parseEther("10"), 1, true);
-            // 10 KAIRO * 1 USDT = 10 USDT, minus 10% fee = 9.0, minus 1% slippage = 8.91
-            const gross = ethers.parseEther("10");
+            // gross = 10 KAIRO * price (10000/10005), minus 10% fee, minus 1% slippage
+            const price = (ethers.parseEther("10000") * PRICE_PRECISION) / KAIRO_TOTAL_SUPPLY;
+            const gross = (ethers.parseEther("10") * price) / PRICE_PRECISION;
             const fee = (gross * 10n) / 100n;
             const net = gross - fee;
             const slip = (net * 1n) / 100n;

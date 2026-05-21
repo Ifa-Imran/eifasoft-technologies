@@ -1,7 +1,7 @@
 import { ethers } from "hardhat";
 
 export async function deployFullEcosystemFixture() {
-    const [owner, systemWallet, user1, user2, user3, user4, user5, dao1, dao2, dao3, dao4, dao5, dao6, ...others] = await ethers.getSigners();
+    const [owner, systemWallet, user1, user2, user3, user4, user5, dao1, dao2, dao3, dao4, dao5, dao6, dao7, ...others] = await ethers.getSigners();
 
     // Step 1: Deploy MockUSDT
     const MockUSDT = await ethers.getContractFactory("MockUSDT");
@@ -18,22 +18,24 @@ export async function deployFullEcosystemFixture() {
     const liquidityPool = await LiquidityPool.deploy(await kairoToken.getAddress(), await usdt.getAddress());
     await liquidityPool.waitForDeployment();
 
-    // Step 4: Configure KAIROToken
+    // Step 4: Configure KAIROToken (mints LP social lock + 5 KAIRO to dev/system wallet)
     await kairoToken.setLiquidityPool(await liquidityPool.getAddress());
-    await kairoToken.mintInitialSupply();
+    await kairoToken.mintInitialSupply(systemWallet.address);
 
-    // Step 5: Deploy AffiliateDistributor
+    // Step 5: Deploy AffiliateDistributor (testnet RANK_INTERVAL: 15 minutes)
+    const RANK_INTERVAL_TEST = 15 * 60;
     const AffiliateDistributor = await ethers.getContractFactory("AffiliateDistributor");
     const affiliateDistributor = await AffiliateDistributor.deploy(
         await kairoToken.getAddress(),
         await liquidityPool.getAddress(),
         owner.address,
-        systemWallet.address
+        systemWallet.address,
+        RANK_INTERVAL_TEST
     );
     await affiliateDistributor.waitForDeployment();
 
     // Step 6: Deploy StakingManager
-    const daoWallets = [dao1.address, dao2.address, dao3.address, dao4.address, dao5.address, dao6.address] as [string, string, string, string, string, string];
+    const daoWallets = [dao1.address, dao2.address, dao3.address, dao4.address, dao5.address, dao6.address, dao7.address] as [string, string, string, string, string, string, string];
     const StakingManager = await ethers.getContractFactory("StakingManager");
     const stakingManager = await StakingManager.deploy(
         await kairoToken.getAddress(),
@@ -85,18 +87,15 @@ export async function deployFullEcosystemFixture() {
 
     // Step 9: Grant all roles
     const MINTER_ROLE = await kairoToken.MINTER_ROLE();
-    const BURNER_ROLE = await kairoToken.BURNER_ROLE();
+    const BURNER_ROLE = ethers.ZeroHash; // BURNER_ROLE removed from KAIROToken; burns are public via ERC20Burnable
 
     await kairoToken.grantRole(MINTER_ROLE, await stakingManager.getAddress());
     await kairoToken.grantRole(MINTER_ROLE, await affiliateDistributor.getAddress());
     await kairoToken.grantRole(MINTER_ROLE, await cms.getAddress());
-    await kairoToken.grantRole(BURNER_ROLE, await liquidityPool.getAddress());
-    await kairoToken.grantRole(BURNER_ROLE, await p2pEscrow.getAddress());
 
     const RANK_UPDATER_ROLE = ethers.ZeroHash; // placeholder, role no longer exists
 
-    const COMPOUNDER_ROLE = await stakingManager.COMPOUNDER_ROLE();
-    await stakingManager.grantRole(COMPOUNDER_ROLE, owner.address);
+    const COMPOUNDER_ROLE = ethers.ZeroHash; // COMPOUNDER_ROLE removed from StakingManager
 
     await liquidityPool.grantCoreRole(await stakingManager.getAddress());
     await liquidityPool.grantCoreRole(await cms.getAddress());
@@ -106,10 +105,11 @@ export async function deployFullEcosystemFixture() {
     const STAKING_ROLE = await affiliateDistributor.STAKING_ROLE();
     await affiliateDistributor.grantRole(STAKING_ROLE, await cms.getAddress());
 
-    // Register genesis account (root of referral tree) — uses others[0] so it doesn't interfere with tests
+    // Register genesis account (root of referral tree) — uses others[6] (signer 20)
+    // so it doesn't collide with signers[14..19] used as referral chain in tests.
     // Genesis account cannot stake but serves as the root ancestor.
     await affiliateDistributor.grantRole(STAKING_ROLE, owner.address);
-    const genesisAccount = others[0];
+    const genesisAccount = others[6];
     await affiliateDistributor.setReferrer(genesisAccount.address, ethers.ZeroAddress);
 
     // Step 10: Seed LiquidityPool with 10,000 USDT liquidity
@@ -126,7 +126,7 @@ export async function deployFullEcosystemFixture() {
 
     return {
         owner, systemWallet, user1, user2, user3, user4, user5,
-        dao1, dao2, dao3, dao4, dao5, dao6, daoWallets, others, genesisAccount,
+        dao1, dao2, dao3, dao4, dao5, dao6, dao7, daoWallets, others, genesisAccount,
         kairoToken, usdt, liquidityPool, stakingManager,
         affiliateDistributor, cms, p2pEscrow,
         MINTER_ROLE, BURNER_ROLE, COMPOUNDER_ROLE, RANK_UPDATER_ROLE, STAKING_ROLE

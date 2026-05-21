@@ -74,14 +74,17 @@ async function main() {
 
   // ── Deploy new StakingManager ─────────────────────────────────────────────
   const daoWallets = [
+    // DAOs 1-3: 1% each
     "0x4465f4e53241c118a19d092d2495984f467a01a9",
     "0x3c5bB7A176F2787de0A6Ae73C6Eff4Ff5dD63295",
-    "0xA91970AcA653591fd20231ad29ecCA0c7F691ceB",
     "0xe3E3Ca6feD0F6Bd26B1E684854F2B7AFB49b2805",
+    // DAOs 4-7: 0.5% each
     "0x20d8cF481f06459FdFEAfF9219AD7a979eE06c32",
     "0xBDAb83d8eb19b0454648Db15897796BCFBB2F9B7",
+    "0x12f25959b654F308BC1C5224bC856fCf50529e60",
+    "0x7DdD88D53A0FEBee5035C97461fba609880311A5",
   ];
-  const devFund = "0x1bdbE7e3411E6439741335f1FC9fa37Adf385E07";
+  const devFund = "0x96c01bc3142eFB0379C96ac5157d04cA6ED1d796";
 
   console.log("\n[1/6] Deploying new StakingManager...");
   const SMFactory = await ethers.getContractFactory("StakingManager");
@@ -97,6 +100,13 @@ async function main() {
   await sleep(DELAY);
   const newSMAddress = await newSM.getAddress();
   console.log("  New StakingManager:", newSMAddress);
+
+  // Override production tier defaults (8h/6h/5h) with testnet seconds-scale
+  // intervals (3min/2min/1min) so demo flows compound visibly.
+  console.log("  Overriding tier intervals for testnet (3min/2min/1min)...");
+  await waitTx(await newSM.setTier(0, ethers.parseEther("10"), ethers.parseEther("499"), 180, 3), "setTier(0)");
+  await waitTx(await newSM.setTier(1, ethers.parseEther("500"), ethers.parseEther("1999"), 120, 4), "setTier(1)");
+  await waitTx(await newSM.setTier(2, ethers.parseEther("2000"), ethers.MaxUint256, 60, 4), "setTier(2)");
 
   // ── Wire AffiliateDistributor ─────────────────────────────────────────────
   console.log("\n[2/6] Wire AffiliateDistributor → new StakingManager...");

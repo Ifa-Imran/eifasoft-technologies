@@ -51,8 +51,9 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
     mapping(address => uint256) public userRankLevel;
     mapping(address => uint256) public lastRankClaimTime;
 
-    // TESTNET: 15 minutes (prod: 7 days)
-    uint256 public constant RANK_INTERVAL = 15 minutes;
+    // Rank salary cycle. Set at deploy time: 7 days for mainnet, lower (e.g. 15 minutes)
+    // on testnet. Immutable so users have a permanent guarantee post-deployment.
+    uint256 public immutable RANK_INTERVAL;
 
     uint256 public constant MIN_HARVEST = 10e18;
     uint256 public constant MAX_TREE_DEPTH = 50;
@@ -85,16 +86,19 @@ contract AffiliateDistributor is ReentrancyGuard, Pausable, AccessControl {
         address _kairoToken,
         address _liquidityPool,
         address _admin,
-        address _systemWallet
+        address _systemWallet,
+        uint256 _rankInterval
     ) {
         require(_kairoToken != address(0), "AD: Invalid KAIRO token");
         require(_liquidityPool != address(0), "AD: Invalid LiquidityPool");
         require(_admin != address(0), "AD: Invalid admin");
         require(_systemWallet != address(0), "AD: Invalid system wallet");
+        require(_rankInterval > 0, "AD: Invalid rank interval");
 
         kairoToken = IKAIROToken(_kairoToken);
         liquidityPool = ILiquidityPool(_liquidityPool);
         systemWallet = _systemWallet;
+        RANK_INTERVAL = _rankInterval;
 
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
     }

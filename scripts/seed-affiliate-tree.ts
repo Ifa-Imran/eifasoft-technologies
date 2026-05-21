@@ -39,12 +39,14 @@ const ZERO = ethers.ZeroAddress;
 
 interface SnapshotUser {
   user: string;
-  affiliate: { referrer: string };
+  affiliate?: { referrer?: string };
+  referrer?: string; // correct-tree.json flat format
 }
 
 interface Snapshot {
-  meta: { network?: { chainId?: string }; addresses?: any };
-  global: { affiliate: { genesisAccount: string } };
+  meta?: { network?: { chainId?: string }; addresses?: any };
+  global?: { affiliate?: { genesisAccount?: string } };
+  genesis?: string; // correct-tree.json
   users: SnapshotUser[];
 }
 
@@ -67,7 +69,8 @@ async function main() {
   console.log("  start index       :", START_INDEX);
 
   const snap: Snapshot = JSON.parse(fs.readFileSync(SNAPSHOT_FILE, "utf8"));
-  const genesisLower = snap.global.affiliate.genesisAccount.toLowerCase();
+  const snapshotGenesis: string = (snap.global?.affiliate?.genesisAccount || snap.genesis || "").toLowerCase();
+  const genesisLower = snapshotGenesis;
   if (!ethers.isAddress(genesisLower)) {
     throw new Error(`Snapshot has invalid genesisAccount: ${genesisLower}`);
   }
@@ -75,10 +78,12 @@ async function main() {
   console.log("  total users       :", snap.users.length);
 
   // Build referrer map (user -> referrer). Use lowercase canonical form.
+  // Supports both snapshot.json (nested affiliate.referrer) and correct-tree.json (flat referrer).
   const refMap = new Map<string, string>();
   for (const u of snap.users) {
     const userLower = u.user.toLowerCase();
-    const refLower = (u.affiliate?.referrer || ZERO).toLowerCase();
+    const refRaw = u.affiliate?.referrer || u.referrer || ZERO;
+    const refLower = refRaw.toLowerCase();
     if (!ethers.isAddress(userLower)) continue;
     refMap.set(userLower, refLower);
   }
@@ -113,7 +118,13 @@ async function main() {
   let graftedCount = 0;
   for (const [user, referrer] of refMap) {
     if (user === onChainGenesisLower) continue;
-    const refMissing = referrer === ZERO || (!refMap.has(referrer) && referrer !== onChainGenesisLower);
+    // Self-loop indicates this is the snapshot's root (genesis). Graft it to the
+    // on-chain genesis so descendants can chain underneath.
+    const isSelfLoop = referrer === user;
+    const refMissing =
+      referrer === ZERO ||
+      isSelfLoop ||
+      (!refMap.has(referrer) && referrer !== onChainGenesisLower);
     if (refMissing) {
       ordered.push({ user, referrer: onChainGenesisLower });
       placed.add(user);

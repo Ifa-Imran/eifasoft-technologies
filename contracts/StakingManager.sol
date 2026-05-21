@@ -47,7 +47,7 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
     struct Tier {
         uint256 min;
         uint256 max;
-        uint256 compoundInterval;  // TESTNET 180/120/60 (prod: 28800/21600/18000)
+        uint256 compoundInterval;  // PRODUCTION: 28800/21600/18000 seconds (testnet override via setTier)
         uint256 dailyClosings;
     }
 
@@ -78,7 +78,7 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
     address public affiliateDistributor;
     address public cmsContract;
     address public developmentFundWallet;
-    address[6] public daoWallets;
+    address[7] public daoWallets;
 
     mapping(address => bool) public autoCompoundEnabled;
 
@@ -103,7 +103,8 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
     event TierUpdated(address indexed user, uint8 newTier);
     event AffiliateDistributorSet(address indexed distributor);
     event DevelopmentFundWalletSet(address indexed wallet);
-    event DaoWalletsSet(address[6] wallets);
+    event DaoWalletsSet(address[7] wallets);
+    event TierConfigured(uint256 indexed tierId, uint256 minStake, uint256 maxStake, uint256 compoundInterval, uint256 dailyClosings);
     event CMSSet(address indexed cms);
     event CappedHarvestApplied(address indexed user, uint256 requested, uint256 applied);
     event AutoCompoundToggled(address indexed user, bool enabled);
@@ -116,7 +117,7 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
         address _liquidityPool,
         address _usdt,
         address _developmentFundWallet,
-        address[6] memory _daoWallets,
+        address[7] memory _daoWallets,
         address _admin
     ) {
         require(_kairoToken != address(0), "StakingManager: Invalid KAIRO token");
@@ -125,7 +126,7 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
         require(_developmentFundWallet != address(0), "StakingManager: Invalid development fund wallet");
         require(_admin != address(0), "StakingManager: Invalid admin");
 
-        for (uint256 i = 0; i < 6; i++) {
+        for (uint256 i = 0; i < 7; i++) {
             require(_daoWallets[i] != address(0), "StakingManager: Invalid DAO wallet");
         }
 
@@ -137,12 +138,13 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
 
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
 
-        // Tier 0: 10-499 USDT, 3 minutes (180s) TESTNET (prod 28800s)
-        tiers[0] = Tier(10 * 10 ** 18, 499 * 10 ** 18, 180, 3);
-        // Tier 1: 500-1999 USDT, 2 minutes (120s) TESTNET (prod 21600s)
-        tiers[1] = Tier(500 * 10 ** 18, 1999 * 10 ** 18, 120, 4);
-        // Tier 2: 2000+ USDT, 1 minute (60s) TESTNET (prod 18000s)
-        tiers[2] = Tier(2000 * 10 ** 18, type(uint256).max, 60, 4);
+        // PRODUCTION tier defaults. Admins (e.g. testnet deploy scripts) may override via setTier.
+        // Tier 0: 10-499 USDT, 8h compound interval (28800s)
+        tiers[0] = Tier(10 * 10 ** 18, 499 * 10 ** 18, 28800, 3);
+        // Tier 1: 500-1999 USDT, 6h compound interval (21600s)
+        tiers[1] = Tier(500 * 10 ** 18, 1999 * 10 ** 18, 21600, 4);
+        // Tier 2: 2000+ USDT, 5h compound interval (18000s)
+        tiers[2] = Tier(2000 * 10 ** 18, type(uint256).max, 18000, 4);
     }
 
     function stake(uint256 _usdtAmount, address _referrer) external nonReentrant whenNotPaused {
@@ -167,11 +169,13 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
         require(usdt.transfer(address(liquidityPool), liquidityPoolShare), "StakingManager: LiquidityPool transfer failed");
         liquidityPool.receiveStakingFunds(liquidityPoolShare);
 
-        for (uint256 i = 0; i < 4; i++) {
+        // DAOs 1-3: 1% each (total 3%)
+        for (uint256 i = 0; i < 3; i++) {
             uint256 daoSharePerWallet = (_usdtAmount * 1) / 100;
             require(usdt.transfer(daoWallets[i], daoSharePerWallet), "StakingManager: DAO wallet transfer failed");
         }
-        for (uint256 i = 4; i < 6; i++) {
+        // DAOs 4-7: 0.5% each (total 2%)
+        for (uint256 i = 3; i < 7; i++) {
             uint256 daoSharePerWallet = (_usdtAmount * 5) / 1000;
             require(usdt.transfer(daoWallets[i], daoSharePerWallet), "StakingManager: DAO wallet transfer failed");
         }
@@ -523,16 +527,36 @@ contract StakingManager is ReentrancyGuard, Pausable, AccessControl {
         emit DevelopmentFundWalletSet(_wallet);
     }
 
-    function setDaoWallets(address[6] calldata _daoWallets) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        for (uint256 i = 0; i < 6; i++) {
+    function setDaoWallets(address[7] calldata _daoWallets) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        for (uint256 i = 0; i < 7; i++) {
             require(_daoWallets[i] != address(0), "StakingManager: Invalid DAO wallet");
         }
         daoWallets = _daoWallets;
         emit DaoWalletsSet(_daoWallets);
     }
 
-    function getDaoWallets() external view returns (address[6] memory) {
+    function getDaoWallets() external view returns (address[7] memory) {
         return daoWallets;
+    }
+
+    /**
+     * @dev Admin setter for tier configuration. Used to override the production defaults
+     *      on testnet so compound cycles complete in seconds rather than hours.
+     *      Mainnet operators should NOT call this once the deployer admin role is renounced.
+     */
+    function setTier(
+        uint256 _tierId,
+        uint256 _min,
+        uint256 _max,
+        uint256 _compoundInterval,
+        uint256 _dailyClosings
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_tierId < 3, "StakingManager: Invalid tier id");
+        require(_max >= _min, "StakingManager: Invalid tier bounds");
+        require(_compoundInterval > 0, "StakingManager: Invalid compound interval");
+        require(_dailyClosings > 0, "StakingManager: Invalid daily closings");
+        tiers[_tierId] = Tier(_min, _max, _compoundInterval, _dailyClosings);
+        emit TierConfigured(_tierId, _min, _max, _compoundInterval, _dailyClosings);
     }
 
     function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {

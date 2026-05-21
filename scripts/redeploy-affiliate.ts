@@ -32,10 +32,11 @@ async function main() {
     "BNB\n"
   );
 
-  // 1. Deploy new AffiliateDistributor
+  // 1. Deploy new AffiliateDistributor (testnet rank interval = 15 minutes)
   console.log("[1/10] Deploying new AffiliateDistributor...");
+  const RANK_INTERVAL_TESTNET = 15 * 60;
   const AD = await ethers.getContractFactory("AffiliateDistributor");
-  const ad = await AD.deploy(KAIRO_TOKEN, LIQUIDITY_POOL, deployer.address, SYSTEM_WALLET);
+  const ad = await AD.deploy(KAIRO_TOKEN, LIQUIDITY_POOL, deployer.address, SYSTEM_WALLET, RANK_INTERVAL_TESTNET);
   await ad.waitForDeployment();
   await sleep(DELAY);
   const adAddress = await ad.getAddress();
@@ -104,17 +105,8 @@ async function main() {
   await waitTx(tx);
   console.log("  Genesis:", deployer.address);
 
-  // 10. Grant deployer COMPOUNDER_ROLE on StakingManager (if not already)
-  console.log("[10/10] Ensuring deployer has COMPOUNDER_ROLE...");
-  const COMPOUNDER_ROLE = await sm.COMPOUNDER_ROLE();
-  const hasRole = await sm.hasRole(COMPOUNDER_ROLE, deployer.address);
-  if (!hasRole) {
-    tx = await sm.grantRole(COMPOUNDER_ROLE, deployer.address);
-    await waitTx(tx);
-    console.log("  Granted");
-  } else {
-    console.log("  Already has it");
-  }
+  // 10. COMPOUNDER_ROLE was removed from StakingManager — nothing to grant.
+  console.log("[10/10] (skipped) COMPOUNDER_ROLE no longer exists on StakingManager.");
 
   console.log("\n=============================================");
   console.log("Redeployment complete!");

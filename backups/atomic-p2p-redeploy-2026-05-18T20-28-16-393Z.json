@@ -1,0 +1,12 @@
+{
+  "deployedAt": "2026-05-18T20:28:16.240Z",
+  "network": {
+    "chainId": "5611"
+  },
+  "oldAtomicP2p": "0xD1ff5759206BA1468C393059d9A5205bB952953F",
+  "newAtomicP2p": "0xc54ADF4ECdaE213945557cE24fE3F1318d59203E",
+  "txs": {
+    "grantP2PRole": "see logs",
+    "setStakingManager": "see logs"
+  }
+}

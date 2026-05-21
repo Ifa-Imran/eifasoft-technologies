@@ -58,28 +58,28 @@ describe("StakingManager", function () {
             expect(balAfter - balBefore).to.equal((stakeAmount * 90n) / 100n);
         });
 
-        it("should forward 1% to DAOs 1-4 and 0.5% to DAOs 5-6", async function () {
-            const { stakingManager, usdt, user1, dao1, dao2, dao3, dao4, dao5, dao6 } = await loadFixture(stakeFixture);
+        it("should forward 1% to DAOs 1-3 and 0.5% to DAOs 4-7", async function () {
+            const { stakingManager, usdt, user1, dao1, dao2, dao3, dao4, dao5, dao6, dao7 } = await loadFixture(stakeFixture);
             const stakeAmount = ethers.parseEther("100");
             const expected1Pct = (stakeAmount * 1n) / 100n;
             const expected05Pct = (stakeAmount * 5n) / 1000n;
 
             const balsBefore = await Promise.all(
-                [dao1, dao2, dao3, dao4, dao5, dao6].map(d => usdt.balanceOf(d.address))
+                [dao1, dao2, dao3, dao4, dao5, dao6, dao7].map(d => usdt.balanceOf(d.address))
             );
 
             await stakingManager.connect(user1).stake(stakeAmount, REF);
 
             const balsAfter = await Promise.all(
-                [dao1, dao2, dao3, dao4, dao5, dao6].map(d => usdt.balanceOf(d.address))
+                [dao1, dao2, dao3, dao4, dao5, dao6, dao7].map(d => usdt.balanceOf(d.address))
             );
 
-            // DAOs 1-4: 1% each
-            for (let i = 0; i < 4; i++) {
+            // DAOs 1-3: 1% each
+            for (let i = 0; i < 3; i++) {
                 expect(balsAfter[i] - balsBefore[i]).to.equal(expected1Pct);
             }
-            // DAOs 5-6: 0.5% each
-            for (let i = 4; i < 6; i++) {
+            // DAOs 4-7: 0.5% each
+            for (let i = 3; i < 7; i++) {
                 expect(balsAfter[i] - balsBefore[i]).to.equal(expected05Pct);
             }
         });
@@ -476,11 +476,11 @@ describe("StakingManager", function () {
         });
 
         it("should allow admin to set DAO wallets", async function () {
-            const { stakingManager, user1, user2, user3, user4, user5, dao6 } = await loadFixture(stakeFixture);
-            const newDaoWallets = [user1.address, user2.address, user3.address, user4.address, user5.address, dao6.address];
+            const { stakingManager, user1, user2, user3, user4, user5, dao6, dao7 } = await loadFixture(stakeFixture);
+            const newDaoWallets = [user1.address, user2.address, user3.address, user4.address, user5.address, dao6.address, dao7.address];
             await stakingManager.setDaoWallets(newDaoWallets);
             const wallets = await stakingManager.getDaoWallets();
-            for (let i = 0; i < 6; i++) {
+            for (let i = 0; i < 7; i++) {
                 expect(wallets[i]).to.equal(newDaoWallets[i]);
             }
         });

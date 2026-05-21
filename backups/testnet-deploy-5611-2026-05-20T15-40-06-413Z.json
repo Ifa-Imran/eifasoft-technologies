@@ -1,0 +1,16 @@
+{
+  "network": {
+    "chainId": "5611"
+  },
+  "deployedAt": "2026-05-20T15:40:06.413Z",
+  "deploymentBlock": 161928912,
+  "deployer": "0x34277284E5Aa048eb4D7D09c297003875dA2A0F4",
+  "addresses": {
+    "mockUSDT": "0x003be700b2A8C04504e6FAe52677636F3930589d",
+    "kairoToken": "0x2B7752392B21482209e5a78A7f653d31Ac9CA880",
+    "liquidityPool": "0x8c568535893D7519a78712f341eFB3244a4a01e8",
+    "affiliateDistributor": "0x40B6e1d652206D109dc4A3370a9076D47ea13fD7",
+    "stakingManager": "0x828F587E66A696841a9de2E3cabC2b24158e469b",
+    "atomicP2p": "0x46794D3160172247b0E03eB3430001a2553181d4"
+  }
+}

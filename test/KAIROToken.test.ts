@@ -37,8 +37,8 @@ describe("KAIROToken", function () {
         });
 
         it("should revert on second mintInitialSupply call", async function () {
-            const { kairoToken } = await loadFixture(deployFullEcosystemFixture);
-            await expect(kairoToken.mintInitialSupply()).to.be.revertedWith("KAIROToken: Social lock already applied");
+            const { kairoToken, systemWallet } = await loadFixture(deployFullEcosystemFixture);
+            await expect(kairoToken.mintInitialSupply(systemWallet.address)).to.be.revertedWith("KAIROToken: Social lock already applied");
         });
 
         it("should return correct socialLockAmount", async function () {
@@ -162,15 +162,16 @@ describe("KAIROToken", function () {
     describe("View Functions", function () {
         it("should return correct effective supply (totalSupply - socialLock)", async function () {
             const { kairoToken } = await loadFixture(deployFullEcosystemFixture);
-            // totalSupply = 10000 KAIRO (social lock), effectiveSupply = 0
-            expect(await kairoToken.getEffectiveSupply()).to.equal(0);
+            // totalSupply = 10000 (social lock) + 5 (dev genesis), effective = 5 KAIRO
+            expect(await kairoToken.getEffectiveSupply()).to.equal(ethers.parseEther("5"));
         });
 
         it("should update effective supply after minting", async function () {
             const { kairoToken, owner, user1, MINTER_ROLE } = await loadFixture(deployFullEcosystemFixture);
             await kairoToken.grantRole(MINTER_ROLE, owner.address);
             await kairoToken.mint(user1.address, ethers.parseEther("500"));
-            expect(await kairoToken.getEffectiveSupply()).to.equal(ethers.parseEther("500"));
+            // 5 KAIRO dev genesis + 500 minted = 505 effective
+            expect(await kairoToken.getEffectiveSupply()).to.equal(ethers.parseEther("505"));
         });
     });
 
