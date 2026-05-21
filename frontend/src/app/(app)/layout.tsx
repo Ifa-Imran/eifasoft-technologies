@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAccount } from 'wagmi';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { AnnouncementPopup } from '@/components/landing/AnnouncementPopup';
 
 export default function AppGroupLayout({ children }: { children: React.ReactNode }) {
   const { isRegistered, isLoading, isConnected } = useRegistration();
@@ -40,5 +41,10 @@ export default function AppGroupLayout({ children }: { children: React.ReactNode
     return null; // Will redirect
   }
 
-  return <AppLayout>{children}</AppLayout>;
+  return (
+    <AppLayout>
+      <AnnouncementPopup />
+      {children}
+    </AppLayout>
+  );
 }
