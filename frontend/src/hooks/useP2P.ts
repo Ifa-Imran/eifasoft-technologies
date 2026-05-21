@@ -133,8 +133,8 @@ export function useP2P() {
     query: { enabled: contracts.atomicP2p !== '0x', refetchInterval: 10000 },
   });
 
-  // Dust threshold: hide orders with remaining value < 1 USDT
-  const DUST_THRESHOLD = BigInt(10 ** 18); // 1 USDT (18 decimals)
+  // Dust threshold: hide orders with remaining value < 0.01 USDT
+  const DUST_THRESHOLD = BigInt(10 ** 16); // 0.01 USDT (18 decimals)
 
   // Zip order data with IDs, filter out dust
   const activeBuyOrders: P2PBuyOrder[] = useMemo(() => {
