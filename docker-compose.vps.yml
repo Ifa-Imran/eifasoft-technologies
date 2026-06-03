@@ -1,3 +1,19 @@
+# =====================================================================
+# KAIRO DAO — Mainnet stack for kairodao.com (opBNB chainId 204)
+# =====================================================================
+# Project name on Hostinger: kairo-dev
+# Network name (auto-generated): kairo-dev_kairo_network  (referenced by
+# the side-by-side kairo-testnet stack via `external: true`).
+#
+# Bootstrap pattern (matches the proven kairo-testnet stack):
+#   - shallow git clone of the testnet-dev branch
+#   - strip committed .env* files so docker-compose env wins
+#   - skip rebuild on container restart (idempotent: only build if
+#     /app/.next/standalone/server.js is missing)
+#   - cap Node memory so `next build` doesn't OOM the 8GB VPS
+#   - healthcheck so Traefik routes traffic only after the server is up
+# =====================================================================
+
 services:
   postgres:
     image: postgres:14-alpine
@@ -37,12 +53,16 @@ services:
     command: >
       sh -c "
         apk add --no-cache git &&
-        rm -rf /tmp/repo &&
-        git clone --branch testnet-dev https://github.com/Ifa-Imran/eifasoft-technologies.git /tmp/repo &&
-        cp -a /tmp/repo/backend/. /app/ &&
-        NODE_ENV=development npm ci &&
-        npx tsc &&
-        mkdir -p dist/db/migrations && cp src/db/migrations/*.sql dist/db/migrations/ &&
+        if [ ! -f /app/.bootstrap-v3-done ]; then
+          rm -rf /tmp/repo &&
+          git clone --branch testnet-dev --depth 1 https://github.com/Ifa-Imran/eifasoft-technologies.git /tmp/repo &&
+          find /app -mindepth 1 -maxdepth 1 ! -name node_modules -exec rm -rf {} + &&
+          cp -a /tmp/repo/backend/. /app/ &&
+          NODE_ENV=development npm ci &&
+          npx tsc &&
+          mkdir -p dist/db/migrations && cp src/db/migrations/*.sql dist/db/migrations/ &&
+          touch /app/.bootstrap-v3-done ;
+        fi &&
         node dist/db/migrate.js &&
         NODE_ENV=production node dist/index.js
       "
@@ -61,6 +81,10 @@ services:
       - USDT_TOKEN_ADDRESS=0x9e5AAC1Ba1a2e6aEd6b32689DFcF62A509Ca96f3
       - SYSTEM_WALLET=0x5f1DcDaBaa4df191C9faEf933583D6B7721b3268
       - DEPLOYMENT_BLOCK=144922203
+      - INDEXER_PRIVATE_KEY=
+      - ADMIN_JWT_SECRET=K41r0Adm1nJWT2024!SecretKey
+      - ADMIN_PASSWORD=K41r0Adm1n2024!
+      - CORS_ORIGINS=https://kairodao.com
     volumes:
       - backend_app:/app
     depends_on:
@@ -94,28 +118,36 @@ services:
     command: >
       sh -c "
         apk add --no-cache git &&
-        rm -rf /tmp/repo &&
-        git clone --branch testnet-dev https://github.com/Ifa-Imran/eifasoft-technologies.git /tmp/repo &&
-        cp -a /tmp/repo/frontend/. /app/ &&
-        npm ci --legacy-peer-deps &&
-        NEXT_PUBLIC_BACKEND_URL=https://kairodao.com
-        NEXT_PUBLIC_WS_URL=wss://kairodao.com/ws
-        NEXT_PUBLIC_CHAIN_ID=204
-        NEXT_PUBLIC_RPC_URL=https://opbnb-mainnet-rpc.bnbchain.org
-        NEXT_PUBLIC_EXPLORER_URL=https://opbnb.bscscan.com
-        NEXT_PUBLIC_KAIRO_TOKEN=0x8D01409fB9Adc19F5f1Fb7eD47c12D5A88051AeD
-        NEXT_PUBLIC_LIQUIDITY_POOL=0x26782184F8346832a2e0c84DEe09deFFF23DBf56
-        NEXT_PUBLIC_STAKING_MANAGER=0x21c22de855e87B2124A50d76f31E79152C977090
-        NEXT_PUBLIC_AFFILIATE_DISTRIBUTOR=0x8C7FF618C0Bc7ae9b9fd2828Ba33d977edb99237
-        NEXT_PUBLIC_ATOMIC_P2P=0xD9CaCE2B7C23013E3eDFf93dbF1CeE197AC386B2
-        NEXT_PUBLIC_USDT=0x9e5AAC1Ba1a2e6aEd6b32689DFcF62A509Ca96f3
-        NEXT_PUBLIC_SYSTEM_WALLET=0x5f1DcDaBaa4df191C9faEf933583D6B7721b3268
-        NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=d9fddb48789291a159e8270ef32105c2
-        npm run build &&
-        cp -r .next/static .next/standalone/.next/static &&
-        cp -r public .next/standalone/public &&
+        if [ ! -f /app/.bootstrap-v5-done ]; then
+          rm -rf /tmp/repo &&
+          git clone --branch testnet-dev --depth 1 https://github.com/Ifa-Imran/eifasoft-technologies.git /tmp/repo &&
+          find /app -mindepth 1 -maxdepth 1 ! -name node_modules -exec rm -rf {} + &&
+          cp -a /tmp/repo/frontend/. /app/ &&
+          rm -f /app/.env /app/.env.local /app/.env.production /app/.env.production.local &&
+          rm -rf /app/.next /app/node_modules/.cache &&
+          npm ci --legacy-peer-deps &&
+          NODE_OPTIONS=--max-old-space-size=2048 npm run build &&
+          rm -rf /app/.next/standalone/.next/static /app/.next/standalone/public &&
+          cp -r .next/static .next/standalone/.next/static &&
+          cp -r public .next/standalone/public &&
+          touch /app/.bootstrap-v5-done ;
+        fi &&
         NODE_ENV=production node .next/standalone/server.js
       "
+    environment:
+      - NEXT_PUBLIC_BACKEND_URL=https://kairodao.com
+      - NEXT_PUBLIC_WS_URL=wss://kairodao.com/ws
+      - NEXT_PUBLIC_CHAIN_ID=204
+      - NEXT_PUBLIC_RPC_URL=https://opbnb-mainnet-rpc.bnbchain.org
+      - NEXT_PUBLIC_EXPLORER_URL=https://opbnb.bscscan.com
+      - NEXT_PUBLIC_KAIRO_TOKEN=0x8D01409fB9Adc19F5f1Fb7eD47c12D5A88051AeD
+      - NEXT_PUBLIC_LIQUIDITY_POOL=0x26782184F8346832a2e0c84DEe09deFFF23DBf56
+      - NEXT_PUBLIC_STAKING_MANAGER=0x21c22de855e87B2124A50d76f31E79152C977090
+      - NEXT_PUBLIC_AFFILIATE_DISTRIBUTOR=0x8C7FF618C0Bc7ae9b9fd2828Ba33d977edb99237
+      - NEXT_PUBLIC_ATOMIC_P2P=0xD9CaCE2B7C23013E3eDFf93dbF1CeE197AC386B2
+      - NEXT_PUBLIC_USDT=0x9e5AAC1Ba1a2e6aEd6b32689DFcF62A509Ca96f3
+      - NEXT_PUBLIC_SYSTEM_WALLET=0x5f1DcDaBaa4df191C9faEf933583D6B7721b3268
+      - NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=d9fddb48789291a159e8270ef32105c2
     volumes:
       - frontend_app:/app
     depends_on:
@@ -125,7 +157,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=kairo-dev_kairo_network"
-      - "traefik.http.routers.kairodao-frontend.rule=Host(`kairodao.com`) || Host(`www.kairodao.com`)"
+      - "traefik.http.routers.kairodao-frontend.rule=Host(`kairodao.com`)"
       - "traefik.http.routers.kairodao-frontend.entrypoints=websecure"
       - "traefik.http.routers.kairodao-frontend.tls.certresolver=letsencrypt"
       - "traefik.http.services.kairodao-frontend.loadbalancer.server.port=3000"

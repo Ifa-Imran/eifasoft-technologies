@@ -1,24 +1,22 @@
 import { Router, Request, Response } from 'express';
 import { query } from '../db/connection';
 import { isValidAddress } from '../utils/validation';
-import { getTeamVolume, getLargestLeg, getDirectReferralCount, getDownline } from '../utils/referral-tree';
+import { getTeamVolume, getLargestLeg, getDirectReferralCount, getDownline, getUpline } from '../utils/referral-tree';
 import { getAffiliateDistributor, getCurrentBlock } from '../services/blockchain';
 import { getConnectedClients } from '../services/websocket';
 import { pool } from '../db/connection';
+import { requireAdminJWT, AdminRequest } from './admin-auth';
 
 const router = Router();
 
-// ============ Admin Authentication Middleware ============
-// Protects admin endpoints with API key. Set ADMIN_API_KEY in .env for production.
+// ============ Legacy Admin Authentication Middleware (API key) ============
 function requireAdminAuth(req: Request, res: Response, next: Function): void {
     const apiKey = process.env.ADMIN_API_KEY;
     if (!apiKey) {
-        // No API key configured — block all admin access in production
         if (process.env.NODE_ENV === 'production') {
             res.status(403).json({ success: false, error: 'Admin access disabled (no ADMIN_API_KEY configured)' });
             return;
         }
-        // Allow in development without key
         next();
         return;
     }
@@ -72,12 +70,18 @@ async function calculateUserRank(address: string): Promise<{
         }
     }
 
-    // Persist if changed
+    // Persist if changed + log to rank_history
     if (newRank !== previousRank) {
         await query(
             'UPDATE users SET rank_level = $1, team_volume = $2, updated_at = NOW() WHERE wallet_address = $3',
             [newRank, teamVolume, walletAddress]
         );
+        // Log rank change for the Rank Promotion Tracker
+        await query(
+            `INSERT INTO rank_history (wallet_address, previous_rank, new_rank, team_volume, direct_count)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [walletAddress, previousRank, newRank, teamVolume, directCount]
+        ).catch(() => { /* table may not exist yet */ });
     }
 
     return { address: walletAddress, previousRank, newRank, teamVolume, directCount };
@@ -199,6 +203,269 @@ router.get('/admin/system-stats', requireAdminAuth, async (_req: Request, res: R
         });
     } catch (error) {
         console.error('System stats error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+});
+
+// ============ NEW: Staking Volume Tracker ============
+/**
+ * GET /api/v1/admin/staking-volume
+ * Query params: wallet (optional), from, to, preset (24h|48h|7d)
+ */
+router.get('/admin/staking-volume', requireAdminJWT, async (req: AdminRequest, res: Response) => {
+    try {
+        const { wallet, from, to, preset } = req.query as Record<string, string>;
+
+        let startDate: Date;
+        let endDate: Date = new Date();
+
+        if (preset) {
+            const hours = preset === '24h' ? 24 : preset === '48h' ? 48 : 168; // 7d = 168h
+            startDate = new Date(Date.now() - hours * 60 * 60 * 1000);
+        } else if (from) {
+            startDate = new Date(from);
+            if (to) endDate = new Date(to);
+        } else {
+            startDate = new Date(Date.now() - 24 * 60 * 60 * 1000); // default 24h
+        }
+
+        let sql = `
+            SELECT user_address, 
+                   COUNT(*)::int AS stake_count,
+                   COALESCE(SUM(original_amount), 0) AS new_volume,
+                   json_agg(json_build_object(
+                       'stakeId', stake_id_on_chain,
+                       'amount', original_amount,
+                       'tier', tier,
+                       'createdAt', created_at
+                   ) ORDER BY created_at DESC) AS stakes
+            FROM stakes
+            WHERE created_at >= $1 AND created_at <= $2
+        `;
+        const params: any[] = [startDate.toISOString(), endDate.toISOString()];
+
+        if (wallet && isValidAddress(wallet)) {
+            sql += ` AND user_address = $3`;
+            params.push(wallet.toLowerCase());
+        }
+
+        sql += ` GROUP BY user_address ORDER BY new_volume DESC`;
+
+        const result = await query(sql, params);
+
+        res.json({
+            success: true,
+            data: {
+                from: startDate.toISOString(),
+                to: endDate.toISOString(),
+                totalWallets: result.rows.length,
+                totalVolume: result.rows.reduce((acc: number, r: any) => acc + parseFloat(r.new_volume), 0).toString(),
+                wallets: result.rows.map((r: any) => ({
+                    wallet: r.user_address,
+                    stakeCount: r.stake_count,
+                    newVolume: r.new_volume,
+                    stakes: r.stakes,
+                })),
+            },
+        });
+    } catch (error) {
+        console.error('Staking volume tracker error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+});
+
+// ============ NEW: Rank Promotion Tracker ============
+/**
+ * GET /api/v1/admin/rank-promotions
+ * Query params: from (ISO date), to (ISO date)
+ */
+router.get('/admin/rank-promotions', requireAdminJWT, async (req: AdminRequest, res: Response) => {
+    try {
+        const { from, to } = req.query as Record<string, string>;
+
+        if (!from || !to) {
+            res.status(400).json({ success: false, error: 'Both "from" and "to" date params are required' });
+            return;
+        }
+
+        const result = await query(
+            `SELECT wallet_address, previous_rank, new_rank, team_volume, direct_count, changed_at
+             FROM rank_history
+             WHERE changed_at >= $1 AND changed_at <= $2
+               AND new_rank > previous_rank
+             ORDER BY changed_at DESC`,
+            [new Date(from).toISOString(), new Date(to).toISOString()]
+        );
+
+        res.json({
+            success: true,
+            data: {
+                from,
+                to,
+                totalPromotions: result.rows.length,
+                promotions: result.rows.map((r: any) => ({
+                    wallet: r.wallet_address,
+                    previousRank: r.previous_rank,
+                    newRank: r.new_rank,
+                    teamVolume: r.team_volume,
+                    directCount: r.direct_count,
+                    changedAt: r.changed_at,
+                })),
+            },
+        });
+    } catch (error) {
+        console.error('Rank promotions tracker error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+});
+
+// ============ NEW: Volume Disbursement ============
+/**
+ * POST /api/v1/admin/disburse
+ * Body: { wallet, amount, note? }
+ */
+router.post('/admin/disburse', requireAdminJWT, async (req: AdminRequest, res: Response) => {
+    try {
+        const { wallet, amount, note } = req.body;
+
+        if (!wallet || !isValidAddress(wallet)) {
+            res.status(400).json({ success: false, error: 'Valid wallet address required' });
+            return;
+        }
+        if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+            res.status(400).json({ success: false, error: 'Valid positive amount required' });
+            return;
+        }
+
+        const walletAddress = wallet.toLowerCase();
+        const adminUsername = req.adminUsername || 'unknown';
+
+        // Insert disbursement record
+        const disbResult = await query(
+            `INSERT INTO disbursements (target_wallet, amount, note, admin_username)
+             VALUES ($1, $2, $3, $4) RETURNING id, created_at`,
+            [walletAddress, amount, note || null, adminUsername]
+        );
+        const disbursementId = disbResult.rows[0].id;
+
+        // Get upline tree and create rollup entries
+        const upline = await getUpline(walletAddress, 15);
+        const rollups: Array<{ wallet: string; depth: number }> = [];
+
+        for (const ancestor of upline) {
+            await query(
+                `INSERT INTO disbursement_rollups (disbursement_id, wallet_address, depth, amount)
+                 VALUES ($1, $2, $3, $4)`,
+                [disbursementId, ancestor.ancestor, ancestor.depth, amount]
+            );
+            rollups.push({ wallet: ancestor.ancestor, depth: ancestor.depth });
+        }
+
+        res.json({
+            success: true,
+            data: {
+                disbursementId,
+                targetWallet: walletAddress,
+                amount,
+                note: note || null,
+                adminUsername,
+                createdAt: disbResult.rows[0].created_at,
+                uplineRollups: rollups,
+            },
+        });
+    } catch (error) {
+        console.error('Disburse error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+});
+
+/**
+ * GET /api/v1/admin/disbursements
+ * Query params: wallet (optional), page, limit
+ */
+router.get('/admin/disbursements', requireAdminJWT, async (req: AdminRequest, res: Response) => {
+    try {
+        const { wallet, page: pageStr, limit: limitStr } = req.query as Record<string, string>;
+        const page = Math.max(1, parseInt(pageStr) || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(limitStr) || 50));
+        const offset = (page - 1) * limit;
+
+        let sql = `SELECT id, target_wallet, amount, note, admin_username, created_at FROM disbursements`;
+        let countSql = `SELECT COUNT(*)::int AS total FROM disbursements`;
+        const params: any[] = [];
+        const countParams: any[] = [];
+
+        if (wallet && isValidAddress(wallet)) {
+            sql += ` WHERE target_wallet = $1`;
+            countSql += ` WHERE target_wallet = $1`;
+            params.push(wallet.toLowerCase());
+            countParams.push(wallet.toLowerCase());
+        }
+
+        sql += ` ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+        params.push(limit, offset);
+
+        const [dataResult, countResult] = await Promise.all([
+            query(sql, params),
+            query(countSql, countParams),
+        ]);
+
+        res.json({
+            success: true,
+            data: {
+                disbursements: dataResult.rows,
+                pagination: {
+                    page,
+                    limit,
+                    total: countResult.rows[0]?.total || 0,
+                    pages: Math.ceil((countResult.rows[0]?.total || 0) / limit),
+                },
+            },
+        });
+    } catch (error) {
+        console.error('List disbursements error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+});
+
+/**
+ * GET /api/v1/admin/disbursement-total/:wallet
+ * Returns total disbursed for a wallet (direct + rollup from downline)
+ */
+router.get('/admin/disbursement-total/:wallet', requireAdminJWT, async (req: AdminRequest, res: Response) => {
+    try {
+        const { wallet } = req.params;
+        if (!wallet || !isValidAddress(wallet)) {
+            res.status(400).json({ success: false, error: 'Valid wallet address required' });
+            return;
+        }
+        const walletAddress = wallet.toLowerCase();
+
+        const [directResult, rollupResult] = await Promise.all([
+            query(
+                `SELECT COALESCE(SUM(amount), 0) AS total FROM disbursements WHERE target_wallet = $1`,
+                [walletAddress]
+            ),
+            query(
+                `SELECT COALESCE(SUM(amount), 0) AS total FROM disbursement_rollups WHERE wallet_address = $1`,
+                [walletAddress]
+            ),
+        ]);
+
+        const directTotal = parseFloat(directResult.rows[0]?.total || '0');
+        const rollupTotal = parseFloat(rollupResult.rows[0]?.total || '0');
+
+        res.json({
+            success: true,
+            data: {
+                wallet: walletAddress,
+                directDisbursed: directTotal.toString(),
+                rollupFromDownline: rollupTotal.toString(),
+                grandTotal: (directTotal + rollupTotal).toString(),
+            },
+        });
+    } catch (error) {
+        console.error('Disbursement total error:', error);
         res.status(500).json({ success: false, error: 'Internal server error' });
     }
 });

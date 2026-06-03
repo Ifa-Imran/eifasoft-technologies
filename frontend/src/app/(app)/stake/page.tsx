@@ -216,7 +216,7 @@ function StakePageInner() {
       <h1 className="text-3xl font-orbitron font-bold gradient-text">Staking</h1>
 
       {/* Tier Comparison */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         {STAKING_TIERS.map((t, i) => {
           const isCurrentTier = numAmount >= 10 && tier.name === t.name;
           const tierBadge = t.name.toLowerCase() as 'bronze' | 'silver' | 'gold';
@@ -224,14 +224,16 @@ function StakePageInner() {
             <GlassCard
               key={t.name}
               variant={isCurrentTier ? (i === 2 ? 'gold' : i === 1 ? 'purple' : 'cyan') : 'default'}
-              padding="p-5"
+              padding="p-3 sm:p-5"
               className={isCurrentTier ? 'ring-2 ring-primary-300 shadow-lg' : 'opacity-60'}
             >
-              <div className="text-center">
+              <div className="flex flex-col items-center text-center h-full">
                 <Badge tier={tierBadge} size="md">{t.name}</Badge>
-                <p className="text-sm text-surface-400 mt-3">${t.minAmount.toLocaleString()}{t.maxAmount === Infinity ? '+' : ` – $${t.maxAmount.toLocaleString()}`}</p>
-                <p className="text-2xl font-mono font-bold text-surface-900 mt-1">{t.compoundInterval >= 3600 ? `${t.compoundInterval / 3600}h` : `${t.compoundInterval / 60}m`}</p>
-                <p className="text-sm text-surface-500">closing interval</p>
+                <p className="text-[10px] sm:text-sm text-surface-400 mt-2 sm:mt-3 min-h-[1.25rem] sm:min-h-[1.5rem] flex items-center">
+                  ${t.minAmount.toLocaleString()}{t.maxAmount === Infinity ? '+' : ` – $${t.maxAmount.toLocaleString()}`}
+                </p>
+                <p className="text-xl sm:text-2xl font-mono font-bold text-surface-900 mt-1">{t.compoundInterval >= 3600 ? `${t.compoundInterval / 3600}h` : `${t.compoundInterval / 60}m`}</p>
+                <p className="text-xs sm:text-sm text-surface-500">closing interval</p>
               </div>
             </GlassCard>
           );

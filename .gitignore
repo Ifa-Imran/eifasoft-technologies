@@ -16,3 +16,6 @@ certbot/
 
 # IDE
 .qoder/
+
+# Large files
+*.zip

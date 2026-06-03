@@ -75,10 +75,11 @@ export function useAffiliate() {
       setHistoryLoading(true);
       try {
         // Use a safe fromBlock range (some RPCs reject fromBlock:0n)
+        // opBNB has ~1s block time, so 5M blocks ≈ 58 days of history
         let safeFrom = 0n;
         try {
           const latestBlock = await publicClient.getBlockNumber();
-          safeFrom = latestBlock > 500_000n ? latestBlock - 500_000n : 0n;
+          safeFrom = latestBlock > 5_000_000n ? latestBlock - 5_000_000n : 0n;
         } catch {}
 
         // Fetch events - each wrapped individually so one failure doesn't block others
@@ -296,10 +297,10 @@ export function useAffiliate() {
               directBusiness += principalVal;
             }
 
-            // Place into compressed level bucket — business = principal only
+            // Place into compressed level bucket — only active members count
             if (myCL >= 1 && myCL <= 15) {
-              levelMembers.get(myCL)!.add(addr.toLowerCase());
               if (isActive) {
+                levelMembers.get(myCL)!.add(addr.toLowerCase());
                 levelBusiness.set(myCL, (levelBusiness.get(myCL) || 0n) + principalVal);
               }
             } else if (myCL > 15) {
@@ -350,7 +351,7 @@ export function useAffiliate() {
         }
         try {
           const latestBlock = await publicClient.getBlockNumber();
-          const safeFrom = latestBlock > 500_000n ? latestBlock - 500_000n : 0n;
+          const safeFrom = latestBlock > 5_000_000n ? latestBlock - 5_000_000n : 0n;
           const teamEarnedLogs = await publicClient.getLogs({
             address: contractAddr,
             event: parseAbiItem('event TeamEarned(address indexed upline, address indexed staker, uint256 level, uint256 amount)'),

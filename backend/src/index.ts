@@ -12,6 +12,7 @@ import userRoutes from './routes/user';
 import globalRoutes from './routes/global';
 import p2pRoutes from './routes/p2p';
 import adminRoutes from './routes/admin';
+import adminAuthRoutes from './routes/admin-auth';
 import { startIndexer } from './services/indexer';
 import { startWorkers, stopWorkers } from './services/workers';
 import { initQueues, closeQueues } from './services/queue';
@@ -33,7 +34,10 @@ process.on('uncaughtException', (err) => {
 const corsOrigins = process.env.NODE_ENV === 'production'
     ? (process.env.CORS_ORIGINS || '').split(',').filter(Boolean)
     : true; // Allow all in development
-app.use(cors(typeof corsOrigins === 'boolean' ? undefined : { origin: corsOrigins, credentials: true }));
+app.use(cors(typeof corsOrigins === 'boolean'
+    ? { origin: true, credentials: true }
+    : { origin: corsOrigins, credentials: true }
+));
 app.use(helmet());
 app.use(morgan('combined'));
 app.use(compression());
@@ -43,6 +47,7 @@ app.use(express.json());
 app.use('/api/v1', userRoutes);
 app.use('/api/v1', globalRoutes);
 app.use('/api/v1', p2pRoutes);
+app.use('/api/v1', adminAuthRoutes);
 app.use('/api/v1', adminRoutes);
 
 // Error handling middleware

@@ -85,16 +85,12 @@ export default function SwapPage() {
 
       <div className="max-w-lg mx-auto space-y-4">
         {/* Pool Liquidity Info */}
-        <div className="grid grid-cols-2 gap-3">
-          <GlassCard padding="p-3" variant="gold">
-            <p className="text-[10px] uppercase tracking-wider text-surface-400">Pool USDT</p>
-            <p className="text-lg font-mono font-bold text-surface-900">${formatCompact(poolUsdt, 2)}</p>
-          </GlassCard>
-          <GlassCard padding="p-3">
-            <p className="text-[10px] uppercase tracking-wider text-surface-400">Pool KAIRO</p>
-            <p className="text-lg font-mono font-bold text-primary-700">{formatCompact(poolKairo, 2)}</p>
-          </GlassCard>
-        </div>
+        <GlassCard padding="p-4 sm:p-5" variant="gold" className="w-full">
+          <div className="flex items-center justify-between">
+            <p className="text-xs sm:text-sm uppercase tracking-wider text-surface-400">Pool USDT</p>
+            <p className="text-xl sm:text-2xl font-mono font-bold text-surface-900">${formatCompact(poolUsdt, 2)}</p>
+          </div>
+        </GlassCard>
 
         <GlassCard variant="gradient">
           <div className="mb-6 text-center">

@@ -160,6 +160,7 @@ export function useStaking() {
       }
       toast({ type: 'pending', title: 'Compounding...', description: `Compounding ${eligible.length} stake(s)` });
       let success = 0;
+      let userRejected = false;
       for (const s of eligible) {
         try {
           const hash = await writeContractAsync({
@@ -170,12 +171,22 @@ export function useStaking() {
           });
           await publicClient.waitForTransactionReceipt({ hash });
           success++;
-        } catch {
-          // Skip — stake may have just been compounded or not yet eligible
+        } catch (err: any) {
+          // If user rejected the wallet prompt, stop asking for more approvals
+          const msg = (err?.message || err?.shortMessage || '').toLowerCase();
+          if (msg.includes('user rejected') || msg.includes('user denied') || msg.includes('rejected') || err?.name === 'UserRejectedRequestError') {
+            userRejected = true;
+            break;
+          }
+          // Otherwise skip — stake may have just been compounded or not yet eligible
         }
       }
-      if (success > 0) {
+      if (success > 0 && userRejected) {
+        toast({ type: 'success', title: 'Compound partial', description: `${success} stake(s) compounded. Click again for the rest.` });
+      } else if (success > 0) {
         toast({ type: 'success', title: 'Compound complete!', description: `${success} stake(s) compounded` });
+      } else if (userRejected) {
+        toast({ type: 'error', title: 'Compound cancelled', description: 'Transaction rejected. Click Compound again when ready.' });
       } else {
         toast({ type: 'error', title: 'Compound failed', description: 'No stakes were compounded.' });
       }

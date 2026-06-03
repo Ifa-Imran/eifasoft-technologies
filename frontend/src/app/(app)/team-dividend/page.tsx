@@ -108,17 +108,19 @@ export default function TeamDividendPage() {
           <p className="text-xs text-surface-400 mt-1">Total downline volume</p>
         </GlassCard>
         <GlassCard padding="p-4" className="col-span-2 sm:col-span-1">
-          <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">Team Dividend</p>
-          <p className="text-xl sm:text-2xl font-mono font-bold text-accent-700">${teamDividendBalance.toFixed(2)}</p>
-          <Button
-            size="sm"
-            onClick={() => harvestIncome(1)}
-            disabled={teamDividendBalance <= 0 || isPending}
-            className="w-full mt-2"
-            icon={<ArrowDownTrayIcon className="w-3.5 h-3.5" />}
-          >
-            Harvest
-          </Button>
+          <div className="flex flex-col items-center text-center">
+            <p className="text-[10px] sm:text-xs uppercase tracking-wider text-surface-400 mb-1">Team Dividend</p>
+            <p className="text-2xl sm:text-3xl font-mono font-bold text-accent-700">${teamDividendBalance.toFixed(2)}</p>
+            <Button
+              size="sm"
+              onClick={() => harvestIncome(1)}
+              disabled={teamDividendBalance <= 0 || isPending}
+              className="w-full mt-3"
+              icon={<ArrowDownTrayIcon className="w-3.5 h-3.5" />}
+            >
+              Harvest
+            </Button>
+          </div>
         </GlassCard>
       </div>
 
