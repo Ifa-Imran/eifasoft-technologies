@@ -113,7 +113,7 @@ export default function DisbursementsPage() {
     <div className="space-y-6 animate-fade-in">
       {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-bold text-surface-900">Volume Disbursements</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Volume Disbursements</h1>
         <p className="text-sm text-surface-400 mt-1">Mark volumes as disbursed and sync to upline MLM tree</p>
       </div>
 

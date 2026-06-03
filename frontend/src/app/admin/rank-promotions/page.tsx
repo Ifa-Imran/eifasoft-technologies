@@ -86,7 +86,7 @@ export default function RankPromotionsPage() {
     <div className="space-y-6 animate-fade-in">
       {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-bold text-surface-900">Rank Promotion Tracker</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Rank Promotion Tracker</h1>
         <p className="text-sm text-surface-400 mt-1">Track users who advanced ranks within date ranges</p>
       </div>
 

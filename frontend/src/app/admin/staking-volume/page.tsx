@@ -62,7 +62,7 @@ export default function StakingVolumePage() {
     <div className="space-y-6 animate-fade-in">
       {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-bold text-surface-900">Staking Volume Tracker</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Staking Volume Tracker</h1>
         <p className="text-sm text-surface-400 mt-1">Monitor new staking activity by wallet within timeframes</p>
       </div>
 
@@ -179,7 +179,8 @@ export default function StakingVolumePage() {
       {/* Results Table */}
       {results.length > 0 && (
         <div className="card overflow-hidden">
-          <table className="w-full">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[600px]">
             <thead className="bg-surface-50 border-b border-surface-100">
               <tr>
                 <th className="text-left text-xs font-medium text-surface-500 uppercase px-6 py-3">Wallet Address</th>
@@ -215,9 +216,10 @@ export default function StakingVolumePage() {
             </tbody>
           </table>
 
+          </div>
           {/* Expanded Stake Details */}
           {expandedRow && (
-            <div className="border-t border-surface-100 bg-surface-50 p-6">
+            <div className="border-t border-surface-100 bg-surface-50 p-4 sm:p-6">
               <h4 className="text-sm font-semibold text-surface-700 mb-3">
                 Stakes for {expandedRow.slice(0, 6)}...{expandedRow.slice(-4)}
               </h4>
