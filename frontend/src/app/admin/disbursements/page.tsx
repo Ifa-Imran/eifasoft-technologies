@@ -16,6 +16,9 @@ interface DisbursementTotal {
   direct: string;
   rollup: string;
   total: string;
+  directDisbursed?: string;
+  rollupFromDownline?: string;
+  grandTotal?: string;
 }
 
 export default function DisbursementsPage() {
@@ -53,8 +56,9 @@ export default function DisbursementsPage() {
       const res = await apiFetch(`/api/v1/admin/disbursements?page=${page}&limit=20`);
       const json = await res.json();
       if (res.ok) {
-        setDisbursements(json.data || []);
-        setHasMore((json.data || []).length === 20);
+        const items = json.data?.disbursements || json.data || [];
+        setDisbursements(Array.isArray(items) ? items : []);
+        setHasMore((Array.isArray(items) ? items : []).length === 20);
       }
     } catch {
       // silent
@@ -79,7 +83,9 @@ export default function DisbursementsPage() {
       });
       const json = await res.json();
       if (res.ok) {
-        setSubmitSuccess(`Disbursement #${json.data.disbursement.id} created successfully with ${json.data.rollupCount} upline rollups`);
+        const rollupCount = json.data?.uplineRollups?.length || 0;
+        const disbId = json.data?.disbursementId || json.data?.disbursement?.id || '?';
+        setSubmitSuccess(`Disbursement #${disbId} created successfully with ${rollupCount} upline rollups`);
         setTargetWallet('');
         setAmount('');
         setNote('');
@@ -101,7 +107,12 @@ export default function DisbursementsPage() {
       const res = await apiFetch(`/api/v1/admin/disbursement-total/${lookupWallet.trim()}`);
       const json = await res.json();
       if (res.ok) {
-        setWalletTotal(json.data);
+        const d = json.data;
+        setWalletTotal({
+          direct: d?.directDisbursed || d?.direct || '0',
+          rollup: d?.rollupFromDownline || d?.rollup || '0',
+          total: d?.grandTotal || d?.total || '0',
+        });
       }
     } catch {
       // silent
