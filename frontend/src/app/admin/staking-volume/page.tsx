@@ -132,13 +132,35 @@ export default function StakingVolumePage() {
           {/* Wallet Filter */}
           <div className="flex-1 min-w-[200px]">
             <label className="block text-xs font-medium text-surface-500 mb-2">Wallet Address</label>
-            <input
-              type="text"
-              value={wallet}
-              onChange={(e) => setWallet(e.target.value)}
-              className="input-field w-full text-sm"
-              placeholder="0x... (optional)"
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={wallet}
+                onChange={(e) => setWallet(e.target.value)}
+                onPaste={(e) => { const text = e.clipboardData.getData('text'); if (text) { e.preventDefault(); setWallet(text.trim()); } }}
+                className="input-field flex-1 text-sm select-text"
+                placeholder="0x... (long-press to paste)"
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                inputMode="text"
+              />
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const text = await navigator.clipboard.readText();
+                    if (text) setWallet(text.trim());
+                  } catch {
+                    // Clipboard API not available
+                  }
+                }}
+                className="px-3 py-2 rounded-lg text-xs font-medium bg-surface-100 text-surface-600 hover:bg-surface-200 transition-all whitespace-nowrap"
+                title="Paste from clipboard"
+              >
+                Paste
+              </button>
+            </div>
           </div>
 
           {/* Self / Team Toggle */}
