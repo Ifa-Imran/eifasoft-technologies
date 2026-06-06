@@ -18,13 +18,15 @@ interface VolumeResult {
 }
 
 type Preset = '24h' | '48h' | '7d' | 'custom';
+type Mode = 'self' | 'team';
 
 export default function StakingVolumePage() {
   const { apiFetch } = useAdminAuth();
-  const [preset, setPreset] = useState<Preset>('24h');
+  const [preset, setPreset] = useState<Preset>('48h');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [wallet, setWallet] = useState('');
+  const [mode, setMode] = useState<Mode>('team');
   const [results, setResults] = useState<VolumeResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
@@ -41,7 +43,10 @@ export default function StakingVolumePage() {
         if (fromDate) params.set('from', fromDate);
         if (toDate) params.set('to', toDate);
       }
-      if (wallet.trim()) params.set('wallet', wallet.trim());
+      if (wallet.trim()) {
+        params.set('wallet', wallet.trim());
+        params.set('mode', mode);
+      }
 
       const res = await apiFetch(`/api/v1/admin/staking-volume?${params.toString()}`);
       const json = await res.json();
@@ -135,6 +140,35 @@ export default function StakingVolumePage() {
               placeholder="0x... (optional)"
             />
           </div>
+
+          {/* Self / Team Toggle */}
+          {wallet.trim() && (
+            <div>
+              <label className="block text-xs font-medium text-surface-500 mb-2">Scope</label>
+              <div className="flex gap-1 bg-surface-100 rounded-lg p-1">
+                <button
+                  onClick={() => setMode('self')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    mode === 'self'
+                      ? 'bg-white text-primary-600 shadow-sm'
+                      : 'text-surface-500 hover:text-surface-700'
+                  }`}
+                >
+                  Self
+                </button>
+                <button
+                  onClick={() => setMode('team')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    mode === 'team'
+                      ? 'bg-white text-primary-600 shadow-sm'
+                      : 'text-surface-500 hover:text-surface-700'
+                  }`}
+                >
+                  Team
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Search Button */}
           <button

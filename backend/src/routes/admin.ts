@@ -210,11 +210,11 @@ router.get('/admin/system-stats', requireAdminAuth, async (_req: Request, res: R
 // ============ NEW: Staking Volume Tracker ============
 /**
  * GET /api/v1/admin/staking-volume
- * Query params: wallet (optional), from, to, preset (24h|48h|7d)
+ * Query params: wallet (optional), from, to, preset (24h|48h|7d), mode (self|team)
  */
 router.get('/admin/staking-volume', requireAdminJWT, async (req: AdminRequest, res: Response) => {
     try {
-        const { wallet, from, to, preset } = req.query as Record<string, string>;
+        const { wallet, from, to, preset, mode } = req.query as Record<string, string>;
 
         let startDate: Date;
         let endDate: Date = new Date();
@@ -245,8 +245,37 @@ router.get('/admin/staking-volume', requireAdminJWT, async (req: AdminRequest, r
         const params: any[] = [startDate.toISOString(), endDate.toISOString()];
 
         if (wallet && isValidAddress(wallet)) {
-            sql += ` AND user_address = $3`;
-            params.push(wallet.toLowerCase());
+            const walletLower = wallet.toLowerCase();
+            if (mode === 'team') {
+                // Get all downline wallets from referral_tree
+                const downlineResult = await query(
+                    `SELECT descendant FROM referral_tree WHERE ancestor = $1 AND depth > 0`,
+                    [walletLower]
+                );
+                const teamWallets = downlineResult.rows.map((r: any) => r.descendant);
+                if (teamWallets.length === 0) {
+                    res.json({
+                        success: true,
+                        data: {
+                            from: startDate.toISOString(),
+                            to: endDate.toISOString(),
+                            mode: 'team',
+                            parentWallet: walletLower,
+                            totalWallets: 0,
+                            totalVolume: '0',
+                            wallets: [],
+                        },
+                    });
+                    return;
+                }
+                // Build IN clause
+                const placeholders = teamWallets.map((_: any, i: number) => `$${params.length + 1 + i}`).join(',');
+                sql += ` AND user_address IN (${placeholders})`;
+                params.push(...teamWallets);
+            } else {
+                sql += ` AND user_address = $${params.length + 1}`;
+                params.push(walletLower);
+            }
         }
 
         sql += ` GROUP BY user_address ORDER BY new_volume DESC`;
@@ -258,6 +287,8 @@ router.get('/admin/staking-volume', requireAdminJWT, async (req: AdminRequest, r
             data: {
                 from: startDate.toISOString(),
                 to: endDate.toISOString(),
+                mode: mode || 'self',
+                parentWallet: wallet ? wallet.toLowerCase() : undefined,
                 totalWallets: result.rows.length,
                 totalVolume: result.rows.reduce((acc: number, r: any) => acc + parseFloat(r.new_volume), 0).toString(),
                 wallets: result.rows.map((r: any) => ({
@@ -270,6 +301,44 @@ router.get('/admin/staking-volume', requireAdminJWT, async (req: AdminRequest, r
         });
     } catch (error) {
         console.error('Staking volume tracker error:', error);
+        res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+});
+
+// ============ NEW: Rank Holders List ============
+/**
+ * GET /api/v1/admin/rank-holders
+ * Returns all users with rank_level > 0, sorted by rank descending
+ */
+router.get('/admin/rank-holders', requireAdminJWT, async (req: AdminRequest, res: Response) => {
+    try {
+        const result = await query(
+            `SELECT u.wallet_address, u.rank_level, u.team_volume, u.total_staked_volume, u.created_at,
+                    (SELECT COUNT(*)::int FROM referral_tree rt WHERE rt.ancestor = u.wallet_address AND rt.depth = 1) AS direct_count
+             FROM users u
+             WHERE u.rank_level > 0
+             ORDER BY u.rank_level DESC, u.team_volume DESC`
+        );
+
+        const RANK_NAMES_LIST = ['None', 'Associate', 'Executive', 'Director', 'Vice President', 'Senior VP', 'Managing Director', 'Partner', 'Senior Partner', 'Global Leader', 'Chairman'];
+
+        res.json({
+            success: true,
+            data: {
+                totalHolders: result.rows.length,
+                holders: result.rows.map((r: any) => ({
+                    wallet: r.wallet_address,
+                    rankLevel: r.rank_level,
+                    rankName: RANK_NAMES_LIST[r.rank_level] || `Rank ${r.rank_level}`,
+                    teamVolume: r.team_volume,
+                    personalVolume: r.total_staked_volume,
+                    directCount: r.direct_count,
+                    joinedAt: r.created_at,
+                })),
+            },
+        });
+    } catch (error) {
+        console.error('Rank holders error:', error);
         res.status(500).json({ success: false, error: 'Internal server error' });
     }
 });
