@@ -74,50 +74,52 @@ export function useAffiliate() {
     (async () => {
       setHistoryLoading(true);
       try {
-        // Use a safe fromBlock range (some RPCs reject fromBlock:0n)
-        // opBNB has ~1s block time, so 5M blocks ≈ 58 days of history
-        let safeFrom = 0n;
-        try {
-          const latestBlock = await publicClient.getBlockNumber();
-          safeFrom = latestBlock > 5_000_000n ? latestBlock - 5_000_000n : 0n;
-        } catch {}
+        // opBNB RPC limits getLogs to 50,000 blocks per call.
+        // We scan up to 1M blocks (~12 days) in chunks of 45,000.
+        const CHUNK = 45_000n;
+        const SCAN_RANGE = 1_000_000n;
+        let latestBlock = 0n;
+        try { latestBlock = await publicClient.getBlockNumber(); } catch {}
+        const safeFrom = latestBlock > SCAN_RANGE ? latestBlock - SCAN_RANGE : 0n;
 
-        // Fetch events - each wrapped individually so one failure doesn't block others
-        let claimLogs: any[] = [];
-        let allHarvestLogs: any[] = [];
-        let stakingHarvestLogs: any[] = [];
+        // Helper: fetch logs in chunked batches to stay within RPC limits
+        async function getLogsChunked(params: any): Promise<any[]> {
+          const results: any[] = [];
+          let from = safeFrom;
+          while (from <= latestBlock) {
+            if (cancelled) break;
+            const to = from + CHUNK - 1n > latestBlock ? latestBlock : from + CHUNK - 1n;
+            try {
+              const logs = await publicClient!.getLogs({ ...params, fromBlock: from, toBlock: to });
+              results.push(...logs);
+            } catch (e) {
+              console.warn(`getLogs chunk ${from}-${to} failed:`, e);
+            }
+            from = to + 1n;
+          }
+          return results;
+        }
 
-        try {
-          claimLogs = await publicClient.getLogs({
+        // Fetch events in parallel (each internally chunked)
+        const [claimLogs, allHarvestLogs, stakingHarvestLogs] = await Promise.all([
+          getLogsChunked({
             address: contracts.affiliateDistributor,
             event: parseAbiItem('event RankSalaryClaimed(address indexed user, uint256 rankLevel, uint256 salary)'),
             args: { user: address },
-            fromBlock: safeFrom,
-            toBlock: 'latest',
-          });
-        } catch (e) { console.warn('Failed to fetch RankSalaryClaimed logs:', e); }
-
-        try {
-          allHarvestLogs = await publicClient.getLogs({
+          }).catch(() => [] as any[]),
+          getLogsChunked({
             address: contracts.affiliateDistributor,
             event: parseAbiItem('event Harvested(address indexed user, uint8 incomeType, uint256 usdAmount, uint256 kairoAmount)'),
             args: { user: address },
-            fromBlock: safeFrom,
-            toBlock: 'latest',
-          });
-        } catch (e) { console.warn('Failed to fetch Harvested logs:', e); }
-
-        try {
-          if (contracts.stakingManager !== '0x') {
-            stakingHarvestLogs = await publicClient.getLogs({
-              address: contracts.stakingManager,
-              event: parseAbiItem('event Harvested(address indexed user, uint256 stakeId, uint256 amount)'),
-              args: { user: address },
-              fromBlock: safeFrom,
-              toBlock: 'latest',
-            });
-          }
-        } catch (e) { console.warn('Failed to fetch staking Harvested logs:', e); }
+          }).catch(() => [] as any[]),
+          contracts.stakingManager !== '0x'
+            ? getLogsChunked({
+                address: contracts.stakingManager,
+                event: parseAbiItem('event Harvested(address indexed user, uint256 stakeId, uint256 amount)'),
+                args: { user: address },
+              }).catch(() => [] as any[])
+            : Promise.resolve([] as any[]),
+        ]);
 
         if (cancelled) return;
 
@@ -350,23 +352,34 @@ export function useAffiliate() {
           levelTxCount.set(i, 0);
         }
         try {
+          const CHUNK_SIZE = 45_000n;
+          const SCAN_BACK = 1_000_000n;
           const latestBlock = await publicClient.getBlockNumber();
-          const safeFrom = latestBlock > 5_000_000n ? latestBlock - 5_000_000n : 0n;
-          const teamEarnedLogs = await publicClient.getLogs({
-            address: contractAddr,
-            event: parseAbiItem('event TeamEarned(address indexed upline, address indexed staker, uint256 level, uint256 amount)'),
-            args: { upline: address },
-            fromBlock: safeFrom,
-            toBlock: 'latest',
-          });
-          for (const log of teamEarnedLogs) {
-            const args = log.args as any;
-            const lvl = Number(args.level);
-            const amt = BigInt(args.amount || 0);
-            if (lvl >= 1 && lvl <= 15) {
-              levelEarned.set(lvl, (levelEarned.get(lvl) || 0n) + amt);
-              levelTxCount.set(lvl, (levelTxCount.get(lvl) || 0) + 1);
+          const startFrom = latestBlock > SCAN_BACK ? latestBlock - SCAN_BACK : 0n;
+          let from = startFrom;
+          while (from <= latestBlock) {
+            const to = from + CHUNK_SIZE - 1n > latestBlock ? latestBlock : from + CHUNK_SIZE - 1n;
+            try {
+              const teamEarnedLogs = await publicClient.getLogs({
+                address: contractAddr,
+                event: parseAbiItem('event TeamEarned(address indexed upline, address indexed staker, uint256 level, uint256 amount)'),
+                args: { upline: address },
+                fromBlock: from,
+                toBlock: to,
+              });
+              for (const log of teamEarnedLogs) {
+                const args = log.args as any;
+                const lvl = Number(args.level);
+                const amt = BigInt(args.amount || 0);
+                if (lvl >= 1 && lvl <= 15) {
+                  levelEarned.set(lvl, (levelEarned.get(lvl) || 0n) + amt);
+                  levelTxCount.set(lvl, (levelTxCount.get(lvl) || 0) + 1);
+                }
+              }
+            } catch (chunkErr) {
+              console.warn(`TeamEarned chunk ${from}-${to} failed:`, chunkErr);
             }
+            from = to + 1n;
           }
         } catch (logErr) {
           console.warn('Failed to fetch TeamEarned logs (non-fatal):', logErr);
