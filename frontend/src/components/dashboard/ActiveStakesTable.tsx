@@ -57,7 +57,7 @@ export function ActiveStakesTable() {
                   <span className="text-xs text-surface-400">{tg.stakeCount} stake{tg.stakeCount > 1 ? 's' : ''}</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-[10px] text-surface-500 font-medium">
-                  Manual &middot; {tg.compoundInterval >= 3600 ? `${tg.compoundInterval / 3600}h` : `${tg.compoundInterval / 60}m`}
+                  Auto Compound &middot; {tg.compoundInterval >= 3600 ? `${tg.compoundInterval / 3600}h` : `${tg.compoundInterval / 60}m`} intervals
                 </div>
               </div>
 
@@ -106,7 +106,7 @@ export function ActiveStakesTable() {
                       disabled={!canCompound || isPending}
                       icon={<ArrowPathIcon className="w-3.5 h-3.5" />}
                     >
-                      {canCompound ? `Compound (${eligibleCount})` : 'Wait'}
+                      {canCompound ? `Auto Compound (${eligibleCount})` : 'Accruing'}
                     </Button>
                     <Button
                       size="sm"

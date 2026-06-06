@@ -258,7 +258,7 @@ function StakePageInner() {
               <div className="flex items-center gap-2 p-3 rounded-xl bg-gradient-to-r from-primary-50 to-secondary-50 border border-primary-100">
                 <Badge tier={tier.name.toLowerCase() as any}>{tier.name}</Badge>
                 <span className="text-xs text-surface-500">
-                  Compound every {tier.compoundInterval >= 3600 ? `${tier.compoundInterval / 3600}h` : `${tier.compoundInterval / 60}m`} (manual) &middot; 3X FIFO Cap
+                  Auto Compound every {tier.compoundInterval >= 3600 ? `${tier.compoundInterval / 3600}h` : `${tier.compoundInterval / 60}m`} &middot; 3X FIFO Cap
                 </span>
               </div>
             )}
@@ -309,7 +309,7 @@ function StakePageInner() {
                       </div>
                       <div className="flex items-center gap-1.5 text-xs text-surface-500 font-medium">
                         <ClockIcon className="w-3.5 h-3.5" />
-                        Manual compound &middot; {tg.compoundInterval >= 3600 ? `${tg.compoundInterval / 3600}h` : `${tg.compoundInterval / 60}m`}
+                        Auto Compound &middot; {tg.compoundInterval >= 3600 ? `${tg.compoundInterval / 3600}h` : `${tg.compoundInterval / 60}m`} intervals
                       </div>
                     </div>
 
@@ -369,7 +369,7 @@ function StakePageInner() {
                             variant="secondary"
                             icon={<ArrowPathIcon className="w-4 h-4" />}
                           >
-                            {canCompound ? `Compound (${eligibleCount})` : 'Wait for interval'}
+                            {canCompound ? `Auto Compound (${eligibleCount})` : 'Accruing'}
                           </Button>
                           <Button
                             onClick={() => harvestTier(tg.stakes)}

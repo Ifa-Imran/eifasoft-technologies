@@ -9,6 +9,7 @@ import {
   TrophyIcon,
   FireIcon,
   ArrowPathIcon,
+  TicketIcon,
 } from '@heroicons/react/24/outline';
 
 const features = [
@@ -19,6 +20,14 @@ const features = [
     iconBg: 'from-primary-500 to-primary-300',
     iconColor: 'text-white',
     cardVariant: 'cyan' as const,
+  },
+  {
+    title: 'Core Membership (CMS)',
+    description: 'Purchase subscriptions for 10 USDT, earn 5 KAIRO loyalty rewards and 5-level referral bonuses.',
+    icon: TicketIcon,
+    iconBg: 'from-accent-500 to-accent-300',
+    iconColor: 'text-white',
+    cardVariant: 'gold' as const,
   },
   {
     title: 'Atomic P2P Exchange',

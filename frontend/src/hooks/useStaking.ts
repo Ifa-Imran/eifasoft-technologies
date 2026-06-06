@@ -7,8 +7,8 @@ import { useToast } from '@/components/ui/Toast';
 import { Address } from 'viem';
 import { useEffect, useRef, useCallback, useState } from 'react';
 import type { StakeInfo } from '@/hooks/useUserStakes';
-// Compounding is MANUAL — the user must explicitly click "Compound" per tier.
-// The contract no longer auto-compounds on stake/unstake/harvest.
+// Compounding is AUTO — profits accrue automatically based on time intervals.
+// Users click "Compound" to crystallize accrued profits and trigger team dividends.
 
 export function useStaking() {
   const { toast } = useToast();

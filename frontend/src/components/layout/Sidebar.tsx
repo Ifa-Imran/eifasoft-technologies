@@ -13,11 +13,13 @@ import {
   ChartBarIcon,
   ChevronLeftIcon,
   UsersIcon,
+  TicketIcon,
 } from '@heroicons/react/24/outline';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: HomeIcon },
   { href: '/stake', label: 'Stake', icon: CurrencyDollarIcon },
+  { href: '/cms', label: 'CMS', icon: TicketIcon },
   { href: '/exchange', label: 'Atomic P2P', icon: ArrowsRightLeftIcon },
   { href: '/referrals', label: 'Rank Dividend', icon: UserGroupIcon },
   { href: '/team-dividend', label: 'Team Dividend', icon: UsersIcon },
