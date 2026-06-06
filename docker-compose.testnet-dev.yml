@@ -49,7 +49,7 @@ services:
       sh -c "
         apk add --no-cache git &&
         rm -rf /tmp/repo &&
-        git clone --branch testnet-dev --depth 1 https://github.com/Ifa-Imran/eifasoft-technologies.git /tmp/repo &&
+        git clone --branch kairodao-old --depth 1 https://github.com/Ifa-Imran/eifasoft-technologies.git /tmp/repo &&
         find /app -mindepth 1 -maxdepth 1 ! -name node_modules -exec rm -rf {} + &&
         cp -a /tmp/repo/backend/. /app/ &&
         NODE_ENV=development npm ci &&
@@ -117,7 +117,7 @@ services:
       sh -c "
         apk add --no-cache git &&
         rm -rf /tmp/repo &&
-        git clone --branch testnet-dev --depth 1 https://github.com/Ifa-Imran/eifasoft-technologies.git /tmp/repo &&
+        git clone --branch kairodao-old --depth 1 https://github.com/Ifa-Imran/eifasoft-technologies.git /tmp/repo &&
         find /app -mindepth 1 -maxdepth 1 ! -name node_modules -exec rm -rf {} + &&
         cp -a /tmp/repo/frontend/. /app/ &&
         rm -f /app/.env /app/.env.local /app/.env.production /app/.env.production.local &&
