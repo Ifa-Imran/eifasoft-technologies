@@ -4,9 +4,10 @@ import { useState } from 'react';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 
 interface StakeEntry {
-  id: number;
+  stakeId: number;
   amount: string;
-  created_at: string;
+  tier: number;
+  createdAt: string;
 }
 
 interface VolumeResult {
@@ -45,7 +46,7 @@ export default function StakingVolumePage() {
       const res = await apiFetch(`/api/v1/admin/staking-volume?${params.toString()}`);
       const json = await res.json();
       if (res.ok) {
-        setResults(json.data || []);
+        setResults(json.data?.wallets || json.data || []);
       } else {
         setError(json.error || 'Failed to fetch data');
       }
@@ -226,13 +227,13 @@ export default function StakingVolumePage() {
               <div className="space-y-2">
                 {results
                   .find((r) => r.wallet === expandedRow)
-                  ?.stakes.map((s) => (
+                  ?.stakes.map((s, idx) => (
                     <div
-                      key={s.id}
+                      key={s.stakeId ?? idx}
                       className="flex justify-between items-center bg-white rounded-lg px-4 py-2 border border-surface-100"
                     >
                       <span className="text-sm text-surface-600">
-                        {new Date(s.created_at).toLocaleString()}
+                        {new Date(s.createdAt).toLocaleString()}
                       </span>
                       <span className="text-sm font-medium text-primary-600">
                         {parseFloat(s.amount).toFixed(4)}
