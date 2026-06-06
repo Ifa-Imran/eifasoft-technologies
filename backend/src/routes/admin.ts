@@ -88,11 +88,25 @@ async function calculateUserRank(address: string): Promise<{
 /**
  * POST /api/v1/admin/calculate-rank
  * Body: { address?: string }
- * Trigger rank calculation for a specific user or all users
+ * Trigger rank calculation for a specific user or all users.
+ * First syncs total_staked_volume from the stakes table, then computes ranks.
  */
 router.post('/admin/calculate-rank', requireAdminJWT, async (req: AdminRequest, res: Response) => {
     try {
         const { address } = req.body;
+
+        // Step 1: Sync total_staked_volume from active stakes for accuracy
+        console.log('[calculate-rank] Syncing total_staked_volume from stakes table...');
+        await query(
+            `UPDATE users u SET
+                total_staked_volume = COALESCE((
+                    SELECT SUM(s.original_amount)
+                    FROM stakes s
+                    WHERE s.user_address = u.wallet_address AND s.is_active = TRUE
+                ), 0),
+                updated_at = NOW()`
+        );
+        console.log('[calculate-rank] Volume sync complete.');
 
         if (address) {
             if (!isValidAddress(address)) {
@@ -110,8 +124,6 @@ router.post('/admin/calculate-rank', requireAdminJWT, async (req: AdminRequest, 
             }
 
             const result = await calculateUserRank(address);
-
-            // Rank sync is now user-initiated from frontend (checkRankChange)
 
             res.json({
                 success: true,
@@ -309,9 +321,21 @@ router.get('/admin/staking-volume', requireAdminJWT, async (req: AdminRequest, r
  * Returns all users who qualify for a rank based on team volume.
  * Computes team volume LIVE from the referral_tree + total_staked_volume
  * so results are accurate even if the cached team_volume column is stale.
+ * Also syncs total_staked_volume from active stakes before computing.
  */
 router.get('/admin/rank-holders', requireAdminJWT, async (req: AdminRequest, res: Response) => {
     try {
+        // Step 0: Sync total_staked_volume from stakes table for accuracy
+        await query(
+            `UPDATE users u SET
+                total_staked_volume = COALESCE((
+                    SELECT SUM(s.original_amount)
+                    FROM stakes s
+                    WHERE s.user_address = u.wallet_address AND s.is_active = TRUE
+                ), 0),
+                updated_at = NOW()`
+        );
+
         // Compute team volume live: sum of descendants' total_staked_volume
         const result = await query(
             `SELECT
@@ -369,11 +393,26 @@ router.get('/admin/rank-holders', requireAdminJWT, async (req: AdminRequest, res
             ).catch(() => { /* best-effort cache update */ });
         }
 
+        // Add diagnostic info to help debug empty results
+        const [userCount, stakeCount, treeCount, volumeStats] = await Promise.all([
+            query('SELECT COUNT(*)::int AS count FROM users'),
+            query('SELECT COUNT(*)::int AS count FROM stakes WHERE is_active = TRUE'),
+            query('SELECT COUNT(*)::int AS count FROM referral_tree WHERE depth > 0'),
+            query('SELECT COUNT(*)::int AS with_volume FROM users WHERE total_staked_volume > 0'),
+        ]);
+
         res.json({
             success: true,
             data: {
                 totalHolders: holders.length,
                 holders,
+                diagnostics: {
+                    totalUsers: userCount.rows[0]?.count || 0,
+                    activeStakes: stakeCount.rows[0]?.count || 0,
+                    referralTreeEntries: treeCount.rows[0]?.count || 0,
+                    usersWithVolume: volumeStats.rows[0]?.with_volume || 0,
+                    minRankThreshold: RANK_THRESHOLDS[0],
+                },
             },
         });
     } catch (error) {

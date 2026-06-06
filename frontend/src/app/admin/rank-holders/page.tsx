@@ -33,6 +33,8 @@ export default function RankHoldersPage() {
   const [error, setError] = useState('');
   const [filterRank, setFilterRank] = useState<number | null>(null);
 
+  const [diagnostics, setDiagnostics] = useState<any>(null);
+
   const [recalculating, setRecalculating] = useState(false);
 
   useEffect(() => {
@@ -47,6 +49,7 @@ export default function RankHoldersPage() {
       const json = await res.json();
       if (res.ok) {
         setHolders(json.data?.holders || []);
+        setDiagnostics(json.data?.diagnostics || null);
       } else {
         setError(json.error || 'Failed to fetch rank holders');
       }
@@ -238,6 +241,13 @@ export default function RankHoldersPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
           <p className="text-surface-400 text-sm">No ranked members found</p>
+          <p className="text-surface-300 text-xs mt-1">Minimum team volume: $10,000</p>
+          {diagnostics && (
+            <div className="mt-4 text-xs text-surface-400 space-y-1">
+              <p>Total Users: {diagnostics.totalUsers} | Active Stakes: {diagnostics.activeStakes}</p>
+              <p>Referral Tree Entries: {diagnostics.referralTreeEntries} | Users with Volume: {diagnostics.usersWithVolume}</p>
+            </div>
+          )}
         </div>
       )}
     </div>
