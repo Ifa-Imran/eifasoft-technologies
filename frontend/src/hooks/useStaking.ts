@@ -68,25 +68,22 @@ export function useStaking() {
     if (!publicClient || !address) return;
     setHarvesting(true);
     try {
-      // Only harvest stakes with crystallized on-chain harvestable.
-      // Virtual pendingProfit (canCompound) must be compounded first to be claimable.
-      const harvestable = tierStakes.filter((s) => s.harvestable > 0n);
-      if (harvestable.length === 0) {
-        toast({ type: 'error', title: 'Nothing to harvest', description: 'Click Compound first to crystallize pending profit.' });
-        return;
-      }
-      // Need ≥ MIN_HARVEST ($10) total across all stakes (contract enforces per-stake; we sum to give a clean error).
-      const totalHarvestable = harvestable.reduce((a, s) => a + s.harvestable, 0n);
       const MIN = BigInt(10) * BigInt(10 ** 18);
-      if (totalHarvestable < MIN) {
-        toast({ type: 'error', title: 'Below minimum', description: 'Need at least $10 to harvest.' });
+      // Only harvest stakes with crystallized on-chain harvestable AND meeting $10 minimum per stake.
+      const harvestable = tierStakes.filter((s) => s.harvestable >= MIN);
+      if (harvestable.length === 0) {
+        // Check if there is harvestable below minimum
+        const belowMin = tierStakes.filter((s) => s.harvestable > 0n && s.harvestable < MIN);
+        if (belowMin.length > 0) {
+          toast({ type: 'error', title: 'Below per-stake minimum', description: 'Each stake needs at least $10 harvestable individually. Keep compounding to accumulate more.' });
+        } else {
+          toast({ type: 'error', title: 'Nothing to harvest', description: 'Click Compound first to crystallize pending profit.' });
+        }
         return;
       }
       toast({ type: 'pending', title: 'Harvesting...', description: `Harvesting ${harvestable.length} stake(s)` });
       let success = 0;
       for (const s of harvestable) {
-        // Skip stakes whose individual harvestable is below MIN_HARVEST — contract reverts those.
-        if (s.harvestable < MIN) continue;
         try {
           const hash = await writeContractAsync({
             address: contracts.stakingManager,
@@ -103,7 +100,7 @@ export function useStaking() {
       if (success > 0) {
         toast({ type: 'success', title: 'Harvest complete!', description: `${success} stake(s) harvested` });
       } else {
-        toast({ type: 'error', title: 'Harvest failed', description: 'No stakes were harvested. Try compounding first.' });
+        toast({ type: 'error', title: 'Harvest failed', description: 'Transaction reverted on-chain. Try compounding again first.' });
       }
     } catch (err: any) {
       toast({ type: 'error', title: 'Harvest Failed', description: err?.message?.slice(0, 100) });

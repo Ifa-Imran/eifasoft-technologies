@@ -47,11 +47,14 @@ export interface TierGroup {
   // Derived display values
   displayHarvestable: bigint; // on-chain harvestable + pending profit
   displayTotalEarned: bigint; // displayHarvestable + totalHarvestedRewards
-  harvestable: bigint;        // on-chain confirmed only
+  harvestable: bigint;        // on-chain confirmed only (sum of all)
+  actuallyHarvestable: bigint; // sum of only stakes with >= $10 individually
+  canHarvest: boolean;        // true if at least one stake has >= $10 harvestable
   // Formatted strings
   originalAmountFormatted: string;
   totalEarnedFormatted: string;
   harvestableFormatted: string;
+  actuallyHarvestableFormatted: string;
   displayHarvestableFormatted: string;
   totalHarvestedFormatted: string;
   pendingProfitFormatted: string;
@@ -214,6 +217,8 @@ export function useUserStakes() {
     .map(([tierIdx, tierStakes]) => {
       const tier = STAKING_TIERS[tierIdx] || STAKING_TIERS[0];
 
+      const MIN_HARVEST = BigInt(10) * BigInt(10 ** 18); // $10 in 18 decimals
+
       let totalOriginalAmount = 0n;
       let totalCompoundEarned = 0n;
       let totalHarvestedRewards = 0n;
@@ -221,6 +226,7 @@ export function useUserStakes() {
       let totalHardCap = 0n;
       let pendingProfit = 0n;
       let harvestable = 0n;
+      let actuallyHarvestable = 0n;
 
       for (const s of tierStakes) {
         totalOriginalAmount += s.originalAmount;
@@ -229,10 +235,15 @@ export function useUserStakes() {
         totalCapEarned += s.totalEarned;
         totalHardCap += s.hardCap;
         harvestable += s.harvestable;
+        // Only count stakes that individually meet the $10 minimum
+        if (s.harvestable >= MIN_HARVEST) {
+          actuallyHarvestable += s.harvestable;
+        }
         // Virtual pending compound profit
         pendingProfit += calcPendingProfit(s.amount, s.lastCompoundTime, s.compoundInterval, now);
       }
 
+      const canHarvest = actuallyHarvestable >= MIN_HARVEST;
       const displayHarvestable = harvestable + pendingProfit;
       const displayTotalEarned = displayHarvestable + totalHarvestedRewards;
       const capProgress = totalHardCap > 0n ? Number((totalCapEarned * 100n) / totalHardCap) : 0;
@@ -252,9 +263,12 @@ export function useUserStakes() {
         displayHarvestable,
         displayTotalEarned,
         harvestable,
+        actuallyHarvestable,
+        canHarvest,
         originalAmountFormatted: Number(formatUnits(totalOriginalAmount, USDT_DECIMALS)).toFixed(2),
         totalEarnedFormatted: Number(formatUnits(displayTotalEarned, USDT_DECIMALS)).toFixed(2),
         harvestableFormatted: Number(formatUnits(harvestable, USDT_DECIMALS)).toFixed(2),
+        actuallyHarvestableFormatted: Number(formatUnits(actuallyHarvestable, USDT_DECIMALS)).toFixed(2),
         displayHarvestableFormatted: Number(formatUnits(displayHarvestable, USDT_DECIMALS)).toFixed(2),
         totalHarvestedFormatted: Number(formatUnits(totalHarvestedRewards, USDT_DECIMALS)).toFixed(2),
         pendingProfitFormatted: Number(formatUnits(pendingProfit, USDT_DECIMALS)).toFixed(2),
