@@ -34,7 +34,6 @@ contract KAIROToken is ERC20, ERC20Permit, ERC20Burnable, AccessControl {
     // ============ State Variables ============
     address public liquidityPool;
     uint256 public constant SOCIAL_LOCK = 10_000 * 10 ** 18; // 10,000 KAIRO locked forever
-    uint256 public constant DEV_INITIAL_MINT = 5 * 10 ** 18; // 5 KAIRO seeded to dev fund wallet at genesis
     bool public socialLockApplied;
 
     // Track total burned tokens for LiquidityPool/AtomicP2p compatibility
@@ -44,7 +43,6 @@ contract KAIROToken is ERC20, ERC20Permit, ERC20Burnable, AccessControl {
     event MintedTo(address indexed recipient, uint256 usdAmount, uint256 kairoAmount);
     event LiquidityPoolSet(address indexed pool);
     event SocialLockApplied(uint256 amount);
-    event DevInitialMint(address indexed wallet, uint256 amount);
 
     // ============ Constructor ============
 
@@ -73,22 +71,17 @@ contract KAIROToken is ERC20, ERC20Permit, ERC20Burnable, AccessControl {
      * @dev Mint initial supply to LP and apply social lock
      *      - Requires liquidityPool to be set
      *      - Requires socialLockApplied == false
-     *      - Mints 10,000 KAIRO to liquidityPool address (social lock)
-     *      - Mints 5 KAIRO to the development fund wallet for genesis liquidity ops
+     *      - Mints 10,000 KAIRO to liquidityPool address
      *      - Sets socialLockApplied = true
-     * @param _devWallet Development fund wallet to receive the 5 KAIRO genesis mint
      */
-    function mintInitialSupply(address _devWallet) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function mintInitialSupply() external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(liquidityPool != address(0), "KAIROToken: LP not set");
-        require(_devWallet != address(0), "KAIROToken: Invalid dev wallet");
         require(!socialLockApplied, "KAIROToken: Social lock already applied");
 
         socialLockApplied = true;
         _mint(liquidityPool, SOCIAL_LOCK);
-        _mint(_devWallet, DEV_INITIAL_MINT);
 
         emit SocialLockApplied(SOCIAL_LOCK);
-        emit DevInitialMint(_devWallet, DEV_INITIAL_MINT);
     }
 
     // ============ Minting Functions ============

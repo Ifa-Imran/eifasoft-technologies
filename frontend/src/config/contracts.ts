@@ -9,6 +9,7 @@ export const contracts = {
   stakingManager: (process.env.NEXT_PUBLIC_STAKING_MANAGER || '0x') as Address,
   affiliateDistributor: (process.env.NEXT_PUBLIC_AFFILIATE_DISTRIBUTOR || '0x') as Address,
   atomicP2p: (process.env.NEXT_PUBLIC_ATOMIC_P2P || '0x') as Address,
+  cms: (process.env.NEXT_PUBLIC_CMS || '0x') as Address,
   usdt: (process.env.NEXT_PUBLIC_USDT || '0x') as Address,
 } as const;
 
@@ -31,7 +32,7 @@ export function getExplorerAddressUrl(address: string) {
 export const STAKING_TIERS = [
   { name: 'Bronze', minAmount: 10, maxAmount: 499, compoundInterval: IS_TESTNET ? 180 : 8 * 60 * 60, color: '#CD7F32' },
   { name: 'Silver', minAmount: 500, maxAmount: 1999, compoundInterval: IS_TESTNET ? 120 : 6 * 60 * 60, color: '#C0C0C0' },
-  { name: 'Gold', minAmount: 2000, maxAmount: Infinity, compoundInterval: IS_TESTNET ? 60 : 5 * 60 * 60, color: '#FFD700' },
+  { name: 'Gold', minAmount: 2000, maxAmount: Infinity, compoundInterval: IS_TESTNET ? 60 : 4 * 60 * 60, color: '#FFD700' },
 ] as const;
 
 export const RANK_NAMES = [

@@ -1,10 +1,9 @@
 'use client';
 
-import { useReadContract, useReadContracts, useAccount } from 'wagmi';
+import { useReadContract, useAccount } from 'wagmi';
 import { contracts, STAKING_TIERS, USDT_DECIMALS } from '@/config/contracts';
 import { StakingManagerABI } from '@/config/abis/StakingManager';
 import { formatUnits } from 'viem';
-import { useMemo } from 'react';
 
 // ─── Individual stake (raw on-chain data + derived) ──────────────────────────
 export interface StakeInfo {
@@ -23,10 +22,8 @@ export interface StakeInfo {
   canCompound: boolean;
   hardCap: bigint;
   harvestable: bigint;
-  /** Actual KAIRO returned on unstake (80% principal - outstanding deductions), from previewUnstake() */
+  /** Estimated KAIRO returned on unstake (80% of current amount), calculated client-side */
   previewUnstakeAmount: bigint;
-  /** True if this stake was created via migrateStakes (carried over from old contract). Migrated stakes cannot be unstaked. */
-  isMigrated: boolean;
 }
 
 // ─── Tier-grouped view (what the UI renders) ─────────────────────────────────
@@ -109,29 +106,6 @@ export function useUserStakes() {
     },
   });
 
-  // ── Read totalIncomeClaimedUsd / totalIncomeDeductedUsd for cap & unstake tracking ──
-  const { data: totalIncomeClaimedUsd } = useReadContract({
-    address: contracts.stakingManager,
-    abi: StakingManagerABI,
-    functionName: 'totalIncomeClaimedUsd',
-    args: address ? [address] : undefined,
-    query: {
-      enabled: !!address && contracts.stakingManager !== '0x',
-      refetchInterval: 15000,
-    },
-  });
-
-  const { data: totalIncomeDeductedUsd } = useReadContract({
-    address: contracts.stakingManager,
-    abi: StakingManagerABI,
-    functionName: 'totalIncomeDeductedUsd',
-    args: address ? [address] : undefined,
-    query: {
-      enabled: !!address && contracts.stakingManager !== '0x',
-      refetchInterval: 15000,
-    },
-  });
-
   // ── Read remaining cap (how much more can be earned before hitting 3X FIFO cap) ──
   const { data: remainingCap } = useReadContract({
     address: contracts.stakingManager,
@@ -140,26 +114,6 @@ export function useUserStakes() {
     args: address ? [address] : undefined,
     query: {
       enabled: !!address && contracts.stakingManager !== '0x',
-      refetchInterval: 15000,
-    },
-  });
-
-  // ── Batch previewUnstake for each stake index ──
-  const previewContracts = useMemo(() => {
-    const count = Number(stakeCount || 0);
-    if (!address || count === 0 || contracts.stakingManager === '0x') return [];
-    return Array.from({ length: count }, (_, i) => ({
-      address: contracts.stakingManager as `0x${string}`,
-      abi: StakingManagerABI,
-      functionName: 'previewUnstake' as const,
-      args: [address, BigInt(i)] as const,
-    }));
-  }, [address, stakeCount]);
-
-  const { data: previewResults } = useReadContracts({
-    contracts: previewContracts,
-    query: {
-      enabled: previewContracts.length > 0,
       refetchInterval: 15000,
     },
   });
@@ -177,8 +131,8 @@ export function useUserStakes() {
         const hardCap = originalAmount * 3n;
         const harvestable = compoundEarned > harvestedRewards ? compoundEarned - harvestedRewards : 0n;
         const lastCompound = Number(s.lastCompoundTime || 0);
-        const previewRaw = previewResults?.[i];
-        const previewUnstakeAmount = previewRaw?.status === 'success' ? BigInt((previewRaw.result as any) || 0) : 0n;
+        // Client-side preview: unstake returns 80% of current compounded amount
+        const previewUnstakeAmount = (amount * 80n) / 100n;
 
         return {
           index: i,
@@ -197,7 +151,6 @@ export function useUserStakes() {
           hardCap,
           harvestable,
           previewUnstakeAmount,
-          isMigrated: Boolean(s.isMigrated),
         };
       })
     : [];
@@ -282,11 +235,6 @@ export function useUserStakes() {
   // Sum harvestedRewards across ALL stakes (active + inactive) for lifetime tracking
   const totalHarvestedRewards = stakes.reduce((sum, s) => sum + s.harvestedRewards, 0n);
 
-  // Outstanding claimed income not yet deducted (affects unstake return)
-  const claimed = BigInt((totalIncomeClaimedUsd as any) || 0);
-  const deducted = BigInt((totalIncomeDeductedUsd as any) || 0);
-  const outstandingClaimedUsd = claimed > deducted ? claimed - deducted : 0n;
-
   return {
     stakes,
     activeStakes,
@@ -294,9 +242,6 @@ export function useUserStakes() {
     totalStaked,
     totalHarvestable,
     totalHarvestedRewards,
-    totalIncomeClaimedUsd: claimed,
-    totalIncomeDeductedUsd: deducted,
-    outstandingClaimedUsd,
     remainingCap: remainingCap as bigint | undefined,
     stakeCount: Number(stakeCount || 0),
     isLoading: countLoading || stakesLoading,

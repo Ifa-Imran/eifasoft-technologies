@@ -146,7 +146,7 @@ function StakePageInner() {
   const { isConnected } = useAccount();
   const [amount, setAmount] = useState('');
   const { stake, harvestTier, compoundTier, unstake, isPending, isCompounding } = useStaking();
-  const { tierGroups, activeStakes, stakes, isLoading, outstandingClaimedUsd } = useUserStakes();
+  const { tierGroups, activeStakes, stakes, isLoading } = useUserStakes();
   const { usdtFormatted } = useTokenBalances();
   const { storedReferrer, hasOnChainReferrer } = useRegistration();
   const { unlockedLevels, directReferrals: directRefs } = useAffiliate();
@@ -195,8 +195,7 @@ function StakePageInner() {
 
   /**
    * Confirm + trigger unstake for a single stake.
-   * Uses the contract's previewUnstake() which returns the actual KAIRO amount
-   * after deducting outstanding claimed income (80% principal - deductions).
+   * Uses client-side calculation: unstake returns 80% of current compounded amount in KAIRO.
    */
   const handleUnstake = (stakeIndex: number, originalUsdt: number, previewKairo: number) => {
     const previewUsd = previewKairo; // previewUnstake returns KAIRO (18 decimals, same as USDT)
@@ -466,13 +465,6 @@ function StakePageInner() {
                       <td className="py-2.5 px-2 text-center">
                         {!s.active ? (
                           <span className="text-[10px] text-surface-300">—</span>
-                        ) : s.isMigrated ? (
-                          <span
-                            className="inline-flex items-center gap-1 text-[10px] text-surface-300 italic"
-                            title="Migrated stakes are locked and cannot be unstaked"
-                          >
-                            🔒 Locked
-                          </span>
                         ) : (
                           <Button
                             size="sm"

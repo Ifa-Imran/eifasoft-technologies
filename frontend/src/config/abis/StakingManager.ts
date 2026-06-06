@@ -22,9 +22,9 @@ export const StakingManagerABI = [
         "type": "address"
       },
       {
-        "internalType": "address[7]",
+        "internalType": "address[6]",
         "name": "_daoWallets",
-        "type": "address[7]"
+        "type": "address[6]"
       },
       {
         "internalType": "address",
@@ -82,25 +82,6 @@ export const StakingManagerABI = [
       }
     ],
     "name": "AffiliateDistributorSet",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "user",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "bool",
-        "name": "enabled",
-        "type": "bool"
-      }
-    ],
-    "name": "AutoCompoundToggled",
     "type": "event"
   },
   {
@@ -177,9 +158,9 @@ export const StakingManagerABI = [
     "inputs": [
       {
         "indexed": false,
-        "internalType": "address[7]",
+        "internalType": "address[6]",
         "name": "wallets",
-        "type": "address[7]"
+        "type": "address[6]"
       }
     ],
     "name": "DaoWalletsSet",
@@ -221,37 +202,6 @@ export const StakingManagerABI = [
       }
     ],
     "name": "Harvested",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "user",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "usdAmount",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "totalClaimed",
-        "type": "uint256"
-      }
-    ],
-    "name": "IncomeClaimRecorded",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [],
-    "name": "MigrationFinalized",
     "type": "event"
   },
   {
@@ -409,68 +359,6 @@ export const StakingManagerABI = [
       },
       {
         "indexed": false,
-        "internalType": "uint256",
-        "name": "stakeId",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "principal",
-        "type": "uint256"
-      }
-    ],
-    "name": "StakeMigrated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "tierId",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "minStake",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "maxStake",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "compoundInterval",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "dailyClosings",
-        "type": "uint256"
-      }
-    ],
-    "name": "TierConfigured",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "user",
-        "type": "address"
-      },
-      {
-        "indexed": false,
         "internalType": "uint8",
         "name": "newTier",
         "type": "uint8"
@@ -533,19 +421,6 @@ export const StakingManagerABI = [
   {
     "inputs": [],
     "name": "DEFAULT_ADMIN_ROLE",
-    "outputs": [
-      {
-        "internalType": "bytes32",
-        "name": "",
-        "type": "bytes32"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "INCOME_RECORDER_ROLE",
     "outputs": [
       {
         "internalType": "bytes32",
@@ -672,25 +547,6 @@ export const StakingManagerABI = [
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "autoCompoundEnabled",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [],
     "name": "cmsContract",
     "outputs": [
@@ -781,13 +637,6 @@ export const StakingManagerABI = [
   },
   {
     "inputs": [],
-    "name": "finalizeMigration",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
     "name": "getAllStakers",
     "outputs": [
       {
@@ -833,9 +682,9 @@ export const StakingManagerABI = [
     "name": "getDaoWallets",
     "outputs": [
       {
-        "internalType": "address[7]",
+        "internalType": "address[6]",
         "name": "",
-        "type": "address[7]"
+        "type": "address[6]"
       }
     ],
     "stateMutability": "view",
@@ -969,11 +818,6 @@ export const StakingManagerABI = [
             "internalType": "uint8",
             "name": "tier",
             "type": "uint8"
-          },
-          {
-            "internalType": "bool",
-            "name": "isMigrated",
-            "type": "bool"
           }
         ],
         "internalType": "struct StakingManager.Stake",
@@ -1091,11 +935,6 @@ export const StakingManagerABI = [
             "internalType": "uint8",
             "name": "tier",
             "type": "uint8"
-          },
-          {
-            "internalType": "bool",
-            "name": "isMigrated",
-            "type": "bool"
           }
         ],
         "internalType": "struct StakingManager.Stake[]",
@@ -1212,37 +1051,6 @@ export const StakingManagerABI = [
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "address[]",
-        "name": "users",
-        "type": "address[]"
-      },
-      {
-        "internalType": "uint256[]",
-        "name": "principals",
-        "type": "uint256[]"
-      }
-    ],
-    "name": "migrateStakes",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "migrationFinalized",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [],
     "name": "pause",
     "outputs": [],
@@ -1260,48 +1068,6 @@ export const StakingManagerABI = [
       }
     ],
     "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_user",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "_stakeId",
-        "type": "uint256"
-      }
-    ],
-    "name": "previewUnstake",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_user",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "_usdAmount",
-        "type": "uint256"
-      }
-    ],
-    "name": "recordIncomeClaim",
-    "outputs": [],
-    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -1356,19 +1122,6 @@ export const StakingManagerABI = [
   {
     "inputs": [
       {
-        "internalType": "bool",
-        "name": "_enabled",
-        "type": "bool"
-      }
-    ],
-    "name": "setAutoCompound",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
         "internalType": "address",
         "name": "_cms",
         "type": "address"
@@ -1382,9 +1135,9 @@ export const StakingManagerABI = [
   {
     "inputs": [
       {
-        "internalType": "address[7]",
+        "internalType": "address[6]",
         "name": "_daoWallets",
-        "type": "address[7]"
+        "type": "address[6]"
       }
     ],
     "name": "setDaoWallets",
@@ -1401,39 +1154,6 @@ export const StakingManagerABI = [
       }
     ],
     "name": "setDevelopmentFundWallet",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "_tierId",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "_min",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "_max",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "_compoundInterval",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "_dailyClosings",
-        "type": "uint256"
-      }
-    ],
-    "name": "setTier",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1518,44 +1238,6 @@ export const StakingManagerABI = [
       }
     ],
     "name": "totalActiveStakeValue",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "totalIncomeClaimedUsd",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "totalIncomeDeductedUsd",
     "outputs": [
       {
         "internalType": "uint256",
@@ -1658,11 +1340,6 @@ export const StakingManagerABI = [
         "internalType": "uint8",
         "name": "tier",
         "type": "uint8"
-      },
-      {
-        "internalType": "bool",
-        "name": "isMigrated",
-        "type": "bool"
       }
     ],
     "stateMutability": "view",

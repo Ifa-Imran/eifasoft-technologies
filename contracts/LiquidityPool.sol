@@ -31,7 +31,9 @@ interface IStakingManager {
  */
 contract LiquidityPool is ReentrancyGuard, AccessControl {
     bytes32 public constant CORE_ROLE = keccak256("CORE_ROLE");
+    bytes32 public constant REGISTRATION_ROLE = keccak256("REGISTRATION_ROLE");
     bytes32 public constant P2P_ROLE = keccak256("P2P_ROLE");
+    bytes32 public constant POOL_ROLE = keccak256("POOL_ROLE");
     
     // Token interfaces
     IKAIROToken public immutable kairoToken;
@@ -94,11 +96,22 @@ contract LiquidityPool is ReentrancyGuard, AccessControl {
         uint256 fee
     );
     
+    event USDTWithdrawn(address indexed to, uint256 amount, uint256 timestamp);
     event PriceSnapshotUpdated(uint256 indexed snapshotId, uint256 price, uint256 timestamp);
+    event RegistrationFeeReceived(uint256 amount, uint256 timestamp);
+    event ForfeitedTierBonusReceived(uint256 amount, uint256 timestamp);
     event LiquidityPoolInitialized(address kairoToken, address usdtToken, uint256 timestamp);
     event DeployerSwapBlocked(address indexed deployer, uint256 attemptedAmount, uint256 timestamp);
+    
+    // Staking-specific events
     event StakingFundsReceived(uint256 amount, uint256 timestamp);
+    event TeamGratuityPaid(address indexed recipient, uint256 amount, uint256 timestamp);
+    event SupportPursePaid(address indexed recipient, uint256 amount, uint256 timestamp);
+    event PrematureExitPaid(address indexed recipient, uint256 amount, uint256 timestamp);
     event P2PFeeReceived(uint256 amount, uint256 timestamp);
+    
+    // Pool balances (0 = Weekly Qualifiers Dividend, 1 = Monthly Qualifiers Dividend)
+    mapping(uint256 => uint256) public poolBalances;
 
     // StakingManager for global auto-compound on DEX actions
     IStakingManager public stakingManager;
@@ -339,11 +352,75 @@ contract LiquidityPool is ReentrancyGuard, AccessControl {
     }
     
     /**
-     * @dev Notify LP of incoming stake funds (called by StakingManager on every stake)
-     * @param amount USDT amount received
+     * @dev Withdraw USDT (only Core contract can call)
+     * @param to Address to withdraw to
+     * @param amount Amount to withdraw
+     */
+    function withdrawUSDT(address to, uint256 amount) external onlyRole(CORE_ROLE) {
+        require(to != address(0), "LiquidityPool: Invalid recipient");
+        require(amount > 0, "LiquidityPool: Invalid amount");
+        
+        uint256 balance = usdtToken.balanceOf(address(this));
+        require(amount <= balance, "LiquidityPool: Insufficient balance");
+        
+        usdtToken.transfer(to, amount);
+        emit USDTWithdrawn(to, amount, block.timestamp);
+    }
+    
+    /**
+     * @dev Receive registration fee (called by Registration contract)
+     * @param amount Fee amount received
+     */
+    function receiveRegistrationFee(uint256 amount) external onlyRole(REGISTRATION_ROLE) {
+        emit RegistrationFeeReceived(amount, block.timestamp);
+    }
+    
+    /**
+     * @dev Receive forfeited tier bonus
+     * @param amount Forfeited bonus amount
+     */
+    function receiveForfeitedTierBonus(uint256 amount) external onlyRole(CORE_ROLE) {
+        emit ForfeitedTierBonusReceived(amount, block.timestamp);
+    }
+    
+    /**
+     * @dev Receive staking funds (60% of staking amount)
+     * @param amount Staking funds amount
      */
     function receiveStakingFunds(uint256 amount) external onlyRole(CORE_ROLE) {
         emit StakingFundsReceived(amount, block.timestamp);
+    }
+    
+    /**
+     * @dev Distribute Team Gratuity payment from LiquidityPool
+     * @param recipient Recipient address
+     * @param amount Amount to pay
+     */
+    function distributeTeamGratuity(address recipient, uint256 amount) external onlyRole(CORE_ROLE) {
+        require(recipient != address(0), "LiquidityPool: Invalid recipient");
+        require(amount > 0, "LiquidityPool: Invalid amount");
+        
+        uint256 balance = usdtToken.balanceOf(address(this));
+        require(amount <= balance, "LiquidityPool: Insufficient balance");
+        
+        usdtToken.transfer(recipient, amount);
+        emit TeamGratuityPaid(recipient, amount, block.timestamp);
+    }
+    
+    /**
+     * @dev Distribute Support Purse payment from LiquidityPool
+     * @param recipient Recipient address
+     * @param amount Amount to pay
+     */
+    function distributeSupportPurse(address recipient, uint256 amount) external onlyRole(CORE_ROLE) {
+        require(recipient != address(0), "LiquidityPool: Invalid recipient");
+        require(amount > 0, "LiquidityPool: Invalid amount");
+        
+        uint256 balance = usdtToken.balanceOf(address(this));
+        require(amount <= balance, "LiquidityPool: Insufficient balance");
+        
+        usdtToken.transfer(recipient, amount);
+        emit SupportPursePaid(recipient, amount, block.timestamp);
     }
     
     /**
@@ -443,6 +520,15 @@ contract LiquidityPool is ReentrancyGuard, AccessControl {
     }
 
     /**
+     * @dev Grant REGISTRATION_ROLE to Registration contract
+     * @param account Address to grant role to
+     */
+    function grantRegistrationRole(address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(account != address(0), "LiquidityPool: Invalid account");
+        grantRole(REGISTRATION_ROLE, account);
+    }
+
+    /**
      * @dev Grant P2P_ROLE to AtomicP2p contract
      * @param account Address to grant role to
      */
@@ -459,4 +545,68 @@ contract LiquidityPool is ReentrancyGuard, AccessControl {
         emit P2PFeeReceived(amount, block.timestamp);
     }
 
+    /**
+     * @dev Grant POOL_ROLE to AchieversPools contract
+     * @param account Address to grant role to
+     */
+    function grantPoolRole(address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(account != address(0), "LiquidityPool: Invalid account");
+        grantRole(POOL_ROLE, account);
+    }
+
+    // ============ AchieversPools Functions ============
+
+    /**
+     * @dev Reserve pool contribution (called by Staking via AchieversPools)
+     * @param poolType 0 = Weekly Qualifiers Dividend, 1 = Monthly Qualifiers Dividend
+     * @param amount USDT amount to reserve
+     */
+    function reservePoolContribution(uint256 poolType, uint256 amount) external onlyRole(POOL_ROLE) {
+        poolBalances[poolType] += amount;
+    }
+
+    /**
+     * @dev Distribute pool reward to recipient
+     * @param recipient Reward recipient
+     * @param poolType 0 = Weekly Qualifiers Dividend, 1 = Monthly Qualifiers Dividend
+     * @param amount USDT amount to distribute
+     */
+    function distributePoolReward(address recipient, uint256 poolType, uint256 amount) external onlyRole(POOL_ROLE) {
+        require(recipient != address(0), "LiquidityPool: Invalid recipient");
+        require(amount > 0, "LiquidityPool: Invalid amount");
+        
+        uint256 balance = usdtToken.balanceOf(address(this));
+        require(amount <= balance, "LiquidityPool: Insufficient balance for pool reward");
+        require(amount <= poolBalances[poolType], "LiquidityPool: Insufficient pool balance");
+        
+        poolBalances[poolType] -= amount;
+        usdtToken.transfer(recipient, amount);
+    }
+
+    /**
+     * @dev Get pool balance
+     * @param poolType 0 = Elite, 1 = Peak
+     * @return balance Current pool balance
+     */
+    function getPoolBalance(uint256 poolType) external view returns (uint256 balance) {
+        return poolBalances[poolType];
+    }
+
+    // ============ Premature Exit Functions ============
+
+    /**
+     * @dev Distribute premature exit settlement to user
+     * @param recipient Recipient address
+     * @param amount USDT amount to pay
+     */
+    function distributePrematureExit(address recipient, uint256 amount) external onlyRole(CORE_ROLE) {
+        require(recipient != address(0), "LiquidityPool: Invalid recipient");
+        require(amount > 0, "LiquidityPool: Invalid amount");
+        
+        uint256 balance = usdtToken.balanceOf(address(this));
+        require(amount <= balance, "LiquidityPool: Insufficient balance for premature exit");
+        
+        usdtToken.transfer(recipient, amount);
+        emit PrematureExitPaid(recipient, amount, block.timestamp);
+    }
 }

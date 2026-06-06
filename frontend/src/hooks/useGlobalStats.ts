@@ -1,15 +1,16 @@
 'use client';
 
-import { useReadContract } from 'wagmi';
+import { useReadContract, useAccount } from 'wagmi';
 import { contracts, KAIRO_DECIMALS, USDT_DECIMALS } from '@/config/contracts';
 import { KAIROTokenABI } from '@/config/abis/KAIROToken';
 import { LiquidityPoolABI } from '@/config/abis/LiquidityPool';
 import { StakingManagerABI } from '@/config/abis/StakingManager';
 import { AtomicP2pABI } from '@/config/abis/AtomicP2p';
-import { erc20Abi } from 'viem';
+
 import { formatUnits } from 'viem';
 
 export function useGlobalStats() {
+  const { address } = useAccount();
   const { data: totalBurned } = useReadContract({
     address: contracts.kairoToken,
     abi: KAIROTokenABI,
@@ -49,14 +50,13 @@ export function useGlobalStats() {
     },
   });
 
-  // TVL = USDT balance in liquidity pool only
+  // TVL = getTotalValueLocked() from LiquidityPool (USDT + KAIRO value)
   const { data: tvl } = useReadContract({
-    address: contracts.usdt,
-    abi: erc20Abi,
-    functionName: 'balanceOf',
-    args: [contracts.liquidityPool],
+    address: contracts.liquidityPool,
+    abi: LiquidityPoolABI,
+    functionName: 'getTotalValueLocked',
     query: {
-      enabled: contracts.usdt !== '0x' && contracts.liquidityPool !== '0x',
+      enabled: contracts.liquidityPool !== '0x',
       refetchInterval: 15000,
     },
   });
@@ -75,8 +75,9 @@ export function useGlobalStats() {
     address: contracts.stakingManager,
     abi: StakingManagerABI,
     functionName: 'getGlobalCapProgress',
+    args: address ? [address] : undefined,
     query: {
-      enabled: contracts.stakingManager !== '0x',
+      enabled: !!address && contracts.stakingManager !== '0x',
       refetchInterval: 30000,
     },
   });
