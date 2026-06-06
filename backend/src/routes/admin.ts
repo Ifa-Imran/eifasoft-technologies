@@ -30,14 +30,11 @@ function requireAdminAuth(req: Request, res: Response, next: Function): void {
 
 // Rank thresholds (team volume in USD, matching contract RANK_THRESHOLDS)
 const RANK_THRESHOLDS = [
-    0,          // Rank 0 - no requirement
-    10_000,     // Rank 1
-    50_000,     // Rank 2
-    200_000,    // Rank 3
-    500_000,    // Rank 4
-    1_000_000,  // Rank 5
-    5_000_000,  // Rank 6
+    10_000, 30_000, 100_000, 300_000, 1_000_000,
+    3_000_000, 10_000_000, 30_000_000, 100_000_000, 250_000_000,
 ];
+
+const RANK_NAMES_LIST = ['None', 'Associate', 'Executive', 'Director', 'Vice President', 'Senior VP', 'Managing Director', 'Partner', 'Senior Partner', 'Global Leader', 'Chairman'];
 
 /**
  * Calculate rank for a single user based on team volume + direct referral count.
@@ -61,11 +58,11 @@ async function calculateUserRank(address: string): Promise<{
     const previousRank = userResult.rows[0]?.rank_level ?? 0;
     const tvNum = parseFloat(teamVolume);
 
-    // Determine highest eligible rank
+    // Determine highest eligible rank (just team volume based)
     let newRank = 0;
-    for (let i = RANK_THRESHOLDS.length - 1; i >= 1; i--) {
-        if (tvNum >= RANK_THRESHOLDS[i] && directCount >= i) {
-            newRank = i;
+    for (let i = RANK_THRESHOLDS.length - 1; i >= 0; i--) {
+        if (tvNum >= RANK_THRESHOLDS[i]) {
+            newRank = i + 1;
             break;
         }
     }
@@ -92,7 +89,7 @@ async function calculateUserRank(address: string): Promise<{
  * Body: { address?: string }
  * Trigger rank calculation for a specific user or all users
  */
-router.post('/admin/calculate-rank', requireAdminAuth, async (req: Request, res: Response) => {
+router.post('/admin/calculate-rank', requireAdminJWT, async (req: AdminRequest, res: Response) => {
     try {
         const { address } = req.body;
 
@@ -308,33 +305,48 @@ router.get('/admin/staking-volume', requireAdminJWT, async (req: AdminRequest, r
 // ============ NEW: Rank Holders List ============
 /**
  * GET /api/v1/admin/rank-holders
- * Returns all users with rank_level > 0, sorted by rank descending
+ * Returns all users who qualify for a rank based on team volume.
+ * Computes rank on-the-fly from team_volume in DB.
  */
 router.get('/admin/rank-holders', requireAdminJWT, async (req: AdminRequest, res: Response) => {
     try {
+        // Get all users with team_volume >= minimum rank threshold ($10,000)
         const result = await query(
             `SELECT u.wallet_address, u.rank_level, u.team_volume, u.total_staked_volume, u.created_at,
                     (SELECT COUNT(*)::int FROM referral_tree rt WHERE rt.ancestor = u.wallet_address AND rt.depth = 1) AS direct_count
              FROM users u
-             WHERE u.rank_level > 0
-             ORDER BY u.rank_level DESC, u.team_volume DESC`
+             WHERE COALESCE(u.team_volume, 0) >= $1
+             ORDER BY u.team_volume DESC`,
+            [RANK_THRESHOLDS[0]]
         );
 
-        const RANK_NAMES_LIST = ['None', 'Associate', 'Executive', 'Director', 'Vice President', 'Senior VP', 'Managing Director', 'Partner', 'Senior Partner', 'Global Leader', 'Chairman'];
+        const holders = result.rows.map((r: any) => {
+            const tv = parseFloat(r.team_volume || '0');
+            // Calculate rank on the fly
+            let computedRank = 0;
+            for (let i = RANK_THRESHOLDS.length - 1; i >= 0; i--) {
+                if (tv >= RANK_THRESHOLDS[i]) {
+                    computedRank = i + 1;
+                    break;
+                }
+            }
+            return {
+                wallet: r.wallet_address,
+                rankLevel: computedRank,
+                rankName: RANK_NAMES_LIST[computedRank] || `Rank ${computedRank}`,
+                teamVolume: r.team_volume,
+                personalVolume: r.total_staked_volume,
+                directCount: r.direct_count,
+                joinedAt: r.created_at,
+                dbRankLevel: r.rank_level,
+            };
+        }).filter((h: any) => h.rankLevel > 0);
 
         res.json({
             success: true,
             data: {
-                totalHolders: result.rows.length,
-                holders: result.rows.map((r: any) => ({
-                    wallet: r.wallet_address,
-                    rankLevel: r.rank_level,
-                    rankName: RANK_NAMES_LIST[r.rank_level] || `Rank ${r.rank_level}`,
-                    teamVolume: r.team_volume,
-                    personalVolume: r.total_staked_volume,
-                    directCount: r.direct_count,
-                    joinedAt: r.created_at,
-                })),
+                totalHolders: holders.length,
+                holders,
             },
         });
     } catch (error) {

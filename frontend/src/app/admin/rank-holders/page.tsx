@@ -33,6 +33,8 @@ export default function RankHoldersPage() {
   const [error, setError] = useState('');
   const [filterRank, setFilterRank] = useState<number | null>(null);
 
+  const [recalculating, setRecalculating] = useState(false);
+
   useEffect(() => {
     fetchRankHolders();
   }, []);
@@ -52,6 +54,27 @@ export default function RankHoldersPage() {
       setError('Network error');
     }
     setLoading(false);
+  };
+
+  const recalculateRanks = async () => {
+    setRecalculating(true);
+    setError('');
+    try {
+      const res = await apiFetch('/api/v1/admin/calculate-rank', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        await fetchRankHolders();
+      } else {
+        setError(json.error || 'Failed to recalculate ranks');
+      }
+    } catch {
+      setError('Network error during recalculation');
+    }
+    setRecalculating(false);
   };
 
   const filteredHolders = filterRank
@@ -79,19 +102,34 @@ export default function RankHoldersPage() {
           <h1 className="text-xl sm:text-2xl font-bold text-surface-900">Rank Holders</h1>
           <p className="text-sm text-surface-400 mt-1">All current ranked members in the system</p>
         </div>
-        <button
-          onClick={fetchRankHolders}
-          disabled={loading}
-          className="btn-primary flex items-center gap-2 self-start"
-        >
-          {loading && (
-            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-          )}
-          Refresh
-        </button>
+        <div className="flex gap-2 self-start">
+          <button
+            onClick={recalculateRanks}
+            disabled={recalculating || loading}
+            className="px-4 py-2 rounded-lg text-sm font-medium bg-amber-100 text-amber-700 hover:bg-amber-200 transition-all flex items-center gap-2"
+          >
+            {recalculating && (
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            )}
+            Recalculate
+          </button>
+          <button
+            onClick={fetchRankHolders}
+            disabled={loading}
+            className="btn-primary flex items-center gap-2"
+          >
+            {loading && (
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            )}
+            Refresh
+          </button>
+        </div>
       </div>
 
       {error && (
