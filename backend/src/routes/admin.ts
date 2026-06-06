@@ -67,12 +67,13 @@ async function calculateUserRank(address: string): Promise<{
         }
     }
 
-    // Persist if changed + log to rank_history
+    // Always persist team_volume (keeps cache fresh); persist rank + log if changed
+    await query(
+        'UPDATE users SET rank_level = $1, team_volume = $2, updated_at = NOW() WHERE wallet_address = $3',
+        [newRank, teamVolume, walletAddress]
+    );
+
     if (newRank !== previousRank) {
-        await query(
-            'UPDATE users SET rank_level = $1, team_volume = $2, updated_at = NOW() WHERE wallet_address = $3',
-            [newRank, teamVolume, walletAddress]
-        );
         // Log rank change for the Rank Promotion Tracker
         await query(
             `INSERT INTO rank_history (wallet_address, previous_rank, new_rank, team_volume, direct_count)
@@ -306,22 +307,40 @@ router.get('/admin/staking-volume', requireAdminJWT, async (req: AdminRequest, r
 /**
  * GET /api/v1/admin/rank-holders
  * Returns all users who qualify for a rank based on team volume.
- * Computes rank on-the-fly from team_volume in DB.
+ * Computes team volume LIVE from the referral_tree + total_staked_volume
+ * so results are accurate even if the cached team_volume column is stale.
  */
 router.get('/admin/rank-holders', requireAdminJWT, async (req: AdminRequest, res: Response) => {
     try {
-        // Get all users with team_volume >= minimum rank threshold ($10,000)
+        // Compute team volume live: sum of descendants' total_staked_volume
         const result = await query(
-            `SELECT u.wallet_address, u.rank_level, u.team_volume, u.total_staked_volume, u.created_at,
-                    (SELECT COUNT(*)::int FROM referral_tree rt WHERE rt.ancestor = u.wallet_address AND rt.depth = 1) AS direct_count
+            `SELECT
+                u.wallet_address,
+                u.rank_level,
+                u.total_staked_volume,
+                u.created_at,
+                COALESCE(tv.computed_team_volume, 0) AS computed_team_volume,
+                COALESCE(dc.direct_count, 0) AS direct_count
              FROM users u
-             WHERE COALESCE(u.team_volume, 0) >= $1
-             ORDER BY u.team_volume DESC`,
+             INNER JOIN (
+                 SELECT rt.ancestor, SUM(u2.total_staked_volume) AS computed_team_volume
+                 FROM referral_tree rt
+                 JOIN users u2 ON u2.wallet_address = rt.descendant
+                 WHERE rt.depth > 0
+                 GROUP BY rt.ancestor
+                 HAVING SUM(u2.total_staked_volume) >= $1
+             ) tv ON tv.ancestor = u.wallet_address
+             LEFT JOIN (
+                 SELECT ancestor, COUNT(*)::int AS direct_count
+                 FROM referral_tree WHERE depth = 1
+                 GROUP BY ancestor
+             ) dc ON dc.ancestor = u.wallet_address
+             ORDER BY tv.computed_team_volume DESC`,
             [RANK_THRESHOLDS[0]]
         );
 
         const holders = result.rows.map((r: any) => {
-            const tv = parseFloat(r.team_volume || '0');
+            const tv = parseFloat(r.computed_team_volume || '0');
             // Calculate rank on the fly
             let computedRank = 0;
             for (let i = RANK_THRESHOLDS.length - 1; i >= 0; i--) {
@@ -334,13 +353,21 @@ router.get('/admin/rank-holders', requireAdminJWT, async (req: AdminRequest, res
                 wallet: r.wallet_address,
                 rankLevel: computedRank,
                 rankName: RANK_NAMES_LIST[computedRank] || `Rank ${computedRank}`,
-                teamVolume: r.team_volume,
+                teamVolume: r.computed_team_volume,
                 personalVolume: r.total_staked_volume,
                 directCount: r.direct_count,
                 joinedAt: r.created_at,
                 dbRankLevel: r.rank_level,
             };
         }).filter((h: any) => h.rankLevel > 0);
+
+        // Also update the cached team_volume column for users we just computed
+        for (const h of holders) {
+            query(
+                'UPDATE users SET team_volume = $1, rank_level = $2, updated_at = NOW() WHERE wallet_address = $3',
+                [h.teamVolume, h.rankLevel, h.wallet]
+            ).catch(() => { /* best-effort cache update */ });
+        }
 
         res.json({
             success: true,
