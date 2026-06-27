@@ -50,11 +50,11 @@ export function useGlobalStats() {
     },
   });
 
-  // TVL = getTotalValueLocked() from LiquidityPool (USDT + KAIRO value)
+  // TVL = USDT balance only from pool (not including KAIRO token value)
   const { data: tvl } = useReadContract({
     address: contracts.liquidityPool,
     abi: LiquidityPoolABI,
-    functionName: 'getTotalValueLocked',
+    functionName: 'getBalances',
     query: {
       enabled: contracts.liquidityPool !== '0x',
       refetchInterval: 15000,
@@ -124,8 +124,8 @@ export function useGlobalStats() {
     effectiveSupplyFormatted: effectiveSupply ? formatUnits(effectiveSupply as bigint, KAIRO_DECIMALS) : '0',
     socialLockAmount: socialLockAmount as bigint | undefined,
     socialLockFormatted: socialLockAmount ? formatUnits(socialLockAmount as bigint, KAIRO_DECIMALS) : '0',
-    tvl: tvl as bigint | undefined,
-    tvlFormatted: tvl ? formatUnits(tvl as bigint, USDT_DECIMALS) : '0',
+    tvl: tvl ? BigInt((tvl as any)[0] || 0) : undefined,
+    tvlFormatted: tvl ? formatUnits(BigInt((tvl as any)[0] || 0), USDT_DECIMALS) : '0',
     swapStats: swapStats as any,
     globalCap: globalCap as any,
     orderBookStats: orderBookStats as any,

@@ -76,7 +76,6 @@ export default function Home() {
               { name: 'Liquidity Pool', address: contracts.liquidityPool },
               { name: 'Staking Manager', address: contracts.stakingManager },
               { name: 'Affiliate Distributor', address: contracts.affiliateDistributor },
-              { name: 'Core Membership (CMS)', address: contracts.cms },
               { name: 'Atomic P2P Exchange', address: contracts.atomicP2p },
               { name: IS_TESTNET ? 'USDT (opBNB Testnet)' : 'USDT (opBNB)', address: contracts.usdt },
             ].map((contract) => (
