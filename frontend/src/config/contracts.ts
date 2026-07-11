@@ -32,7 +32,7 @@ export function getExplorerAddressUrl(address: string) {
 export const STAKING_TIERS = [
   { name: 'Bronze', minAmount: 10, maxAmount: 499, compoundInterval: IS_TESTNET ? 180 : 8 * 60 * 60, color: '#CD7F32' },
   { name: 'Silver', minAmount: 500, maxAmount: 1999, compoundInterval: IS_TESTNET ? 120 : 6 * 60 * 60, color: '#C0C0C0' },
-  { name: 'Gold', minAmount: 2000, maxAmount: Infinity, compoundInterval: IS_TESTNET ? 60 : 4 * 60 * 60, color: '#FFD700' },
+  { name: 'Gold', minAmount: 2000, maxAmount: Infinity, compoundInterval: IS_TESTNET ? 60 : 5 * 60 * 60, color: '#FFD700' },
 ] as const;
 
 export const RANK_NAMES = [
