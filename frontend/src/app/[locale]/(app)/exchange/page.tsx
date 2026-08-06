@@ -175,7 +175,7 @@ export default function ExchangePage() {
           <p className="text-xl font-mono font-bold text-surface-900">{activeSellOrders.length}</p>
           <p className="text-xs text-surface-500">{totalSellVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KAIRO</p>
         </GlassCard>
-        <GlassCard padding="p-4">
+        <GlassCard padding="p-4" className="col-span-2 md:col-span-1">
           <p className="text-[10px] uppercase tracking-wider text-surface-400 mb-1">{t('trades24h')}</p>
           <p className="text-xl font-mono font-bold text-primary-600">{p2pFilledTrades}</p>
           <p className="text-xs text-surface-500">${p2pTotalVolume.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {t('vol')}</p>

@@ -41,7 +41,7 @@ export function BottomNav() {
               )}
             >
               <item.icon className="w-5 h-5" />
-              <span className="text-[10px] font-medium">{tNav(item.labelKey)}</span>
+              <span className="text-[10px] font-medium text-center whitespace-nowrap">{tNav(item.labelKey)}</span>
             </Link>
           );
         })}
