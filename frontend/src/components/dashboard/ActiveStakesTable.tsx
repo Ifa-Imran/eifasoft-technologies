@@ -5,11 +5,13 @@ import { useUserStakes } from '@/hooks/useUserStakes';
 import { useStaking } from '@/hooks/useStaking';
 import { useEffect, useState } from 'react';
 import { ArrowDownTrayIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { useTranslations } from 'next-intl';
 
 export function ActiveStakesTable() {
   const { tierGroups, isLoading } = useUserStakes();
   const { harvestTier, compoundTier, isPending, isCompounding } = useStaking();
   const [now, setNow] = useState(Math.floor(Date.now() / 1000));
+  const t = useTranslations('activeStakesTable');
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
@@ -19,10 +21,10 @@ export function ActiveStakesTable() {
   if (isLoading) {
     return (
       <GlassCard>
-        <h3 className="text-lg font-semibold text-surface-900 mb-4">Active Stakes</h3>
+        <h3 className="text-lg font-semibold text-surface-900 mb-4">{t('title')}</h3>
         <div className="flex items-center gap-2 text-surface-400 text-sm">
           <div className="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-          Loading stakes...
+          {t('loading')}
         </div>
       </GlassCard>
     );
@@ -31,9 +33,9 @@ export function ActiveStakesTable() {
   if (tierGroups.length === 0) {
     return (
       <GlassCard>
-        <h3 className="text-lg font-semibold text-surface-900 mb-4">Active Stakes</h3>
+        <h3 className="text-lg font-semibold text-surface-900 mb-4">{t('title')}</h3>
         <div className="text-center py-8">
-          <p className="text-surface-500 text-sm">No active stakes. Start staking to earn rewards!</p>
+          <p className="text-surface-500 text-sm">{t('empty')}</p>
         </div>
       </GlassCard>
     );
@@ -42,8 +44,8 @@ export function ActiveStakesTable() {
   return (
     <GlassCard padding="p-0">
       <div className="p-6 pb-4 flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-surface-900">Active Stakes</h3>
-        <span className="text-xs font-mono text-surface-400">{tierGroups.length} tier(s)</span>
+        <h3 className="text-lg font-semibold text-surface-900">{t('title')}</h3>
+        <span className="text-xs font-mono text-surface-400">{t('tierCount', { count: tierGroups.length })}</span>
       </div>
       <div className="space-y-4 p-6 pt-0">
         {tierGroups.map((tg) => {
@@ -54,10 +56,10 @@ export function ActiveStakesTable() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Badge tier={tg.tierName.toLowerCase() as 'bronze' | 'silver' | 'gold'}>{tg.tierName}</Badge>
-                  <span className="text-xs text-surface-400">{tg.stakeCount} stake{tg.stakeCount > 1 ? 's' : ''}</span>
+                  <span className="text-xs text-surface-400">{t('stakeCount', { count: tg.stakeCount })}</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-[10px] text-surface-500 font-medium">
-                  Auto Compound &middot; {tg.compoundInterval >= 3600 ? `${tg.compoundInterval / 3600}h` : `${tg.compoundInterval / 60}m`} intervals
+                  {t('autoCompound')} &middot; {tg.compoundInterval >= 3600 ? `${tg.compoundInterval / 3600}h` : `${tg.compoundInterval / 60}m`} {t('intervals')}
                 </div>
               </div>
 
@@ -65,29 +67,29 @@ export function ActiveStakesTable() {
                 <p className="text-2xl font-mono font-bold text-surface-900">
                   ${tg.originalAmountFormatted}
                 </p>
-                <p className="text-xs text-surface-400 mt-0.5">Staked Amount</p>
+                <p className="text-xs text-surface-400 mt-0.5">{t('stakedAmount')}</p>
               </div>
 
-              <ProgressBar value={tg.capProgress} label="3X Cap Progress" variant={progressVariant} />
+              <ProgressBar value={tg.capProgress} label={t('capProgress')} variant={progressVariant} />
 
               <div className="grid grid-cols-3 gap-2 text-xs">
                 <div className="p-2 rounded-lg bg-accent-50 text-center">
-                  <p className="text-surface-400">Harvestable</p>
+                  <p className="text-surface-400">{t('harvestable')}</p>
                   <p className="font-mono font-semibold text-accent-700">${tg.displayHarvestableFormatted}</p>
                 </div>
                 <div className="p-2 rounded-lg bg-secondary-50 text-center">
-                  <p className="text-surface-400">Harvested</p>
+                  <p className="text-surface-400">{t('harvested')}</p>
                   <p className="font-mono font-semibold text-secondary-700">${tg.totalHarvestedFormatted}</p>
                 </div>
                 <div className="p-2 rounded-lg bg-primary-50 text-center">
-                  <p className="text-surface-400">Total Earned</p>
+                  <p className="text-surface-400">{t('totalEarned')}</p>
                   <p className="font-mono font-semibold text-primary-700">${tg.totalEarnedFormatted}</p>
                 </div>
               </div>
 
               {tg.pendingProfit > 0n && (
                 <div className="flex items-center justify-between p-2 rounded-lg bg-primary-50/60 border border-primary-200/60">
-                  <span className="text-[11px] text-surface-500">Pending compound profit</span>
+                  <span className="text-[11px] text-surface-500">{t('pendingCompoundProfit')}</span>
                   <span className="font-mono font-semibold text-primary-700 text-xs">+${tg.pendingProfitFormatted}</span>
                 </div>
               )}
@@ -95,7 +97,6 @@ export function ActiveStakesTable() {
               {(() => {
                 const eligibleCount = tg.stakes.filter((s) => s.canCompound).length;
                 const canCompound = eligibleCount > 0;
-                const minHarvest = BigInt(10) * BigInt(10 ** 18);
                 return (
                   <div className="grid grid-cols-2 gap-2">
                     <Button
@@ -106,16 +107,20 @@ export function ActiveStakesTable() {
                       disabled={!canCompound || isPending}
                       icon={<ArrowPathIcon className="w-3.5 h-3.5" />}
                     >
-                      {canCompound ? `Auto Compound (${eligibleCount})` : 'Accruing'}
+                      {canCompound ? t('autoCompoundBtn', { count: eligibleCount }) : t('accruing')}
                     </Button>
                     <Button
                       size="sm"
                       onClick={() => harvestTier(tg.stakes)}
                       loading={isPending && !isCompounding}
-                      disabled={tg.harvestable < minHarvest || isCompounding}
+                      disabled={!tg.canHarvest || isCompounding}
                       icon={<ArrowDownTrayIcon className="w-3.5 h-3.5" />}
                     >
-                      {tg.harvestable >= minHarvest ? `Harvest $${tg.harvestableFormatted}` : 'Min $10'}
+                      {tg.canHarvest
+                        ? t('harvest', { amount: tg.actuallyHarvestableFormatted })
+                        : tg.harvestable > 0n
+                          ? t('minHarvestStake')
+                          : t('minHarvestAmount')}
                     </Button>
                   </div>
                 );

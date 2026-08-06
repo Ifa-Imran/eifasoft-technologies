@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { Link, usePathname } from '@/i18n/navigation';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -16,14 +16,14 @@ import {
 } from '@heroicons/react/24/outline';
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: HomeIcon },
-  { href: '/stake', label: 'Stake', icon: CurrencyDollarIcon },
-  { href: '/exchange', label: 'Atomic P2P', icon: ArrowsRightLeftIcon },
-  { href: '/referrals', label: 'Rank Dividend', icon: UserGroupIcon },
-  { href: '/team-dividend', label: 'Team Dividend', icon: UsersIcon },
-  { href: '/swap', label: 'Swap', icon: ArrowPathIcon },
-  { href: '/analytics', label: 'Analytics', icon: ChartBarIcon },
-];
+  { href: '/dashboard', labelKey: 'dashboard', icon: HomeIcon },
+  { href: '/stake', labelKey: 'stake', icon: CurrencyDollarIcon },
+  { href: '/exchange', labelKey: 'atomicP2p', icon: ArrowsRightLeftIcon },
+  { href: '/referrals', labelKey: 'rankDividend', icon: UserGroupIcon },
+  { href: '/team-dividend', labelKey: 'teamDividend', icon: UsersIcon },
+  { href: '/swap', labelKey: 'swap', icon: ArrowPathIcon },
+  { href: '/analytics', labelKey: 'analytics', icon: ChartBarIcon },
+] as const;
 
 interface SidebarProps {
   collapsed: boolean;
@@ -34,6 +34,8 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
+  const tNav = useTranslations('nav');
+  const tCommon = useTranslations('common');
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
@@ -74,7 +76,7 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
               )}
             >
               <item.icon className={cn('w-5 h-5 flex-shrink-0', isActive && 'text-primary-600')} />
-              {!collapsed && <span>{item.label}</span>}
+              {!collapsed && <span>{tNav(item.labelKey)}</span>}
             </Link>
           );
         })}
@@ -84,10 +86,10 @@ export function Sidebar({ collapsed, onToggle, mobileOpen, onMobileClose }: Side
       {!collapsed && (
         <div className="p-4">
           <div className="p-3 rounded-xl bg-gradient-to-br from-primary-100 to-secondary-100 border-2 border-primary-200/60">
-            <p className="text-xs text-surface-600 font-medium">opBNB Network</p>
+            <p className="text-xs text-surface-600 font-medium">{tCommon('opBNBNetwork')}</p>
             <div className="flex items-center gap-1.5 mt-1">
               <div className="w-2 h-2 rounded-full bg-success-500 animate-pulse" />
-              <span className="text-xs text-success-600 font-medium">Connected</span>
+              <span className="text-xs text-success-600 font-medium">{tCommon('connected')}</span>
             </div>
           </div>
         </div>

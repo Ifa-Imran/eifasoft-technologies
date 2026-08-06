@@ -9,6 +9,7 @@ import { useTokenBalances } from '@/hooks/useTokenBalances';
 import { contracts, IS_TESTNET, USDT_DECIMALS, getExplorerAddressUrl } from '@/config/contracts';
 import { MockUSDTABI } from '@/config/abis/MockUSDT';
 import { BeakerIcon } from '@heroicons/react/24/outline';
+import { useTranslations } from 'next-intl';
 
 /**
  * Testnet-only widget that lets the connected wallet mint test USDT.
@@ -24,6 +25,7 @@ export function MockUsdtFaucet() {
   const { usdtFormatted } = useTokenBalances();
   const [pending, setPending] = useState(false);
   const [customAmount, setCustomAmount] = useState('');
+  const t = useTranslations('faucet');
 
   // Hide entirely on mainnet
   if (!IS_TESTNET) return null;
@@ -36,7 +38,7 @@ export function MockUsdtFaucet() {
     if (!publicClient) return;
     try {
       setPending(true);
-      toast({ type: 'pending', title: 'Minting test USDT…', description: 'Sending 10,000 USDT to your wallet' });
+      toast({ type: 'pending', title: t('mintingPending'), description: t('mintingDesc', { amount: '10,000' }) });
       const hash = await writeContractAsync({
         address: contracts.usdt,
         abi: MockUSDTABI,
@@ -44,9 +46,9 @@ export function MockUsdtFaucet() {
         args: [],
       });
       await publicClient.waitForTransactionReceipt({ hash });
-      toast({ type: 'success', title: 'Minted 10,000 test USDT', txHash: hash });
+      toast({ type: 'success', title: t('mintedSuccess', { amount: '10,000' }), txHash: hash });
     } catch (err: any) {
-      toast({ type: 'error', title: 'Mint failed', description: err?.shortMessage || err?.message?.slice(0, 120) });
+      toast({ type: 'error', title: t('mintFailed'), description: err?.shortMessage || err?.message?.slice(0, 120) });
     } finally {
       setPending(false);
     }
@@ -61,12 +63,12 @@ export function MockUsdtFaucet() {
       amountWei = parseUnits(trimmed, USDT_DECIMALS);
       if (amountWei <= 0n) throw new Error('Amount must be > 0');
     } catch (err: any) {
-      toast({ type: 'error', title: 'Invalid amount', description: err?.message?.slice(0, 120) });
+      toast({ type: 'error', title: t('invalidAmount'), description: err?.message?.slice(0, 120) });
       return;
     }
     try {
       setPending(true);
-      toast({ type: 'pending', title: 'Minting test USDT…', description: `Sending ${trimmed} USDT to your wallet` });
+      toast({ type: 'pending', title: t('mintingPending'), description: t('mintingDesc', { amount: trimmed }) });
       const hash = await writeContractAsync({
         address: contracts.usdt,
         abi: MockUSDTABI,
@@ -74,10 +76,10 @@ export function MockUsdtFaucet() {
         args: [address, amountWei],
       });
       await publicClient.waitForTransactionReceipt({ hash });
-      toast({ type: 'success', title: `Minted ${trimmed} test USDT`, txHash: hash });
+      toast({ type: 'success', title: t('mintedSuccess', { amount: trimmed }), txHash: hash });
       setCustomAmount('');
     } catch (err: any) {
-      toast({ type: 'error', title: 'Mint failed', description: err?.shortMessage || err?.message?.slice(0, 120) });
+      toast({ type: 'error', title: t('mintFailed'), description: err?.shortMessage || err?.message?.slice(0, 120) });
     } finally {
       setPending(false);
     }
@@ -92,10 +94,10 @@ export function MockUsdtFaucet() {
           </div>
           <div>
             <p className="text-xs uppercase tracking-wider font-semibold text-warn-600">
-              Testnet Faucet · Mock USDT
+              {t('testnetFaucet')}
             </p>
             <p className="text-sm text-surface-700 mt-0.5">
-              Mint test USDT for development. Current balance:{' '}
+              {t('mintDesc')}{' '}
               <span className="font-mono font-semibold text-surface-900">
                 {usdtBalanceNum.toLocaleString('en-US', { maximumFractionDigits: 2 })} USDT
               </span>
@@ -119,14 +121,14 @@ export function MockUsdtFaucet() {
             disabled={pending}
             onClick={callFaucet}
           >
-            Mint 10,000 USDT
+            {t('mint10000')}
           </Button>
 
           <div className="flex items-center gap-2">
             <input
               type="number"
               min="0"
-              placeholder="custom"
+              placeholder={t('customPlaceholder')}
               value={customAmount}
               onChange={(e) => setCustomAmount(e.target.value)}
               className="w-28 px-3 py-1.5 text-sm rounded-lg border border-surface-200 focus:outline-none focus:ring-2 focus:ring-warn-300 bg-white"
@@ -139,7 +141,7 @@ export function MockUsdtFaucet() {
               disabled={pending || !customAmount.trim()}
               onClick={callMintCustom}
             >
-              Mint
+              {t('mint')}
             </Button>
           </div>
         </div>

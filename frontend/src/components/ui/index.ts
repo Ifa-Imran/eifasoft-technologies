@@ -10,3 +10,4 @@ export { Input } from './Input';
 export { ToastProvider, useToast } from './Toast';
 export { AnimatedCounter } from './AnimatedCounter';
 export { Tooltip } from './Tooltip';
+export { LanguageSwitcher } from './LanguageSwitcher';

@@ -4,6 +4,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useKairoPrice } from '@/hooks/useKairoPrice';
 import { formatPrice } from '@/lib/utils';
 import { Bars3Icon } from '@heroicons/react/24/outline';
+import { LanguageSwitcher } from '@/components/ui';
 
 interface NavbarProps {
   onMenuToggle: () => void;
@@ -38,6 +39,7 @@ export function Navbar({ onMenuToggle }: NavbarProps) {
 
         {/* Right */}
         <div className="flex items-center gap-3">
+          <LanguageSwitcher />
           <ConnectButton
             chainStatus="icon"
             accountStatus={{ smallScreen: 'avatar', largeScreen: 'full' }}

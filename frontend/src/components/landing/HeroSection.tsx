@@ -7,10 +7,12 @@ import { useKairoPrice } from '@/hooks/useKairoPrice';
 import { useGlobalStats } from '@/hooks/useGlobalStats';
 import { formatPrice } from '@/lib/utils';
 import { IS_TESTNET } from '@/config/contracts';
+import { useTranslations } from 'next-intl';
 
 export function HeroSection() {
   const { price } = useKairoPrice();
   const { tvlFormatted } = useGlobalStats();
+  const t = useTranslations('hero');
 
   return (
     <section className="relative min-h-[85vh] flex items-center justify-center overflow-hidden">
@@ -30,13 +32,13 @@ export function HeroSection() {
         >
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-primary-50 to-secondary-50 backdrop-blur-sm border-2 border-primary-300/50 mb-8 shadow-sm shadow-primary-200/30">
             <div className="w-2 h-2 rounded-full bg-success-500 animate-pulse" />
-            <span className="text-sm text-surface-600 font-medium">Live on opBNB {IS_TESTNET ? 'Testnet' : 'Mainnet'}</span>
+            <span className="text-sm text-surface-600 font-medium">{t('liveOn', { network: IS_TESTNET ? t('testnet') : t('mainnet') })}</span>
           </div>
 
           <h1 className="font-orbitron text-6xl md:text-8xl lg:text-9xl font-bold mb-6 leading-tight">
             <span className="gradient-text">KAIRO</span>
             <br />
-            <span className="text-surface-800 text-3xl md:text-5xl lg:text-6xl">Aurora Financial Ecosystem</span>
+            <span className="text-surface-800 text-3xl md:text-5xl lg:text-6xl">{t('headline')}</span>
           </h1>
         </motion.div>
 
@@ -46,7 +48,7 @@ export function HeroSection() {
           transition={{ duration: 0.8, delay: 0.2 }}
           className="text-surface-500 text-lg md:text-2xl max-w-2xl mx-auto mb-8 leading-relaxed"
         >
-          Stake, trade, earn rewards, and grow your network with the next-gen DeFi protocol on opBNB.
+          {t('subheadline')}
         </motion.p>
 
         {/* Live Stats Pills */}
@@ -96,16 +98,16 @@ export function HeroSection() {
         >
           <div className="relative rounded-2xl border-2 border-accent-400/60 bg-gradient-to-r from-accent-50/80 via-primary-50/50 to-secondary-50/80 backdrop-blur-sm p-5 shadow-lg shadow-accent-200/30">
             <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-accent-500 text-white text-xs font-bold uppercase tracking-wider">
-              Deployer Key Published
+              {t('deployerKeyPublished')}
             </div>
             <p className="text-surface-600 text-sm mb-2 mt-1 text-center">
-              All admin roles have been <span className="font-bold text-danger-600">permanently burned</span>. No one can modify contracts.
+              {t('adminRolesBurned')}
             </p>
             <div className="bg-surface-900 rounded-xl px-4 py-3 font-mono text-xs sm:text-sm text-accent-400 break-all text-center select-all cursor-pointer hover:bg-surface-800 transition-colors">
               b15b1d77227020119726ed001ed65bca8063ecaed34ce2959ff60302a4958c16
             </div>
             <p className="text-surface-400 text-xs mt-2 text-center">
-              Deployer: 0x5f1DcDaBaa4df191C9faEf933583D6B7721b3268 &middot; Zero privileges remaining
+              Deployer: 0x5f1DcDaBaa4df191C9faEf933583D6B7721b3268 &middot; {t('zeroPrivileges')}
             </p>
           </div>
         </motion.div>

@@ -1,13 +1,13 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { Link, usePathname } from '@/i18n/navigation';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 
 const navItems = [
   {
-    label: 'Staking Volume',
+    labelKey: 'stakingVolume',
     href: '/admin/staking-volume',
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -16,7 +16,7 @@ const navItems = [
     ),
   },
   {
-    label: 'Rank Promotions',
+    labelKey: 'rankPromotions',
     href: '/admin/rank-promotions',
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -25,7 +25,7 @@ const navItems = [
     ),
   },
   {
-    label: 'Disbursements',
+    labelKey: 'disbursements',
     href: '/admin/disbursements',
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -34,7 +34,7 @@ const navItems = [
     ),
   },
   {
-    label: 'Rank Holders',
+    labelKey: 'rankHolders',
     href: '/admin/rank-holders',
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -42,7 +42,7 @@ const navItems = [
       </svg>
     ),
   },
-];
+] as const;
 
 interface AdminSidebarProps {
   isOpen: boolean;
@@ -52,6 +52,7 @@ interface AdminSidebarProps {
 export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
   const pathname = usePathname();
   const { username, logout } = useAdminAuth();
+  const tAdmin = useTranslations('admin');
 
   return (
     <>
@@ -73,8 +74,8 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
         {/* Header */}
         <div className="p-6 border-b border-primary-100 flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-bold gradient-text">KAIRO Admin</h1>
-            <p className="text-xs text-surface-400 mt-1">Management Panel</p>
+            <h1 className="text-lg font-bold gradient-text">{tAdmin('title')}</h1>
+            <p className="text-xs text-surface-400 mt-1">{tAdmin('subtitle')}</p>
           </div>
           {/* Close button - mobile only */}
           <button
@@ -104,7 +105,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
                 )}
               >
                 {item.icon}
-                {item.label}
+                {tAdmin(item.labelKey)}
               </Link>
             );
           })}
@@ -115,12 +116,12 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-surface-700">{username}</p>
-              <p className="text-xs text-surface-400">Admin</p>
+              <p className="text-xs text-surface-400">{tAdmin('adminRole')}</p>
             </div>
             <button
               onClick={logout}
               className="p-2 rounded-lg text-surface-400 hover:text-danger-500 hover:bg-danger-50 transition-all"
-              title="Logout"
+              title={tAdmin('logout')}
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

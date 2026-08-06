@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { Link, usePathname } from '@/i18n/navigation';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import {
   HomeIcon,
@@ -13,15 +13,16 @@ import {
 } from '@heroicons/react/24/outline';
 
 const items = [
-  { href: '/dashboard', label: 'Home', icon: HomeIcon },
-  { href: '/stake', label: 'Stake', icon: CurrencyDollarIcon },
-  { href: '/exchange', label: 'P2P', icon: ArrowsRightLeftIcon },
-  { href: '/referrals', label: 'Rank', icon: UserGroupIcon },
-  { href: '/team-dividend', label: 'Team', icon: UsersIcon },
-];
+  { href: '/dashboard', labelKey: 'home', icon: HomeIcon },
+  { href: '/stake', labelKey: 'stake', icon: CurrencyDollarIcon },
+  { href: '/exchange', labelKey: 'p2p', icon: ArrowsRightLeftIcon },
+  { href: '/referrals', labelKey: 'rankDividend', icon: UserGroupIcon },
+  { href: '/team-dividend', labelKey: 'teamDividend', icon: UsersIcon },
+] as const;
 
 export function BottomNav() {
   const pathname = usePathname();
+  const tNav = useTranslations('nav');
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 lg:hidden bg-white/90 backdrop-blur-xl border-t border-surface-200">
@@ -40,7 +41,7 @@ export function BottomNav() {
               )}
             >
               <item.icon className="w-5 h-5" />
-              <span className="text-[10px] font-medium">{item.label}</span>
+              <span className="text-[10px] font-medium">{tNav(item.labelKey)}</span>
             </Link>
           );
         })}

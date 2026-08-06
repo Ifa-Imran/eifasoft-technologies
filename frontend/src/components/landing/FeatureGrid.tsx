@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { GlassCard } from '@/components/ui';
+import { useTranslations } from 'next-intl';
 import {
   CurrencyDollarIcon,
   ArrowsRightLeftIcon,
@@ -13,56 +14,57 @@ import {
 
 const features = [
   {
-    title: '3-Tier Staking',
-    description: 'Bronze, Silver, Gold tiers with manual compounding and 3X FIFO hard cap returns.',
+    titleKey: 'staking',
+    descKey: 'gridStakingDesc',
     icon: CurrencyDollarIcon,
     iconBg: 'from-primary-500 to-primary-300',
     iconColor: 'text-white',
     cardVariant: 'cyan' as const,
   },
   {
-    title: 'Atomic P2P Exchange',
-    description: 'Trustless KAIRO/USDT trading with escrow protection and instant settlement.',
+    titleKey: 'p2p',
+    descKey: 'gridP2PDesc',
     icon: ArrowsRightLeftIcon,
     iconBg: 'from-secondary-500 to-secondary-300',
     iconColor: 'text-white',
     cardVariant: 'purple' as const,
   },
   {
-    title: '15-Level Referral System',
-    description: 'Earn multi-level commissions with automated team dividend distribution.',
+    titleKey: 'referral',
+    descKey: 'gridReferralDesc',
     icon: UserGroupIcon,
     iconBg: 'from-success-500 to-success-300',
     iconColor: 'text-white',
     cardVariant: 'cyan' as const,
   },
   {
-    title: '10-Rank Progression',
-    description: 'Climb from Star to Crown Diamond with increasing rank salary rewards.',
+    titleKey: 'ranks',
+    descKey: 'gridRanksDesc',
     icon: TrophyIcon,
     iconBg: 'from-accent-500 to-accent-300',
     iconColor: 'text-white',
     cardVariant: 'gold' as const,
   },
   {
-    title: 'Deflationary Burn',
-    description: 'Continuous KAIRO burn from swap and trading fees reduces supply over time.',
+    titleKey: 'burn',
+    descKey: 'burnDesc',
     icon: FireIcon,
     iconBg: 'from-danger-500 to-danger-300',
     iconColor: 'text-white',
     cardVariant: 'purple' as const,
   },
   {
-    title: 'One-Way AMM Swap',
-    description: 'Swap KAIRO for USDT with dynamic pricing and deflationary burn mechanics.',
+    titleKey: 'swap',
+    descKey: 'swapDesc',
     icon: ArrowPathIcon,
     iconBg: 'from-primary-500 to-secondary-400',
     iconColor: 'text-white',
     cardVariant: 'gold' as const,
   },
-];
+] as const;
 
 export function FeatureGrid() {
+  const t = useTranslations('features');
   return (
     <section className="py-16">
       <div className="max-w-6xl mx-auto px-4">
@@ -72,7 +74,7 @@ export function FeatureGrid() {
           viewport={{ once: true }}
           className="text-3xl md:text-4xl font-orbitron font-bold text-center text-surface-900 mb-4"
         >
-          Powered by <span className="gradient-text">Smart Contracts</span>
+          {t('poweredBy')}
         </motion.h2>
         <motion.p
           initial={{ opacity: 0, y: 10 }}
@@ -80,13 +82,13 @@ export function FeatureGrid() {
           viewport={{ once: true }}
           className="text-center text-surface-500 max-w-xl mx-auto mb-12"
         >
-          A complete DeFi ecosystem built on opBNB with transparent, auditable smart contracts.
+          {t('poweredByDesc')}
         </motion.p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {features.map((feature, i) => (
             <motion.div
-              key={feature.title}
+              key={feature.titleKey}
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -97,9 +99,9 @@ export function FeatureGrid() {
                   <feature.icon className={`w-7 h-7 ${feature.iconColor}`} />
                 </div>
                 <h3 className="text-xl font-bold text-surface-900 mb-2">
-                  {feature.title}
+                  {t(feature.titleKey)}
                 </h3>
-                <p className="text-surface-500 text-base leading-relaxed">{feature.description}</p>
+                <p className="text-surface-500 text-base leading-relaxed">{t(feature.descKey)}</p>
               </GlassCard>
             </motion.div>
           ))}
