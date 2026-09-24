@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "title": "KAIRO DAO | Aurora Finansal Ekosistemi",
+    "title": "KAIRO PROTOCOL | Aurora Finansal Ekosistemi",
     "description": "KAIRO ile stake et, takas et, ödüller kazan ve ağınızı büyütün — opBNB üzerinde yeni nesil DeFi protokolü.",
     "ogLocale": "tr_TR"
   },
@@ -35,7 +35,7 @@
   },
   "landing": {
     "getStarted": "Başla",
-    "getStartedDescription": "KAIRO DAO Aurora Finansal Ekosistemine erişmek için cüzdanınızı bağlayın.",
+    "getStartedDescription": "KAIRO PROTOCOL Aurora Finansal Ekosistemine erişmek için cüzdanınızı bağlayın.",
     "verifiedContracts": "Doğrulanmış Akıllı Sözleşmeler",
     "verifiedContractsDescription": "Tüm sözleşmeler {network} üzerinde doğrulanmış ve açık kaynaktır.",
     "checkingAccount": "Hesabınız kontrol ediliyor..."
@@ -331,7 +331,7 @@
     "contracts": "Doğrulanmış Sözleşmeler",
     "docs": "Dokümantasyon",
     "community": "Topluluk",
-    "copyright": "© 2026 KAIRO DAO. Tüm hakları saklıdır."
+    "copyright": "© 2026 KAIRO PROTOCOL. Tüm hakları saklıdır."
   },
   "language": {
     "switchLabel": "Dil",
@@ -366,12 +366,12 @@
     "rankHolders": "Rütbe Sahipleri"
   },
   "register": {
-    "title": "KAIRO DAO'ya Katıl",
-    "connectPrompt": "KAIRO DAO Ekosistemine başlamak için cüzdanınızı bağlayın.",
+    "title": "KAIRO PROTOCOL'ya Katıl",
+    "connectPrompt": "KAIRO PROTOCOL Ekosistemine başlamak için cüzdanınızı bağlayın.",
     "checkingStatus": "Kayıt durumu kontrol ediliyor...",
     "registering": "Kaydediliyor...",
     "registerButton": "Blockchain'e Kaydol",
-    "formPrompt": "KAIRO DAO Ekosistemine katılmak için zincin üstünde kaydolun.",
+    "formPrompt": "KAIRO PROTOCOL Ekosistemine katılmak için zincin üstünde kaydolun.",
     "referrerLabel": "Davet Eden",
     "referrerPlaceholder": "0x... davet eden adresi",
     "referrerVerified": "Davet eden bağlantınızdan doğrulandı",
@@ -594,6 +594,30 @@
     "stakingEarnings": "Staking Kazançları",
     "harvestedLabel": "Hasatlandı",
     "harvestableLabel": "Hasatlanabilir"
+  },
+  "p2pHistory": {
+    "title": "P2P Emir Geçmişi",
+    "subtitle": "Tüm P2P emirleriniz için eksiksiz işlem kaydı",
+    "totalOrders": "{count} emir",
+    "placed": "Açıldı",
+    "executed": "Gerçekleşti",
+    "canceled": "İptal edildi",
+    "totalTrades": "İşlemler",
+    "filterAll": "Tümü",
+    "loading": "Emir geçmişi yükleniyor...",
+    "noOrders": "Henüz P2P emri yok",
+    "noOrdersDesc": "Geçmişinizi görmek için Exchange sayfasında bir alım veya satım emri oluşturun.",
+    "trade": "{count} işlem",
+    "originalAmount": "Orijinal Tutar",
+    "filledAmount": "Gerçekleşen",
+    "remainingAmount": "Kalan",
+    "fillProgress": "Doluluk İlerlemesi",
+    "executionHistory": "Gerçekleşme Geçmişi",
+    "asRole": "{role} olarak",
+    "roleBuyer": "alıcı",
+    "roleSeller": "satıcı",
+    "price": "Fiyat",
+    "noTradesYet": "Bu emir için henüz işlem gerçekleşmedi"
   },
   "faucet": {
     "testnetFaucet": "Testnet Musluğu · Sahte USDT",

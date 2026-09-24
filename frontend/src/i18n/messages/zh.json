@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "title": "KAIRO DAO | Aurora 金融生态系统",
+    "title": "KAIRO PROTOCOL | Aurora 金融生态系统",
     "description": "质押、交易、赚取奖励并扩展您的网络，使用 KAIRO — opBNB 上的下一代 DeFi 协议。",
     "ogLocale": "zh_CN"
   },
@@ -35,7 +35,7 @@
   },
   "landing": {
     "getStarted": "开始使用",
-    "getStartedDescription": "连接您的钱包以访问 KAIRO DAO Aurora 金融生态系统。",
+    "getStartedDescription": "连接您的钱包以访问 KAIRO PROTOCOL Aurora 金融生态系统。",
     "verifiedContracts": "已验证的智能合约",
     "verifiedContractsDescription": "所有合约均已在 {network} 上验证并开源。",
     "checkingAccount": "正在检查您的账户..."
@@ -331,7 +331,7 @@
     "contracts": "已验证合约",
     "docs": "文档",
     "community": "社区",
-    "copyright": "© 2026 KAIRO DAO。保留所有权利。"
+    "copyright": "© 2026 KAIRO PROTOCOL。保留所有权利。"
   },
   "language": {
     "switchLabel": "语言",
@@ -366,12 +366,12 @@
     "rankHolders": "等级持有者"
   },
   "register": {
-    "title": "加入 KAIRO DAO",
-    "connectPrompt": "连接您的钱包以开始使用 KAIRO DAO 生态系统。",
+    "title": "加入 KAIRO PROTOCOL",
+    "connectPrompt": "连接您的钱包以开始使用 KAIRO PROTOCOL 生态系统。",
     "checkingStatus": "正在检查注册状态...",
     "registering": "注册中...",
     "registerButton": "在区块链上注册",
-    "formPrompt": "在链上注册以加入 KAIRO DAO 生态系统。",
+    "formPrompt": "在链上注册以加入 KAIRO PROTOCOL 生态系统。",
     "referrerLabel": "推荐人",
     "referrerPlaceholder": "0x... 推荐人地址",
     "referrerVerified": "已通过您的链接验证推荐人",
@@ -594,6 +594,30 @@
     "stakingEarnings": "质押收益",
     "harvestedLabel": "已收获",
     "harvestableLabel": "可收获"
+  },
+  "p2pHistory": {
+    "title": "P2P 订单历史",
+    "subtitle": "您所有 P2P 订单的完整交易记录",
+    "totalOrders": "{count} 笔订单",
+    "placed": "已挂单",
+    "executed": "已完成",
+    "canceled": "已取消",
+    "totalTrades": "成交",
+    "filterAll": "全部",
+    "loading": "正在加载订单历史...",
+    "noOrders": "暂无 P2P 订单",
+    "noOrdersDesc": "在交易所页面创建买单或卖单后即可查看您的历史记录。",
+    "trade": "{count} 笔成交",
+    "originalAmount": "原始金额",
+    "filledAmount": "已成交",
+    "remainingAmount": "剩余",
+    "fillProgress": "成交进度",
+    "executionHistory": "成交历史",
+    "asRole": "作为{role}",
+    "roleBuyer": "买方",
+    "roleSeller": "卖方",
+    "price": "价格",
+    "noTradesYet": "此订单尚未有任何成交"
   },
   "faucet": {
     "testnetFaucet": "测试网水龙头 · 模拟USDT",

@@ -1,5 +1,5 @@
 const fs = require('fs');
-const raw = fs.readFileSync('C:\\Users\\imran\\.qoder\\cache\\projects\\KAIRODAO-157a1cfd\\agent-tools\\bbb92b72\\b996fb9b.txt', 'utf8');
+const raw = fs.readFileSync('C:\\Users\\imran\\.qoder\\cache\\projects\\KAIROPROTOCOL-157a1cfd\\agent-tools\\bbb92b72\\b996fb9b.txt', 'utf8');
 const data = JSON.parse(raw);
 
 // Structure: array of { service, entries: [{ timestamp, line }] }

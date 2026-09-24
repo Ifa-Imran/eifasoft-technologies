@@ -1,5 +1,5 @@
 const fs = require('fs');
-const raw = fs.readFileSync('C:/Users/imran/.qoder/cache/projects/KAIRODAO-157a1cfd/agent-tools/bbb92b72/534f1d46.txt', 'utf8');
+const raw = fs.readFileSync('C:/Users/imran/.qoder/cache/projects/KAIROPROTOCOL-157a1cfd/agent-tools/bbb92b72/534f1d46.txt', 'utf8');
 const data = JSON.parse(raw);
 const arr = Array.isArray(data) ? data : [data];
 for (const svc of arr) {

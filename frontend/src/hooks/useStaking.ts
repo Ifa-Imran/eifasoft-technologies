@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/Toast';
 import { Address } from 'viem';
 import { useEffect, useRef, useCallback, useState } from 'react';
 import type { StakeInfo } from '@/hooks/useUserStakes';
+import { useUserStakes } from '@/hooks/useUserStakes';
 // Compounding is AUTO — profits accrue automatically based on time intervals.
 // Users click "Compound" to crystallize accrued profits and trigger team dividends.
 
@@ -14,6 +15,7 @@ export function useStaking() {
   const { toast } = useToast();
   const { address } = useAccount();
   const publicClient = usePublicClient();
+  const { remainingCap } = useUserStakes();
   const [harvesting, setHarvesting] = useState(false);
   const [compounding, setCompounding] = useState(false);
 
@@ -57,7 +59,33 @@ export function useStaking() {
     try {
       const MIN = BigInt(10) * BigInt(10 ** 18);
       // Only harvest stakes with crystallized on-chain harvestable AND meeting $10 minimum per stake.
-      const harvestable = tierStakes.filter((s) => s.harvestable >= MIN);
+      let harvestable = tierStakes.filter((s) => s.harvestable >= MIN);
+
+      // ── Capping validation: Harvestable Amount ≤ Remaining Capping Limit ──
+      if (harvestable.length > 0 && remainingCap !== undefined) {
+        const totalHarvestableAmt = harvestable.reduce((sum, s) => sum + s.harvestable, 0n);
+        if (totalHarvestableAmt > remainingCap) {
+          if (remainingCap === 0n) {
+            toast({ type: 'error', title: 'Capping limit reached', description: 'Your remaining capping limit is zero. No more harvests are possible.' });
+            return;
+          }
+          // Filter to only stakes that fit within the remaining cap
+          let capLeft = remainingCap;
+          harvestable = harvestable.filter((s) => {
+            if (s.harvestable <= capLeft) {
+              capLeft -= s.harvestable;
+              return true;
+            }
+            return false;
+          });
+          if (harvestable.length === 0) {
+            toast({ type: 'error', title: 'Exceeds capping limit', description: 'Your remaining capping limit must be greater than the harvestable amount.' });
+            return;
+          }
+          toast({ type: 'error', title: 'Partial harvest due to cap', description: 'Some stakes exceed your remaining capping limit. Harvesting what fits.' });
+        }
+      }
+
       if (harvestable.length === 0) {
         // Check if there is harvestable below minimum
         const belowMin = tierStakes.filter((s) => s.harvestable > 0n && s.harvestable < MIN);
@@ -94,7 +122,7 @@ export function useStaking() {
     } finally {
       setHarvesting(false);
     }
-  }, [publicClient, address, writeContractAsync, toast]);
+  }, [publicClient, address, writeContractAsync, toast, remainingCap]);
 
   /** Compound a single stake (used internally / for background auto-compound) */
   const compound = useCallback(async (stakeIndex: bigint) => {
@@ -182,6 +210,11 @@ export function useStaking() {
   }, [publicClient, address, writeContractAsync, toast]);
 
   const harvest = async (stakeIndex: bigint, amount: bigint) => {
+    // ── Capping validation: Harvestable Amount ≤ Remaining Capping Limit ──
+    if (remainingCap !== undefined && amount > remainingCap) {
+      toast({ type: 'error', title: 'Exceeds capping limit', description: 'Your remaining capping limit must be greater than the harvestable amount.' });
+      return;
+    }
     try {
       const hash = await writeContractAsync({
         address: contracts.stakingManager,

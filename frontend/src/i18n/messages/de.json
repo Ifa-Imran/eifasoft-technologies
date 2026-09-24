@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "title": "KAIRO DAO | Aurora Finanzökosystem",
+    "title": "KAIRO PROTOCOL | Aurora Finanzökosystem",
     "description": "Stake, tausche, verdiene Belohnungen und erweitere dein Netzwerk mit KAIRO — dem DeFi-Protokoll der nächsten Generation auf opBNB.",
     "ogLocale": "de_DE"
   },
@@ -35,7 +35,7 @@
   },
   "landing": {
     "getStarted": "Loslegen",
-    "getStartedDescription": "Verbinde dein Wallet, um auf das KAIRO DAO Aurora Finanzökosystem zuzugreifen.",
+    "getStartedDescription": "Verbinde dein Wallet, um auf das KAIRO PROTOCOL Aurora Finanzökosystem zuzugreifen.",
     "verifiedContracts": "Verifizierte Smart Contracts",
     "verifiedContractsDescription": "Alle Verträge sind verifiziert und Open-Source auf {network}.",
     "checkingAccount": "Konto wird überprüft..."
@@ -331,7 +331,7 @@
     "contracts": "Verifizierte Verträge",
     "docs": "Dokumentation",
     "community": "Community",
-    "copyright": "© 2026 KAIRO DAO. Alle Rechte vorbehalten."
+    "copyright": "© 2026 KAIRO PROTOCOL. Alle Rechte vorbehalten."
   },
   "language": {
     "switchLabel": "Sprache",
@@ -366,12 +366,12 @@
     "rankHolders": "Rang-Inhaber"
   },
   "register": {
-    "title": "KAIRO DAO beitreten",
-    "connectPrompt": "Verbinde dein Wallet, um mit dem KAIRO DAO Ökosystem zu starten.",
+    "title": "KAIRO PROTOCOL beitreten",
+    "connectPrompt": "Verbinde dein Wallet, um mit dem KAIRO PROTOCOL Ökosystem zu starten.",
     "checkingStatus": "Registrierungsstatus wird überprüft...",
     "registering": "Registrierung...",
     "registerButton": "Auf der Blockchain registrieren",
-    "formPrompt": "Registriere dich On-Chain, um dem KAIRO DAO Ökosystem beizutreten.",
+    "formPrompt": "Registriere dich On-Chain, um dem KAIRO PROTOCOL Ökosystem beizutreten.",
     "referrerLabel": "Empfohlen von",
     "referrerPlaceholder": "0x... Empfehler-Adresse",
     "referrerVerified": "Empfehler über deinen Link verifiziert",
@@ -594,6 +594,30 @@
     "stakingEarnings": "Staking-Einnahmen",
     "harvestedLabel": "Geerntet",
     "harvestableLabel": "Erntbar"
+  },
+  "p2pHistory": {
+    "title": "P2P-Order-Historie",
+    "subtitle": "Vollständiges Transaktionsprotokoll aller Ihrer P2P-Orders",
+    "totalOrders": "{count} Order{count, plural, =1 {} other {s}}",
+    "placed": "Platziert",
+    "executed": "Ausgeführt",
+    "canceled": "Storniert",
+    "totalTrades": "Trades",
+    "filterAll": "Alle",
+    "loading": "Order-Historie wird geladen...",
+    "noOrders": "Noch keine P2P-Orders",
+    "noOrdersDesc": "Erstellen Sie eine Kauf- oder Verkaufsorder auf der Exchange-Seite, um Ihre Historie zu sehen.",
+    "trade": "{count, plural, =1 {Trade} other {Trades}}",
+    "originalAmount": "Ursprünglicher Betrag",
+    "filledAmount": "Ausgeführt",
+    "remainingAmount": "Verbleibend",
+    "fillProgress": "Füllungsfortschritt",
+    "executionHistory": "Ausführungshistorie",
+    "asRole": "als {role}",
+    "roleBuyer": "Käufer",
+    "roleSeller": "Verkäufer",
+    "price": "Preis",
+    "noTradesYet": "Für diese Order wurden noch keine Trades ausgeführt"
   },
   "faucet": {
     "testnetFaucet": "Testnet-Faucet · Mock-USDT",

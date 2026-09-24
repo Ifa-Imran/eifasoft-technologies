@@ -62,7 +62,7 @@ async function main() {
   const userAddr = ethers.getAddress(TARGET_ADDRESS);
 
   console.log("═══════════════════════════════════════════════════════════");
-  console.log("  KAIRO DAO — Staking Volume Debug (Mainnet)");
+  console.log("  KAIRO PROTOCOL — Staking Volume Debug (Mainnet)");
   console.log("═══════════════════════════════════════════════════════════");
   console.log(`  Target Address : ${userAddr}`);
   console.log(`  RPC            : ${RPC}`);

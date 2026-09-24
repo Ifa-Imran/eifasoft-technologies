@@ -51,7 +51,7 @@ async function main() {
   const staking = new ethers.Contract(STAKING_MANAGER, StakingABI, provider);
 
   console.log("═══════════════════════════════════════════════════════════");
-  console.log("  KAIRO DAO — Rank Holders Check (Mainnet)");
+  console.log("  KAIRO PROTOCOL — Rank Holders Check (Mainnet)");
   console.log("═══════════════════════════════════════════════════════════");
   console.log(`  RPC      : ${RPC}`);
   console.log(`  Network  : opBNB Mainnet (204)`);

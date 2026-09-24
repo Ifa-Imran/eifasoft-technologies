@@ -7,6 +7,7 @@ import { StakingManagerABI } from '@/config/abis/StakingManager';
 import { useToast } from '@/components/ui/Toast';
 import { useEffect, useMemo, useState } from 'react';
 import { formatUnits, parseAbiItem } from 'viem';
+import { useUserStakes } from '@/hooks/useUserStakes';
 // v29 contracts auto-compound on harvest — no post-action needed
 
 export interface SalaryClaimEvent {
@@ -59,6 +60,7 @@ export function useAffiliate() {
   const { address } = useAccount();
   const { toast } = useToast();
   const publicClient = usePublicClient();
+  const { remainingCap } = useUserStakes();
   const [salaryHistory, setSalaryHistory] = useState<SalaryClaimEvent[]>([]);
   const [harvestHistory, setHarvestHistory] = useState<SalaryHarvestEvent[]>([]);
   const [teamLevelStats, setTeamLevelStats] = useState<TeamLevelStats[]>([]);
@@ -521,6 +523,15 @@ export function useAffiliate() {
   useEffect(() => { if (checkRankError) toast({ type: 'error', title: 'Rank check failed' }); }, [checkRankError]);
 
   const harvestIncome = (incomeType: number) => {
+    // ── Capping validation for direct (0) and team (1) dividends ──
+    // incomeType 2 = rank salary, not subject to this check
+    if ((incomeType === 0 || incomeType === 1) && allIncome && remainingCap !== undefined) {
+      const harvestableAmt = BigInt(allIncome[incomeType] || 0);
+      if (harvestableAmt > 0n && harvestableAmt > remainingCap) {
+        toast({ type: 'error', title: 'Exceeds capping limit', description: 'Your remaining capping limit must be greater than the harvestable amount.' });
+        return;
+      }
+    }
     writeHarvest({
       address: contracts.affiliateDistributor,
       abi: AffiliateDistributorABI,

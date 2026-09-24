@@ -460,7 +460,7 @@ async function main() {
   console.log("\n[5/5] Writing snapshot file...");
   if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const fileName = `kairodao-backup-${network.chainId}-${blockNumber}-${stamp}.json`;
+  const fileName = `kairoprotocol-backup-${network.chainId}-${blockNumber}-${stamp}.json`;
   const outPath = path.join(OUT_DIR, fileName);
   fs.writeFileSync(outPath, JSON.stringify(snapshot, bigintReplacer, 2));
   console.log(`\nSnapshot written: ${outPath}`);

@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "title": "KAIRO DAO | Aurora Financial Ecosystem",
+    "title": "KAIRO PROTOCOL | Aurora Financial Ecosystem",
     "description": "Stake, trade, earn rewards, and grow your network with KAIRO — the next-gen DeFi protocol on opBNB.",
     "ogLocale": "en_US"
   },
@@ -35,7 +35,7 @@
   },
   "landing": {
     "getStarted": "Get Started",
-    "getStartedDescription": "Connect your wallet to access the KAIRO DAO Aurora Financial Ecosystem.",
+    "getStartedDescription": "Connect your wallet to access the KAIRO PROTOCOL Aurora Financial Ecosystem.",
     "verifiedContracts": "Verified Smart Contracts",
     "verifiedContractsDescription": "All contracts are verified and open-source on {network}.",
     "checkingAccount": "Checking your account..."
@@ -537,6 +537,30 @@
     "referralNetwork": "Referral Network",
     "incomeSummary": "Income Summary"
   },
+  "p2pHistory": {
+    "title": "P2P Order History",
+    "subtitle": "Full transaction log for all your P2P orders",
+    "totalOrders": "{count} order{count, plural, =1 {} other {s}}",
+    "placed": "Placed",
+    "executed": "Executed",
+    "canceled": "Canceled",
+    "totalTrades": "Trades",
+    "filterAll": "All",
+    "loading": "Loading order history...",
+    "noOrders": "No P2P orders yet",
+    "noOrdersDesc": "Create a buy or sell order on the Exchange page to see your history.",
+    "trade": "{count, plural, =1 {trade} other {trades}}",
+    "originalAmount": "Original Amount",
+    "filledAmount": "Filled",
+    "remainingAmount": "Remaining",
+    "fillProgress": "Fill Progress",
+    "executionHistory": "Execution History",
+    "asRole": "as {role}",
+    "roleBuyer": "buyer",
+    "roleSeller": "seller",
+    "price": "Price",
+    "noTradesYet": "No trades executed yet for this order"
+  },
   "faucet": {
     "testnetFaucet": "Testnet Faucet · Mock USDT",
     "mintDesc": "Mint test USDT for development. Current balance:",
@@ -553,7 +577,7 @@
     "contracts": "Verified Contracts",
     "docs": "Documentation",
     "community": "Community",
-    "copyright": "© 2026 KAIRO DAO. All rights reserved."
+    "copyright": "© 2026 KAIRO PROTOCOL. All rights reserved."
   },
   "language": {
     "switchLabel": "Language",
@@ -588,12 +612,12 @@
     "rankHolders": "Rank Holders"
   },
   "register": {
-    "title": "Join KAIRO DAO",
-    "connectPrompt": "Connect your wallet to get started with the KAIRO DAO Ecosystem.",
+    "title": "Join KAIRO PROTOCOL",
+    "connectPrompt": "Connect your wallet to get started with the KAIRO PROTOCOL Ecosystem.",
     "checkingStatus": "Checking registration status...",
     "registering": "Registering...",
     "registerButton": "Register on Blockchain",
-    "formPrompt": "Register on-chain to join the KAIRO DAO Ecosystem.",
+    "formPrompt": "Register on-chain to join the KAIRO PROTOCOL Ecosystem.",
     "referrerLabel": "Referred By",
     "referrerPlaceholder": "0x... referrer address",
     "referrerVerified": "Referrer verified from your link",

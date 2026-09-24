@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "title": "KAIRO DAO | النظام البيئي المالي أورورا",
+    "title": "KAIRO PROTOCOL | النظام البيئي المالي أورورا",
     "description": "ادفع رهاناً، وتداول، واكسب المكافآت، ونمِّ شبكتك مع KAIRO — بروتوكول DeFi من الجيل التالي على opBNB.",
     "ogLocale": "ar_SA"
   },
@@ -35,7 +35,7 @@
   },
   "landing": {
     "getStarted": "ابدأ الآن",
-    "getStartedDescription": "اربط محفظتك للوصول إلى النظام البيئي المالي أورورا لـ KAIRO DAO.",
+    "getStartedDescription": "اربط محفظتك للوصول إلى النظام البيئي المالي أورورا لـ KAIRO PROTOCOL.",
     "verifiedContracts": "عقود ذكية موثقة",
     "verifiedContractsDescription": "جميع العقود موثقة ومفتوحة المصدر على {network}.",
     "checkingAccount": "جاري التحقق من حسابك..."
@@ -331,7 +331,7 @@
     "contracts": "عقود موثقة",
     "docs": "التوثيق",
     "community": "المجتمع",
-    "copyright": "© 2026 KAIRO DAO. جميع الحقوق محفوظة."
+    "copyright": "© 2026 KAIRO PROTOCOL. جميع الحقوق محفوظة."
   },
   "language": {
     "switchLabel": "اللغة",
@@ -366,12 +366,12 @@
     "rankHolders": "حاملو الرتب"
   },
   "register": {
-    "title": "انضم إلى KAIRO DAO",
-    "connectPrompt": "اربط محفظتك للبدء مع النظام البيئي KAIRO DAO.",
+    "title": "انضم إلى KAIRO PROTOCOL",
+    "connectPrompt": "اربط محفظتك للبدء مع النظام البيئي KAIRO PROTOCOL.",
     "checkingStatus": "جاري التحقق من حالة التسجيل...",
     "registering": "جاري التسجيل...",
     "registerButton": "التسجيل على البلوكتشين",
-    "formPrompt": "سجّل على السلسلة للانضمام إلى النظام البيئي KAIRO DAO.",
+    "formPrompt": "سجّل على السلسلة للانضمام إلى النظام البيئي KAIRO PROTOCOL.",
     "referrerLabel": "مُحال بواسطة",
     "referrerPlaceholder": "0x... عنوان المُحيل",
     "referrerVerified": "تم التحقق من المُحيل عبر رابطك",
@@ -594,6 +594,30 @@
     "stakingEarnings": "أرباح الستيكينج",
     "harvestedLabel": "محصود",
     "harvestableLabel": "قابل للحصاد"
+  },
+  "p2pHistory": {
+    "title": "سجل طلبات P2P",
+    "subtitle": "سجل كامل لمعاملات جميع طلبات P2P الخاصة بك",
+    "totalOrders": "{count} طلب",
+    "placed": "مُنشأ",
+    "executed": "منفَّذ",
+    "canceled": "ملغى",
+    "totalTrades": "الصفقات",
+    "filterAll": "الكل",
+    "loading": "جارٍ تحميل سجل الطلبات...",
+    "noOrders": "لا توجد طلبات P2P بعد",
+    "noOrdersDesc": "أنشئ طلب شراء أو بيع في صفحة التداول لعرض سجلك.",
+    "trade": "{count, plural, =1 {صفقة} other {صفقات}}",
+    "originalAmount": "المبلغ الأصلي",
+    "filledAmount": "المنفَّذ",
+    "remainingAmount": "المتبقي",
+    "fillProgress": "نسبة التنفيذ",
+    "executionHistory": "سجل التنفيذ",
+    "asRole": "بصفة {role}",
+    "roleBuyer": "مشترٍ",
+    "roleSeller": "بائع",
+    "price": "السعر",
+    "noTradesYet": "لم يتم تنفيذ أي صفقات لهذا الطلب بعد"
   },
   "faucet": {
     "testnetFaucet": "حنفية Testnet · USDT تجريبي",

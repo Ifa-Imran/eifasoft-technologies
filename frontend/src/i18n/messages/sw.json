@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "title": "KAIRO DAO | Mfumo wa Kifedha wa Aurora",
+    "title": "KAIRO PROTOCOL | Mfumo wa Kifedha wa Aurora",
     "description": "Wekeza, fanya biashara, pata thawabu, na kupanua mtandao wako na KAIRO — itifaki ya kizazi kipya ya DeFi kwenye opBNB.",
     "ogLocale": "sw_KE"
   },
@@ -35,7 +35,7 @@
   },
   "landing": {
     "getStarted": "Anza",
-    "getStartedDescription": "Unganisha pochi yako kufikia Mfumo wa Kifedha wa Aurora wa KAIRO DAO.",
+    "getStartedDescription": "Unganisha pochi yako kufikia Mfumo wa Kifedha wa Aurora wa KAIRO PROTOCOL.",
     "verifiedContracts": "Mikataba Mingire Iliyothibitishwa",
     "verifiedContractsDescription": "Mikataba yote imethibitishwa na ni ya chanzo wazi kwenye {network}.",
     "checkingAccount": "Inakagua akaunti yako..."
@@ -331,7 +331,7 @@
     "contracts": "Mikataba Iliyothibitishwa",
     "docs": "Nyaraka",
     "community": "Jumuiya",
-    "copyright": "© 2026 KAIRO DAO. Haki zote zimehifadhiwa."
+    "copyright": "© 2026 KAIRO PROTOCOL. Haki zote zimehifadhiwa."
   },
   "language": {
     "switchLabel": "Lugha",
@@ -366,12 +366,12 @@
     "rankHolders": "Washikaji wa Daraja"
   },
   "register": {
-    "title": "Jiunge na KAIRO DAO",
-    "connectPrompt": "Unganisha pochi yako kuanza na Mfumo wa KAIRO DAO.",
+    "title": "Jiunge na KAIRO PROTOCOL",
+    "connectPrompt": "Unganisha pochi yako kuanza na Mfumo wa KAIRO PROTOCOL.",
     "checkingStatus": "Inakagua hali ya usajili...",
     "registering": "Inasajili...",
     "registerButton": "Sajili kwenye Blockchain",
-    "formPrompt": "Sajili kwenye chain kujiunga na Mfumo wa KAIRO DAO.",
+    "formPrompt": "Sajili kwenye chain kujiunga na Mfumo wa KAIRO PROTOCOL.",
     "referrerLabel": "Elekezwa Na",
     "referrerPlaceholder": "0x... anwani ya rufaa",
     "referrerVerified": "Rufaa imethibitishwa kutoka kiungo chako",
@@ -594,6 +594,30 @@
     "stakingEarnings": "Mapato ya Staking",
     "harvestedLabel": "Imevunwa",
     "harvestableLabel": "Inayoweza Kuvunwa"
+  },
+  "p2pHistory": {
+    "title": "Historia ya Amri za P2P",
+    "subtitle": "Kumbukumbu kamili ya miamala ya amri zako zote za P2P",
+    "totalOrders": "amri {count}",
+    "placed": "Imewekwa",
+    "executed": "Imetekelezwa",
+    "canceled": "Imeghairiwa",
+    "totalTrades": "Miamala",
+    "filterAll": "Zote",
+    "loading": "Inapakia historia ya amri...",
+    "noOrders": "Hakuna amri za P2P bado",
+    "noOrdersDesc": "Unda amri ya kununua au kuuza kwenye ukurasa wa Exchange ili kuona historia yako.",
+    "trade": "miamala {count}",
+    "originalAmount": "Kiasi cha Asili",
+    "filledAmount": "Imetekelezwa",
+    "remainingAmount": "Iliyosalia",
+    "fillProgress": "Maendeleo ya Utekelezaji",
+    "executionHistory": "Historia ya Utekelezaji",
+    "asRole": "kama {role}",
+    "roleBuyer": "mnunuzi",
+    "roleSeller": "muuzaji",
+    "price": "Bei",
+    "noTradesYet": "Hakuna miamala iliyotekelezwa kwa amri hii bado"
   },
   "faucet": {
     "testnetFaucet": "Mwoko wa Testnet · USDT ya Jaribio",

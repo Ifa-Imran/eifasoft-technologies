@@ -1,4 +1,4 @@
-# KAIRO DAO — System Blueprint (Mainnet-Ready)
+# KAIRO PROTOCOL — System Blueprint (Mainnet-Ready)
 
 > **Status:** Mainnet-ready. Last revised for the opBNB mainnet rollout.
 > Production timings (8h/6h/5h compound, 7-day rank salary), 7 DAO wallets,
@@ -9,7 +9,7 @@
 
 ## 1. Project Overview
 
-KAIRO DAO is a fully decentralized DeFi ecosystem built on **opBNB** (BNB Chain L2).
+KAIRO PROTOCOL is a fully decentralized DeFi ecosystem built on **opBNB** (BNB Chain L2).
 It combines a deflationary ERC-20 token, an on-chain liquidity pool / mini-DEX,
 a multi-tier staking engine, a multi-level affiliate distribution system, an
 optional membership subscription program (testnet only), and an atomic P2P
@@ -517,7 +517,7 @@ Seller (KAIRO) ◄──────► Buyer (USDT)
 ## 9. Repository Layout
 
 ```
-KAIRODAO/
+KAIROPROTOCOL/
 ├── contracts/                 Solidity sources (mainnet)
 │   ├── KAIROToken.sol
 │   ├── LiquidityPool.sol

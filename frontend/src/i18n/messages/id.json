@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "title": "KAIRO DAO | Ekosistem Keuangan Aurora",
+    "title": "KAIRO PROTOCOL | Ekosistem Keuangan Aurora",
     "description": "Stake, dagang, peroleh imbalan, dan kembangkan jaringan Anda dengan KAIRO — protokol DeFi generasi baru di opBNB.",
     "ogLocale": "id_ID"
   },
@@ -35,7 +35,7 @@
   },
   "landing": {
     "getStarted": "Mulai",
-    "getStartedDescription": "Hubungkan dompet Anda untuk mengakses Ekosistem Keuangan Aurora KAIRO DAO.",
+    "getStartedDescription": "Hubungkan dompet Anda untuk mengakses Ekosistem Keuangan Aurora KAIRO PROTOCOL.",
     "verifiedContracts": "Kontrak Pintar Terverifikasi",
     "verifiedContractsDescription": "Semua kontrak telah diverifikasi dan bersumber terbuka di {network}.",
     "checkingAccount": "Memeriksa akun Anda..."
@@ -331,7 +331,7 @@
     "contracts": "Kontrak Terverifikasi",
     "docs": "Dokumentasi",
     "community": "Komunitas",
-    "copyright": "© 2026 KAIRO DAO. Hak cipta dilindungi."
+    "copyright": "© 2026 KAIRO PROTOCOL. Hak cipta dilindungi."
   },
   "language": {
     "switchLabel": "Bahasa",
@@ -366,12 +366,12 @@
     "rankHolders": "Pemegang Pangkat"
   },
   "register": {
-    "title": "Bergabung KAIRO DAO",
-    "connectPrompt": "Hubungkan dompet Anda untuk memulai Ekosistem KAIRO DAO.",
+    "title": "Bergabung KAIRO PROTOCOL",
+    "connectPrompt": "Hubungkan dompet Anda untuk memulai Ekosistem KAIRO PROTOCOL.",
     "checkingStatus": "Memeriksa status pendaftaran...",
     "registering": "Mendaftarkan...",
     "registerButton": "Daftar di Blockchain",
-    "formPrompt": "Daftar on-chain untuk bergabung dengan Ekosistem KAIRO DAO.",
+    "formPrompt": "Daftar on-chain untuk bergabung dengan Ekosistem KAIRO PROTOCOL.",
     "referrerLabel": "Dirujuk Oleh",
     "referrerPlaceholder": "0x... alamat perujuk",
     "referrerVerified": "Perujuk diverifikasi dari tautan Anda",
@@ -594,6 +594,30 @@
     "stakingEarnings": "Pendapatan Staking",
     "harvestedLabel": "Dipanen",
     "harvestableLabel": "Dapat Dipanen"
+  },
+  "p2pHistory": {
+    "title": "Riwayat Pesanan P2P",
+    "subtitle": "Log transaksi lengkap untuk semua pesanan P2P Anda",
+    "totalOrders": "{count} pesanan",
+    "placed": "Ditempatkan",
+    "executed": "Dieksekusi",
+    "canceled": "Dibatalkan",
+    "totalTrades": "Transaksi",
+    "filterAll": "Semua",
+    "loading": "Memuat riwayat pesanan...",
+    "noOrders": "Belum ada pesanan P2P",
+    "noOrdersDesc": "Buat pesanan beli atau jual di halaman Exchange untuk melihat riwayat Anda.",
+    "trade": "{count} transaksi",
+    "originalAmount": "Jumlah Awal",
+    "filledAmount": "Terisi",
+    "remainingAmount": "Tersisa",
+    "fillProgress": "Progres Pengisian",
+    "executionHistory": "Riwayat Eksekusi",
+    "asRole": "sebagai {role}",
+    "roleBuyer": "pembeli",
+    "roleSeller": "penjual",
+    "price": "Harga",
+    "noTradesYet": "Belum ada transaksi yang dieksekusi untuk pesanan ini"
   },
   "faucet": {
     "testnetFaucet": "Faucet Testnet · USDT Mock",

@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-Set-Location 'e:\Projects\KAIRODAO'
+Set-Location 'e:\Projects\KAIROPROTOCOL'
 
 # Extract using cmd.exe's > to keep raw bytes (UTF-8/binary preserved)
 cmd /c "git cat-file -p e1fda25f029f65316c62968d9c053528a06c6d82 > scripts\backup-old-contracts.ts"

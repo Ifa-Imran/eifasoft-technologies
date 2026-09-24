@@ -1,10 +1,10 @@
-# KAIRO DAO — Internationalization (i18n) Guide
+# KAIRO PROTOCOL — Internationalization (i18n) Guide
 
-This document describes the multilingual setup for the KAIRO DAO frontend, how to add new languages, how to maintain translation files, and how to use the automated translation script.
+This document describes the multilingual setup for the KAIRO PROTOCOL frontend, how to add new languages, how to maintain translation files, and how to use the automated translation script.
 
 ## Overview
 
-The KAIRO DAO frontend supports **18 languages** with full RTL support for Arabic. The implementation uses [next-intl](https://next-intl-docs.vercel.app/) v3+ with the Next.js App Router.
+The KAIRO PROTOCOL frontend supports **18 languages** with full RTL support for Arabic. The implementation uses [next-intl](https://next-intl-docs.vercel.app/) v3+ with the Next.js App Router.
 
 ### Supported Languages
 
@@ -156,7 +156,7 @@ return <span>{t('level', { level: 5 })}</span>;
 
 These brand names and technical terms should remain untranslated in ALL languages:
 
-- **Brands**: KAIRO, KAIRO DAO, DAO, opBNB, USDT
+- **Brands**: KAIRO, KAIRO PROTOCOL, DAO, opBNB, USDT
 - **Technical**: FIFO, APY, CMS, P2P, AMM
 - **Rank Names**: Star, Crown Diamond, Bronze, Silver, Gold
 - **Network**: Mainnet, Testnet

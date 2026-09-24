@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "title": "KAIRO DAO | Aurora 金融エコシステム",
+    "title": "KAIRO PROTOCOL | Aurora 金融エコシステム",
     "description": "KAIROでステーキング、取引、報酬を獲得し、ネットワークを拡大しましょう — opBNB上の次世代DeFiプロトコル。",
     "ogLocale": "ja_JP"
   },
@@ -35,7 +35,7 @@
   },
   "landing": {
     "getStarted": "始める",
-    "getStartedDescription": "KAIRO DAO Aurora金融エコシステムにアクセスするにはウォレットを接続してください。",
+    "getStartedDescription": "KAIRO PROTOCOL Aurora金融エコシステムにアクセスするにはウォレットを接続してください。",
     "verifiedContracts": "検証済みスマートコントラクト",
     "verifiedContractsDescription": "すべてのコントラクトは{network}で検証済みでオープンソースです。",
     "checkingAccount": "アカウントを確認中..."
@@ -331,7 +331,7 @@
     "contracts": "検証済みコントラクト",
     "docs": "ドキュメント",
     "community": "コミュニティ",
-    "copyright": "© 2026 KAIRO DAO. All rights reserved."
+    "copyright": "© 2026 KAIRO PROTOCOL. All rights reserved."
   },
   "language": {
     "switchLabel": "言語",
@@ -366,12 +366,12 @@
     "rankHolders": "ランク保持者"
   },
   "register": {
-    "title": "KAIRO DAOに参加",
-    "connectPrompt": "KAIRO DAOエコシステムを開始するにはウォレットを接続してください。",
+    "title": "KAIRO PROTOCOLに参加",
+    "connectPrompt": "KAIRO PROTOCOLエコシステムを開始するにはウォレットを接続してください。",
     "checkingStatus": "登録ステータスを確認中...",
     "registering": "登録中...",
     "registerButton": "ブロックチェーンに登録",
-    "formPrompt": "KAIRO DAOエコシステムに参加するにはオンチェーンで登録してください。",
+    "formPrompt": "KAIRO PROTOCOLエコシステムに参加するにはオンチェーンで登録してください。",
     "referrerLabel": "紹介者",
     "referrerPlaceholder": "0x... 紹介者アドレス",
     "referrerVerified": "リンクから紹介者が確認されました",
@@ -594,6 +594,30 @@
     "stakingEarnings": "ステーキング収入",
     "harvestedLabel": "収穫済み",
     "harvestableLabel": "収穫可能"
+  },
+  "p2pHistory": {
+    "title": "P2P注文履歴",
+    "subtitle": "すべてのP2P注文の完全な取引ログ",
+    "totalOrders": "{count}件の注文",
+    "placed": "出品中",
+    "executed": "約定済み",
+    "canceled": "キャンセル済み",
+    "totalTrades": "取引",
+    "filterAll": "すべて",
+    "loading": "注文履歴を読み込み中...",
+    "noOrders": "P2P注文はまだありません",
+    "noOrdersDesc": "取引所ページで買い注文または売り注文を作成すると履歴が表示されます。",
+    "trade": "{count}件の取引",
+    "originalAmount": "元の数量",
+    "filledAmount": "約定済み",
+    "remainingAmount": "残り",
+    "fillProgress": "約定進捗",
+    "executionHistory": "約定履歴",
+    "asRole": "{role}として",
+    "roleBuyer": "買い手",
+    "roleSeller": "売り手",
+    "price": "価格",
+    "noTradesYet": "この注文はまだ約定がありません"
   },
   "faucet": {
     "testnetFaucet": "テストネットフォーセット · モックUSDT",

@@ -43,7 +43,7 @@ async function main() {
   const userAddr = TARGET_WALLET;
 
   console.log("═══════════════════════════════════════════════════════════");
-  console.log("  KAIRO DAO — Active Stake Debug");
+  console.log("  KAIRO PROTOCOL — Active Stake Debug");
   console.log("═══════════════════════════════════════════════════════════");
   console.log(`  Wallet       : ${userAddr}`);
   console.log(`  RPC          : ${RPC}`);

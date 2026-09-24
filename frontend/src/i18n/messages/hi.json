@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "title": "KAIRO DAO | Aurora वित्तीय पारिस्थितिकी तंत्र",
+    "title": "KAIRO PROTOCOL | Aurora वित्तीय पारिस्थितिकी तंत्र",
     "description": "KAIRO के साथ स्टेक करें, व्यापार करें, पुरस्कार अर्जित करें और अपना नेटवर्क बढ़ाएं — opBNB पर अगली पीढ़ी का DeFi प्रोटोकॉल।",
     "ogLocale": "hi_IN"
   },
@@ -35,7 +35,7 @@
   },
   "landing": {
     "getStarted": "शुरू करें",
-    "getStartedDescription": "KAIRO DAO Aurora वित्तीय पारिस्थितिकी तंत्र तक पहुँचने के लिए अपना वॉलेट कनेक्ट करें।",
+    "getStartedDescription": "KAIRO PROTOCOL Aurora वित्तीय पारिस्थितिकी तंत्र तक पहुँचने के लिए अपना वॉलेट कनेक्ट करें।",
     "verifiedContracts": "सत्यापित स्मार्ट अनुबंध",
     "verifiedContractsDescription": "सभी अनुबंध {network} पर सत्यापित और ओपन-सोर्स हैं।",
     "checkingAccount": "आपका खाता जाँचा जा रहा है..."
@@ -331,7 +331,7 @@
     "contracts": "सत्यापित अनुबंध",
     "docs": "दस्तावेज़ीकरण",
     "community": "समुदाय",
-    "copyright": "© 2026 KAIRO DAO. सर्वाधिकार सुरक्षित।"
+    "copyright": "© 2026 KAIRO PROTOCOL. सर्वाधिकार सुरक्षित।"
   },
   "language": {
     "switchLabel": "भाषा",
@@ -366,12 +366,12 @@
     "rankHolders": "रैंक धारक"
   },
   "register": {
-    "title": "KAIRO DAO में शामिल हों",
-    "connectPrompt": "KAIRO DAO पारिस्थितिकी तंत्र के साथ शुरू करने के लिए अपना वॉलेट कनेक्ट करें।",
+    "title": "KAIRO PROTOCOL में शामिल हों",
+    "connectPrompt": "KAIRO PROTOCOL पारिस्थितिकी तंत्र के साथ शुरू करने के लिए अपना वॉलेट कनेक्ट करें।",
     "checkingStatus": "पंजीकरण स्थिति जाँची जा रही है...",
     "registering": "पंजीकरण हो रहा है...",
     "registerButton": "ब्लॉकचेन पर पंजीकरण करें",
-    "formPrompt": "KAIRO DAO पारिस्थितिकी तंत्र में शामिल होने के लिए ऑन-चेन पंजीकरण करें।",
+    "formPrompt": "KAIRO PROTOCOL पारिस्थितिकी तंत्र में शामिल होने के लिए ऑन-चेन पंजीकरण करें।",
     "referrerLabel": "द्वारा रेफर किया गया",
     "referrerPlaceholder": "0x... रेफरर पता",
     "referrerVerified": "रेफरर आपके लिंक से सत्यापित",
@@ -594,6 +594,30 @@
     "stakingEarnings": "स्टेकिंग आय",
     "harvestedLabel": "हार्वेस्टेड",
     "harvestableLabel": "हार्वेस्टेबल"
+  },
+  "p2pHistory": {
+    "title": "P2P ऑर्डर इतिहास",
+    "subtitle": "आपके सभी P2P ऑर्डरों का पूरा लेनदेन लॉग",
+    "totalOrders": "{count} ऑर्डर",
+    "placed": "प्लेस्ड",
+    "executed": "निष्पादित",
+    "canceled": "रद्द",
+    "totalTrades": "ट्रेड",
+    "filterAll": "सभी",
+    "loading": "ऑर्डर इतिहास लोड हो रहा है...",
+    "noOrders": "अभी तक कोई P2P ऑर्डर नहीं",
+    "noOrdersDesc": "अपना इतिहास देखने के लिए एक्सचेंज पेज पर खरीद या बेच ऑर्डर बनाएं।",
+    "trade": "{count} ट्रेड",
+    "originalAmount": "मूल राशि",
+    "filledAmount": "भरा गया",
+    "remainingAmount": "शेष",
+    "fillProgress": "भरने की प्रगति",
+    "executionHistory": "निष्पादन इतिहास",
+    "asRole": "{role} के रूप में",
+    "roleBuyer": "खरीदार",
+    "roleSeller": "विक्रेता",
+    "price": "मूल्य",
+    "noTradesYet": "इस ऑर्डर के लिए अभी तक कोई ट्रेड निष्पादित नहीं हुआ"
   },
   "faucet": {
     "testnetFaucet": "टेस्टनेट फॉसेट · मॉक USDT",

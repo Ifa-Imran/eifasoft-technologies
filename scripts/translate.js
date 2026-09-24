@@ -100,7 +100,7 @@ const OPENAI_LANG_MAP = {
  * from how they appear in the source.
  */
 const PRESERVE_TERMS = [
-  'KAIRO', 'KAIRO DAO', 'DAO', 'opBNB', 'USDT', 'FIFO', 'APY', 'CMS',
+  'KAIRO', 'KAIRO PROTOCOL', 'DAO', 'opBNB', 'USDT', 'FIFO', 'APY', 'CMS',
   'P2P', 'AMM', 'Star', 'Crown Diamond', 'Bronze', 'Silver', 'Gold',
   'Mainnet', 'Testnet', 'blockchain', 'on-chain', 'escrow', 'compound',
 ];
@@ -307,7 +307,7 @@ async function translateOpenAI(texts, targetLang) {
 
 CRITICAL RULES:
 1. Preserve ALL {placeholder} patterns exactly — do NOT translate or modify text inside curly braces.
-2. Keep brand names untranslated: KAIRO, KAIRO DAO, DAO, opBNB, USDT, FIFO, APY, CMS, P2P, AMM.
+2. Keep brand names untranslated: KAIRO, KAIRO PROTOCOL, DAO, opBNB, USDT, FIFO, APY, CMS, P2P, AMM.
 3. Keep rank names untranslated: Star, Crown Diamond, Bronze, Silver, Gold.
 4. Use professional DeFi terminology, not generic translation.
 5. Return ONLY the translated text, nothing else.
@@ -456,7 +456,7 @@ async function translateWithOpenAI(locale, sourceEntries) {
 
 async function main() {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('  KAIRO DAO — i18n Translation Generator');
+  console.log('  KAIRO PROTOCOL — i18n Translation Generator');
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log();
 

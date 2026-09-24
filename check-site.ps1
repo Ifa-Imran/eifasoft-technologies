@@ -22,9 +22,9 @@ function Probe([string]$url) {
     }
 }
 
-Probe 'https://kairodao.com'
-Probe 'https://www.kairodao.com'
-Probe 'https://kairodao.com/health'
-Probe 'https://kairodao.com/api/v1/health'
-Probe 'https://dev.kairodao.com'
-Probe 'https://dev.kairodao.com/health'
+Probe 'https://kairoprotocol.com'
+Probe 'https://www.kairoprotocol.com'
+Probe 'https://kairoprotocol.com/health'
+Probe 'https://kairoprotocol.com/api/v1/health'
+Probe 'https://dev.kairoprotocol.com'
+Probe 'https://dev.kairoprotocol.com/health'

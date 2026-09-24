@@ -1,4 +1,4 @@
-param([string]$Path = 'C:\Users\imran\.qoder\cache\projects\KAIRODAO-157a1cfd\agent-tools\9db3cea7\f9b26545.txt')
+param([string]$Path = 'C:\Users\imran\.qoder\cache\projects\KAIROPROTOCOL-157a1cfd\agent-tools\9db3cea7\f9b26545.txt')
 $ErrorActionPreference = 'Continue'
 $c = Get-Content -Raw -Path $Path
 Write-Host ("CHARLEN: " + $c.Length)

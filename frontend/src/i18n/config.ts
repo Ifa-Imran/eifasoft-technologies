@@ -1,5 +1,5 @@
 /**
- * Central i18n configuration for KAIRO DAO.
+ * Central i18n configuration for KAIRO PROTOCOL.
  *
  * `locales` is the single source of truth for every supported locale. Add a
  * new locale here (and drop a matching `messages/<locale>.json` file) to

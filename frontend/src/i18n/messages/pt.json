@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "title": "KAIRO DAO | Ecossistema Financeiro Aurora",
+    "title": "KAIRO PROTOCOL | Ecossistema Financeiro Aurora",
     "description": "Faça staking, negocie, ganhe recompensas e expanda sua rede com KAIRO — o protocolo DeFi de próxima geração no opBNB.",
     "ogLocale": "pt_PT"
   },
@@ -35,7 +35,7 @@
   },
   "landing": {
     "getStarted": "Começar",
-    "getStartedDescription": "Conecte sua carteira para acessar o ecossistema financeiro Aurora da KAIRO DAO.",
+    "getStartedDescription": "Conecte sua carteira para acessar o ecossistema financeiro Aurora da KAIRO PROTOCOL.",
     "verifiedContracts": "Contratos Inteligentes Verificados",
     "verifiedContractsDescription": "Todos os contratos são verificados e de código aberto no {network}.",
     "checkingAccount": "Verificando sua conta..."
@@ -331,7 +331,7 @@
     "contracts": "Contratos Verificados",
     "docs": "Documentação",
     "community": "Comunidade",
-    "copyright": "© 2026 KAIRO DAO. Todos os direitos reservados."
+    "copyright": "© 2026 KAIRO PROTOCOL. Todos os direitos reservados."
   },
   "language": {
     "switchLabel": "Idioma",
@@ -366,12 +366,12 @@
     "rankHolders": "Detentores de Rank"
   },
   "register": {
-    "title": "Entrar na KAIRO DAO",
-    "connectPrompt": "Conecte sua carteira para começar com o ecossistema KAIRO DAO.",
+    "title": "Entrar na KAIRO PROTOCOL",
+    "connectPrompt": "Conecte sua carteira para começar com o ecossistema KAIRO PROTOCOL.",
     "checkingStatus": "Verificando status de registro...",
     "registering": "Registrando...",
     "registerButton": "Registrar na Blockchain",
-    "formPrompt": "Registre-se on-chain para entrar no ecossistema KAIRO DAO.",
+    "formPrompt": "Registre-se on-chain para entrar no ecossistema KAIRO PROTOCOL.",
     "referrerLabel": "Indicado Por",
     "referrerPlaceholder": "0x... endereço do indicador",
     "referrerVerified": "Indicador verificado pelo seu link",
@@ -594,6 +594,30 @@
     "stakingEarnings": "Rendimentos de Staking",
     "harvestedLabel": "Colhido",
     "harvestableLabel": "Colhível"
+  },
+  "p2pHistory": {
+    "title": "Histórico de Ordens P2P",
+    "subtitle": "Registro completo de transações de todas as suas ordens P2P",
+    "totalOrders": "{count} ordem{count, plural, =1 {} other {ns}}",
+    "placed": "Colocada",
+    "executed": "Executada",
+    "canceled": "Cancelada",
+    "totalTrades": "Negociações",
+    "filterAll": "Todas",
+    "loading": "Carregando histórico de ordens...",
+    "noOrders": "Ainda não há ordens P2P",
+    "noOrdersDesc": "Crie uma ordem de compra ou venda na página de Exchange para ver seu histórico.",
+    "trade": "{count, plural, =1 {negociação} other {negociações}}",
+    "originalAmount": "Valor Original",
+    "filledAmount": "Preenchido",
+    "remainingAmount": "Restante",
+    "fillProgress": "Progresso de Preenchimento",
+    "executionHistory": "Histórico de Execução",
+    "asRole": "como {role}",
+    "roleBuyer": "comprador",
+    "roleSeller": "vendedor",
+    "price": "Preço",
+    "noTradesYet": "Nenhuma negociação executada para esta ordem"
   },
   "faucet": {
     "testnetFaucet": "Torneira Testnet · USDT Simulado",

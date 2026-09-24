@@ -61,7 +61,7 @@ export async function generateMetadata({
     openGraph: {
       title: t('title'),
       description: t('description'),
-      siteName: 'KAIRO DAO',
+      siteName: 'KAIRO PROTOCOL',
       locale: t('ogLocale'),
       type: 'website',
     },

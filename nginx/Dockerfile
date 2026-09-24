@@ -12,10 +12,10 @@ RUN apk add --no-cache openssl
 
 # Generate a temporary self-signed cert at build time so nginx can start with SSL
 # Certbot will replace these with real certs after startup
-RUN mkdir -p /etc/letsencrypt/live/kairodao.com && \
+RUN mkdir -p /etc/letsencrypt/live/kairoprotocol.com && \
     openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-      -keyout /etc/letsencrypt/live/kairodao.com/privkey.pem \
-      -out /etc/letsencrypt/live/kairodao.com/fullchain.pem \
-      -subj '/CN=kairodao.com'
+      -keyout /etc/letsencrypt/live/kairoprotocol.com/privkey.pem \
+      -out /etc/letsencrypt/live/kairoprotocol.com/fullchain.pem \
+      -subj '/CN=kairoprotocol.com'
 
 EXPOSE 80 443

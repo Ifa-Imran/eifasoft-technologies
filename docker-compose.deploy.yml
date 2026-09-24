@@ -31,7 +31,7 @@ services:
       retries: 5
 
   backend:
-    image: kairodao-backend
+    image: kairoprotocol-backend
     pull_policy: never
     restart: unless-stopped
     environment:
@@ -59,22 +59,22 @@ services:
       - kairo_network
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=kairodao_kairo_network"
-      - "traefik.http.routers.kairodao-api.rule=(Host(`kairodao.com`) || Host(`dev.kairodao.com`)) && PathPrefix(`/api`)"
-      - "traefik.http.routers.kairodao-api.entrypoints=websecure"
-      - "traefik.http.routers.kairodao-api.tls.certresolver=letsencrypt"
-      - "traefik.http.services.kairodao-api.loadbalancer.server.port=4000"
-      - "traefik.http.routers.kairodao-ws.rule=(Host(`kairodao.com`) || Host(`dev.kairodao.com`)) && PathPrefix(`/ws`)"
-      - "traefik.http.routers.kairodao-ws.entrypoints=websecure"
-      - "traefik.http.routers.kairodao-ws.tls.certresolver=letsencrypt"
-      - "traefik.http.services.kairodao-ws.loadbalancer.server.port=4000"
-      - "traefik.http.routers.kairodao-health.rule=(Host(`kairodao.com`) || Host(`dev.kairodao.com`)) && PathPrefix(`/health`)"
-      - "traefik.http.routers.kairodao-health.entrypoints=websecure"
-      - "traefik.http.routers.kairodao-health.tls.certresolver=letsencrypt"
-      - "traefik.http.services.kairodao-health.loadbalancer.server.port=4000"
+      - "traefik.docker.network=kairoprotocol_kairo_network"
+      - "traefik.http.routers.kairoprotocol-api.rule=(Host(`kairoprotocol.com`) || Host(`dev.kairoprotocol.com`)) && PathPrefix(`/api`)"
+      - "traefik.http.routers.kairoprotocol-api.entrypoints=websecure"
+      - "traefik.http.routers.kairoprotocol-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.kairoprotocol-api.loadbalancer.server.port=4000"
+      - "traefik.http.routers.kairoprotocol-ws.rule=(Host(`kairoprotocol.com`) || Host(`dev.kairoprotocol.com`)) && PathPrefix(`/ws`)"
+      - "traefik.http.routers.kairoprotocol-ws.entrypoints=websecure"
+      - "traefik.http.routers.kairoprotocol-ws.tls.certresolver=letsencrypt"
+      - "traefik.http.services.kairoprotocol-ws.loadbalancer.server.port=4000"
+      - "traefik.http.routers.kairoprotocol-health.rule=(Host(`kairoprotocol.com`) || Host(`dev.kairoprotocol.com`)) && PathPrefix(`/health`)"
+      - "traefik.http.routers.kairoprotocol-health.entrypoints=websecure"
+      - "traefik.http.routers.kairoprotocol-health.tls.certresolver=letsencrypt"
+      - "traefik.http.services.kairoprotocol-health.loadbalancer.server.port=4000"
 
   frontend:
-    image: kairodao-frontend
+    image: kairoprotocol-frontend
     pull_policy: never
     restart: unless-stopped
     depends_on:
@@ -83,12 +83,12 @@ services:
       - kairo_network
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=kairodao_kairo_network"
-      - "traefik.http.routers.kairodao-frontend.rule=Host(`kairodao.com`) || Host(`www.kairodao.com`) || Host(`dev.kairodao.com`)"
-      - "traefik.http.routers.kairodao-frontend.entrypoints=websecure"
-      - "traefik.http.routers.kairodao-frontend.tls.certresolver=letsencrypt"
-      - "traefik.http.services.kairodao-frontend.loadbalancer.server.port=3000"
-      - "traefik.http.routers.kairodao-frontend.priority=1"
+      - "traefik.docker.network=kairoprotocol_kairo_network"
+      - "traefik.http.routers.kairoprotocol-frontend.rule=Host(`kairoprotocol.com`) || Host(`www.kairoprotocol.com`) || Host(`dev.kairoprotocol.com`)"
+      - "traefik.http.routers.kairoprotocol-frontend.entrypoints=websecure"
+      - "traefik.http.routers.kairoprotocol-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.kairoprotocol-frontend.loadbalancer.server.port=3000"
+      - "traefik.http.routers.kairoprotocol-frontend.priority=1"
 
 volumes:
   postgres_data:

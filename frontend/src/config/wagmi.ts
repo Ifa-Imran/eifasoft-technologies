@@ -71,7 +71,7 @@ const transport = http(RPC_HTTP, {
 });
 
 export const config = getDefaultConfig({
-  appName: IS_TESTNET ? 'KAIRO DAO (Testnet)' : 'KAIRO DAO',
+  appName: IS_TESTNET ? 'KAIRO PROTOCOL (Testnet)' : 'KAIRO PROTOCOL',
   projectId:
     process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ||
     'd9fddb48789291a159e8270ef32105c2',

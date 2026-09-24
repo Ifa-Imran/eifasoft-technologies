@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "title": "KAIRO DAO | Финансовая экосистема Aurora",
+    "title": "KAIRO PROTOCOL | Финансовая экосистема Aurora",
     "description": "Стейкайте, торгуйте, зарабатывайте вознаграждения и расширяйте свою сеть с KAIRO — DeFi-протоколом нового поколения на opBNB.",
     "ogLocale": "ru_RU"
   },
@@ -35,7 +35,7 @@
   },
   "landing": {
     "getStarted": "Начать",
-    "getStartedDescription": "Подключите кошелёк для доступа к финансовой экосистеме Aurora KAIRO DAO.",
+    "getStartedDescription": "Подключите кошелёк для доступа к финансовой экосистеме Aurora KAIRO PROTOCOL.",
     "verifiedContracts": "Верифицированные смарт-контракты",
     "verifiedContractsDescription": "Все контракты верифицированы и имеют открытый исходный код на {network}.",
     "checkingAccount": "Проверка вашего аккаунта..."
@@ -331,7 +331,7 @@
     "contracts": "Верифицированные контракты",
     "docs": "Документация",
     "community": "Сообщество",
-    "copyright": "© 2026 KAIRO DAO. Все права защищены."
+    "copyright": "© 2026 KAIRO PROTOCOL. Все права защищены."
   },
   "language": {
     "switchLabel": "Язык",
@@ -366,12 +366,12 @@
     "rankHolders": "Держатели рангов"
   },
   "register": {
-    "title": "Присоединиться к KAIRO DAO",
-    "connectPrompt": "Подключите кошелёк для начала работы с экосистемой KAIRO DAO.",
+    "title": "Присоединиться к KAIRO PROTOCOL",
+    "connectPrompt": "Подключите кошелёк для начала работы с экосистемой KAIRO PROTOCOL.",
     "checkingStatus": "Проверка статуса регистрации...",
     "registering": "Регистрация...",
     "registerButton": "Зарегистрироваться в блокчейне",
-    "formPrompt": "Зарегистрируйтесь ончейн, чтобы присоединиться к экосистеме KAIRO DAO.",
+    "formPrompt": "Зарегистрируйтесь ончейн, чтобы присоединиться к экосистеме KAIRO PROTOCOL.",
     "referrerLabel": "Приглашён",
     "referrerPlaceholder": "0x... адрес реферера",
     "referrerVerified": "Реферер подтверждён по вашей ссылке",
@@ -594,6 +594,30 @@
     "stakingEarnings": "Доход от стейкинга",
     "harvestedLabel": "Собрано",
     "harvestableLabel": "Доступно к сбору"
+  },
+  "p2pHistory": {
+    "title": "История P2P-ордеров",
+    "subtitle": "Полный журнал транзакций по всем вашим P2P-ордерам",
+    "totalOrders": "{count} ордер{count, plural, one {} few {а} many {ов} other {ов}}",
+    "placed": "Размещён",
+    "executed": "Исполнен",
+    "canceled": "Отменён",
+    "totalTrades": "Сделки",
+    "filterAll": "Все",
+    "loading": "Загрузка истории ордеров...",
+    "noOrders": "P2P-ордеров пока нет",
+    "noOrdersDesc": "Создайте ордер на покупку или продажу на странице биржи, чтобы увидеть историю.",
+    "trade": "{count, plural, one {сделка} few {сделки} many {сделок} other {сделок}}",
+    "originalAmount": "Исходная сумма",
+    "filledAmount": "Исполнено",
+    "remainingAmount": "Остаток",
+    "fillProgress": "Прогресс исполнения",
+    "executionHistory": "История исполнения",
+    "asRole": "как {role}",
+    "roleBuyer": "покупатель",
+    "roleSeller": "продавец",
+    "price": "Цена",
+    "noTradesYet": "По этому ордеру ещё нет исполненных сделок"
   },
   "faucet": {
     "testnetFaucet": "Testnet-кран · Тестовые USDT",

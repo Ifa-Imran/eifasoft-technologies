@@ -8,7 +8,7 @@
     },
     {
       "name": "www",
-      "records": [{"content": "kairodao.com.", "is_disabled": false}],
+      "records": [{"content": "kairoprotocol.com.", "is_disabled": false}],
       "ttl": 300,
       "type": "CNAME"
     },

@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "title": "KAIRO DAO | ระบบนิเวศการเงิน Aurora",
+    "title": "KAIRO PROTOCOL | ระบบนิเวศการเงิน Aurora",
     "description": "สเตก ซื้อขาย รับรางวัล และขยายเครือข่ายของคุณกับ KAIRO — โปรโตคอล DeFi รุ่นใหม่บน opBNB",
     "ogLocale": "th_TH"
   },
@@ -35,7 +35,7 @@
   },
   "landing": {
     "getStarted": "เริ่มต้น",
-    "getStartedDescription": "เชื่อมต่อกระเป๋าของคุณเพื่อเข้าถึงระบบนิเวศการเงิน Aurora ของ KAIRO DAO",
+    "getStartedDescription": "เชื่อมต่อกระเป๋าของคุณเพื่อเข้าถึงระบบนิเวศการเงิน Aurora ของ KAIRO PROTOCOL",
     "verifiedContracts": "สัญญาอัจฉริยะที่ได้รับการตรวจสอบ",
     "verifiedContractsDescription": "สัญญาทั้งหมดได้รับการตรวจสอบและเป็นโอเพ่นซอร์สบน {network}",
     "checkingAccount": "กำลังตรวจสอบบัญชีของคุณ..."
@@ -331,7 +331,7 @@
     "contracts": "สัญญาที่ตรวจสอบแล้ว",
     "docs": "เอกสาร",
     "community": "ชุมชน",
-    "copyright": "© 2026 KAIRO DAO สงวนลิขสิทธิ์"
+    "copyright": "© 2026 KAIRO PROTOCOL สงวนลิขสิทธิ์"
   },
   "language": {
     "switchLabel": "ภาษา",
@@ -366,12 +366,12 @@
     "rankHolders": "ผู้ถือระดับ"
   },
   "register": {
-    "title": "เข้าร่วม KAIRO DAO",
-    "connectPrompt": "เชื่อมต่อกระเป๋าของคุณเพื่อเริ่มต้นกับระบบนิเวศ KAIRO DAO",
+    "title": "เข้าร่วม KAIRO PROTOCOL",
+    "connectPrompt": "เชื่อมต่อกระเป๋าของคุณเพื่อเริ่มต้นกับระบบนิเวศ KAIRO PROTOCOL",
     "checkingStatus": "กำลังตรวจสอบสถานะการลงทะเบียน...",
     "registering": "กำลังลงทะเบียน...",
     "registerButton": "ลงทะเบียนบนบล็อกเชน",
-    "formPrompt": "ลงทะเบียนบนเชนเพื่อเข้าร่วมระบบนิเวศ KAIRO DAO",
+    "formPrompt": "ลงทะเบียนบนเชนเพื่อเข้าร่วมระบบนิเวศ KAIRO PROTOCOL",
     "referrerLabel": "แนะนำโดย",
     "referrerPlaceholder": "0x... ที่อยู่ผู้แนะนำ",
     "referrerVerified": "ผู้แนะนำได้รับการตรวจสอบจากลิงก์ของคุณ",
@@ -594,6 +594,30 @@
     "stakingEarnings": "รายได้สเตก",
     "harvestedLabel": "เก็บเกี่ยวแล้ว",
     "harvestableLabel": "เก็บเกี่ยวได้"
+  },
+  "p2pHistory": {
+    "title": "ประวัติคำสั่ง P2P",
+    "subtitle": "บันทึกรายการธุรกรรมทั้งหมดของคำสั่ง P2P ของคุณ",
+    "totalOrders": "{count} คำสั่ง",
+    "placed": "ตั้งไว้",
+    "executed": "ดำเนินการแล้ว",
+    "canceled": "ยกเลิกแล้ว",
+    "totalTrades": "การซื้อขาย",
+    "filterAll": "ทั้งหมด",
+    "loading": "กำลังโหลดประวัติคำสั่ง...",
+    "noOrders": "ยังไม่มีคำสั่ง P2P",
+    "noOrdersDesc": "สร้างคำสั่งซื้อหรือขายในหน้า Exchange เพื่อดูประวัติของคุณ",
+    "trade": "{count} รายการ",
+    "originalAmount": "จำนวนเดิม",
+    "filledAmount": "ดำเนินการแล้ว",
+    "remainingAmount": "คงเหลือ",
+    "fillProgress": "ความคืบหน้า",
+    "executionHistory": "ประวัติการดำเนินการ",
+    "asRole": "ในฐานะ{role}",
+    "roleBuyer": "ผู้ซื้อ",
+    "roleSeller": "ผู้ขาย",
+    "price": "ราคา",
+    "noTradesYet": "ยังไม่มีการซื้อขายสำหรับคำสั่งนี้"
   },
   "faucet": {
     "testnetFaucet": "ก๊อก Testnet · USDT จำลอง",

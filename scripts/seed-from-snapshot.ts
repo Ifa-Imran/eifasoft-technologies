@@ -37,11 +37,11 @@ function pickLatestBackup(): string {
   }
   const candidates = fs
     .readdirSync(dir)
-    .filter((f) => f.startsWith("kairodao-backup-") && f.endsWith(".json"))
+    .filter((f) => f.startsWith("kairoprotocol-backup-") && f.endsWith(".json"))
     .map((f) => ({ name: f, full: path.join(dir, f), mtime: fs.statSync(path.join(dir, f)).mtimeMs }))
     .sort((a, b) => b.mtime - a.mtime);
   if (candidates.length === 0) {
-    throw new Error(`No kairodao-backup-*.json files in ${dir}`);
+    throw new Error(`No kairoprotocol-backup-*.json files in ${dir}`);
   }
   return candidates[0].full;
 }

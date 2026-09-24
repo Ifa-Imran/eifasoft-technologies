@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "title": "KAIRO DAO | Aurora 금융 생태계",
+    "title": "KAIRO PROTOCOL | Aurora 금융 생태계",
     "description": "KAIRO로 스테이킹, 거래, 보상을 받고 네트워크를 확장하세요 — opBNB의 차세대 DeFi 프로토콜.",
     "ogLocale": "ko_KR"
   },
@@ -35,7 +35,7 @@
   },
   "landing": {
     "getStarted": "시작하기",
-    "getStartedDescription": "KAIRO DAO Aurora 금융 생태계에 액세스하려면 지갑을 연결하세요.",
+    "getStartedDescription": "KAIRO PROTOCOL Aurora 금융 생태계에 액세스하려면 지갑을 연결하세요.",
     "verifiedContracts": "검증된 스마트 컨트랙트",
     "verifiedContractsDescription": "모든 컨트랙트는 {network}에서 검증되었으며 오픈소스입니다.",
     "checkingAccount": "계정을 확인하는 중..."
@@ -331,7 +331,7 @@
     "contracts": "검증된 컨트랙트",
     "docs": "문서",
     "community": "커뮤니티",
-    "copyright": "© 2026 KAIRO DAO. 모든 권리 보유."
+    "copyright": "© 2026 KAIRO PROTOCOL. 모든 권리 보유."
   },
   "language": {
     "switchLabel": "언어",
@@ -366,12 +366,12 @@
     "rankHolders": "랭크 보유자"
   },
   "register": {
-    "title": "KAIRO DAO 가입",
-    "connectPrompt": "KAIRO DAO 생태계를 시작하려면 지갑을 연결하세요.",
+    "title": "KAIRO PROTOCOL 가입",
+    "connectPrompt": "KAIRO PROTOCOL 생태계를 시작하려면 지갑을 연결하세요.",
     "checkingStatus": "등록 상태 확인 중...",
     "registering": "등록 중...",
     "registerButton": "블록체인에 등록",
-    "formPrompt": "KAIRO DAO 생태계에 가입하려면 온체인에 등록하세요.",
+    "formPrompt": "KAIRO PROTOCOL 생태계에 가입하려면 온체인에 등록하세요.",
     "referrerLabel": "추천인",
     "referrerPlaceholder": "0x... 추천인 주소",
     "referrerVerified": "링크에서 추천인이 확인되었습니다",
@@ -594,6 +594,30 @@
     "stakingEarnings": "스테이킹 수익",
     "harvestedLabel": "수확됨",
     "harvestableLabel": "수확 가능"
+  },
+  "p2pHistory": {
+    "title": "P2P 주문 기록",
+    "subtitle": "모든 P2P 주문에 대한 전체 거래 내역",
+    "totalOrders": "주문 {count}건",
+    "placed": "등록됨",
+    "executed": "체결됨",
+    "canceled": "취소됨",
+    "totalTrades": "거래",
+    "filterAll": "전체",
+    "loading": "주문 기록 불러오는 중...",
+    "noOrders": "아직 P2P 주문이 없습니다",
+    "noOrdersDesc": "거래소 페이지에서 매수 또는 매도 주문을 생성하면 기록이 표시됩니다.",
+    "trade": "거래 {count}건",
+    "originalAmount": "원래 수량",
+    "filledAmount": "체결됨",
+    "remainingAmount": "잔여",
+    "fillProgress": "체결 진행률",
+    "executionHistory": "체결 내역",
+    "asRole": "{role} 역할",
+    "roleBuyer": "매수자",
+    "roleSeller": "매도자",
+    "price": "가격",
+    "noTradesYet": "이 주문에 대한 체결 내역이 아직 없습니다"
   },
   "faucet": {
     "testnetFaucet": "테스트넷 파셋 · 모의 USDT",

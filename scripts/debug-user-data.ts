@@ -64,7 +64,7 @@ async function main() {
   const userAddr = wallet.address;
 
   console.log("═══════════════════════════════════════════════════════════");
-  console.log("  KAIRO DAO — Full User Data Debug");
+  console.log("  KAIRO PROTOCOL — Full User Data Debug");
   console.log("═══════════════════════════════════════════════════════════");
   console.log(`  User Address : ${userAddr}`);
   console.log(`  RPC          : ${RPC}`);

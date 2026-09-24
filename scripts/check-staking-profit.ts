@@ -8,7 +8,7 @@
  *   Source 2: Frontend  -> recomputed locally using the EXACT logic from
  *                          frontend/src/hooks/useUserStakes.ts
  *                          (calcPendingProfit + harvestable + totalEarned)
- *   Source 3: Backend   -> GET https://dev.kairodao.com/api/v1/user/<wallet>/dashboard
+ *   Source 3: Backend   -> GET https://dev.kairoprotocol.com/api/v1/user/<wallet>/dashboard
  *
  * Run:
  *   npx ts-node scripts/check-staking-profit.ts 0x8498835c2EC0eab789997bE99542fb831d33CE57
@@ -23,7 +23,7 @@ import 'dotenv/config';
 const RPC_URL = process.env.OPBNB_TESTNET_RPC || 'https://opbnb-testnet-rpc.bnbchain.org';
 const STAKING_MANAGER = '0x5eADF2F4Ac87EAa2fAA5aBCA74BBab98bC7B843f';
 const AFFILIATE_DISTRIBUTOR = '0x530Ade1d4E3E757214E3E2bc0633b973621216F9';
-const BACKEND_URL = process.env.BACKEND_URL || 'https://dev.kairodao.com';
+const BACKEND_URL = process.env.BACKEND_URL || 'https://dev.kairoprotocol.com';
 const USDT_DECIMALS = 18;
 
 // Mirror `STAKING_TIERS` in frontend/src/config/contracts.ts (IS_TESTNET branch).

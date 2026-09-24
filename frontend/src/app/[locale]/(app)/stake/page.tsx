@@ -34,7 +34,7 @@ function getCompoundTier(amount: number) {
   return COMPOUND_TIERS[0];
 }
 
-const DURATION_OPTIONS = [1, 3, 6, 9, 12, 15, 18, 21, 24] as const;
+const DURATION_OPTIONS = [1, 3, 6, 9, 12] as const;
 const DAILY_RATE = 0.0015; // 0.15% per compound
 
 function CompoundingCalculator() {
@@ -89,7 +89,7 @@ function CompoundingCalculator() {
         <input
           type="range"
           min={1}
-          max={24}
+          max={12}
           step={1}
           value={duration}
           onChange={(e) => setDuration(Number(e.target.value))}

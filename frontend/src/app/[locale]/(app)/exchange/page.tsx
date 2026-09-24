@@ -5,6 +5,7 @@ import { useAccount } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { GlassCard, Button, Input, Tabs, TabContent } from '@/components/ui';
 import { FillOrderModal } from '@/components/p2p/FillOrderModal';
+import { P2POrderHistory } from '@/components/p2p/P2POrderHistory';
 import { useP2P, P2PBuyOrder, P2PSellOrder } from '@/hooks/useP2P';
 import { useApproval } from '@/hooks/useApproval';
 import { useTokenBalances } from '@/hooks/useTokenBalances';
@@ -39,6 +40,7 @@ export default function ExchangePage() {
   const pendingFillIdRef = useRef<bigint>(0n);
   const pendingFillAmountRef = useRef<bigint>(0n);
   const t = useTranslations('p2p');
+  const tHistory = useTranslations('p2pHistory');
 
   // ── Partial-fill modal state ──
   const [fillModalOpen, setFillModalOpen] = useState(false);
@@ -187,6 +189,7 @@ export default function ExchangePage() {
           { value: 'book', label: t('orderBook') },
           { value: 'create', label: t('createOrder') },
           { value: 'my', label: `${t('myOrders')} (${myBuyOrders.length + mySellOrders.length})` },
+          { value: 'history', label: tHistory('title') },
         ]}
         value={tab}
         onValueChange={setTab}
@@ -454,6 +457,10 @@ export default function ExchangePage() {
               )}
             </>
           )}
+        </TabContent>
+
+        <TabContent value="history">
+          <P2POrderHistory />
         </TabContent>
       </Tabs>
 

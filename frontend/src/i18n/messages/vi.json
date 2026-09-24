@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "title": "KAIRO DAO | Hệ sinh thái tài chính Aurora",
+    "title": "KAIRO PROTOCOL | Hệ sinh thái tài chính Aurora",
     "description": "Stake, giao dịch, nhận phần thưởng và mở rộng mạng lưới của bạn với KAIRO — giao thức DeFi thế hệ mới trên opBNB.",
     "ogLocale": "vi_VN"
   },
@@ -35,7 +35,7 @@
   },
   "landing": {
     "getStarted": "Bắt đầu",
-    "getStartedDescription": "Kết nối ví của bạn để truy cập Hệ sinh thái tài chính Aurora KAIRO DAO.",
+    "getStartedDescription": "Kết nối ví của bạn để truy cập Hệ sinh thái tài chính Aurora KAIRO PROTOCOL.",
     "verifiedContracts": "Hợp đồng thông minh đã xác minh",
     "verifiedContractsDescription": "Tất cả hợp đồng đã được xác minh và mã nguồn mở trên {network}.",
     "checkingAccount": "Đang kiểm tra tài khoản của bạn..."
@@ -331,7 +331,7 @@
     "contracts": "Hợp đồng đã xác minh",
     "docs": "Tài liệu",
     "community": "Cộng đồng",
-    "copyright": "© 2026 KAIRO DAO. Mọi quyền được bảo lưu."
+    "copyright": "© 2026 KAIRO PROTOCOL. Mọi quyền được bảo lưu."
   },
   "language": {
     "switchLabel": "Ngôn ngữ",
@@ -366,12 +366,12 @@
     "rankHolders": "Người giữ hạng"
   },
   "register": {
-    "title": "Tham gia KAIRO DAO",
-    "connectPrompt": "Kết nối ví của bạn để bắt đầu với Hệ sinh thái KAIRO DAO.",
+    "title": "Tham gia KAIRO PROTOCOL",
+    "connectPrompt": "Kết nối ví của bạn để bắt đầu với Hệ sinh thái KAIRO PROTOCOL.",
     "checkingStatus": "Đang kiểm tra trạng thái đăng ký...",
     "registering": "Đang đăng ký...",
     "registerButton": "Đăng ký trên Blockchain",
-    "formPrompt": "Đăng ký trên chain để tham gia Hệ sinh thái KAIRO DAO.",
+    "formPrompt": "Đăng ký trên chain để tham gia Hệ sinh thái KAIRO PROTOCOL.",
     "referrerLabel": "Được giới thiệu bởi",
     "referrerPlaceholder": "0x... địa chỉ người giới thiệu",
     "referrerVerified": "Người giới thiệu đã xác minh từ liên kết của bạn",
@@ -594,6 +594,30 @@
     "stakingEarnings": "Thu nhập staking",
     "harvestedLabel": "Đã thu hoạch",
     "harvestableLabel": "Có thể thu hoạch"
+  },
+  "p2pHistory": {
+    "title": "Lịch sử lệnh P2P",
+    "subtitle": "Nhật ký giao dịch đầy đủ cho tất cả lệnh P2P của bạn",
+    "totalOrders": "{count} lệnh",
+    "placed": "Đã đặt",
+    "executed": "Đã khớp",
+    "canceled": "Đã hủy",
+    "totalTrades": "Giao dịch",
+    "filterAll": "Tất cả",
+    "loading": "Đang tải lịch sử lệnh...",
+    "noOrders": "Chưa có lệnh P2P nào",
+    "noOrdersDesc": "Tạo lệnh mua hoặc bán trên trang Exchange để xem lịch sử của bạn.",
+    "trade": "{count} giao dịch",
+    "originalAmount": "Số lượng ban đầu",
+    "filledAmount": "Đã khớp",
+    "remainingAmount": "Còn lại",
+    "fillProgress": "Tiến độ khớp lệnh",
+    "executionHistory": "Lịch sử khớp lệnh",
+    "asRole": "với vai trò {role}",
+    "roleBuyer": "người mua",
+    "roleSeller": "người bán",
+    "price": "Giá",
+    "noTradesYet": "Chưa có giao dịch nào được khớp cho lệnh này"
   },
   "faucet": {
     "testnetFaucet": "Vòi Testnet · USDT giả",

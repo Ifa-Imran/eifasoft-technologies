@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "title": "KAIRO DAO | Ekosistem Kewangan Aurora",
+    "title": "KAIRO PROTOCOL | Ekosistem Kewangan Aurora",
     "description": "Stake, dagang, peroleh ganjaran, dan kembangkan rangkaian anda dengan KAIRO — protokol DeFi generasi baharu di opBNB.",
     "ogLocale": "ms_MY"
   },
@@ -35,7 +35,7 @@
   },
   "landing": {
     "getStarted": "Mula",
-    "getStartedDescription": "Sambungkan dompet anda untuk mengakses Ekosistem Kewangan Aurora KAIRO DAO.",
+    "getStartedDescription": "Sambungkan dompet anda untuk mengakses Ekosistem Kewangan Aurora KAIRO PROTOCOL.",
     "verifiedContracts": "Kontrak Pintar Disahkan",
     "verifiedContractsDescription": "Semua kontrak telah disahkan dan bersumber terbuka di {network}.",
     "checkingAccount": "Menyemak akaun anda..."
@@ -331,7 +331,7 @@
     "contracts": "Kontrak Disahkan",
     "docs": "Dokumentasi",
     "community": "Komuniti",
-    "copyright": "© 2026 KAIRO DAO. Hak cipta terpelihara."
+    "copyright": "© 2026 KAIRO PROTOCOL. Hak cipta terpelihara."
   },
   "language": {
     "switchLabel": "Bahasa",
@@ -366,12 +366,12 @@
     "rankHolders": "Pemegang Pangkat"
   },
   "register": {
-    "title": "Sertai KAIRO DAO",
-    "connectPrompt": "Sambungkan dompet anda untuk memulakan Ekosistem KAIRO DAO.",
+    "title": "Sertai KAIRO PROTOCOL",
+    "connectPrompt": "Sambungkan dompet anda untuk memulakan Ekosistem KAIRO PROTOCOL.",
     "checkingStatus": "Menyemak status pendaftaran...",
     "registering": "Mendaftarkan...",
     "registerButton": "Daftar di Blockchain",
-    "formPrompt": "Daftar on-chain untuk menyertai Ekosistem KAIRO DAO.",
+    "formPrompt": "Daftar on-chain untuk menyertai Ekosistem KAIRO PROTOCOL.",
     "referrerLabel": "Dirujuk Oleh",
     "referrerPlaceholder": "0x... alamat perujuk",
     "referrerVerified": "Perujuk disahkan dari pautan anda",
@@ -594,6 +594,30 @@
     "stakingEarnings": "Pendapatan Staking",
     "harvestedLabel": "Dituai",
     "harvestableLabel": "Boleh Dituai"
+  },
+  "p2pHistory": {
+    "title": "Sejarah Pesanan P2P",
+    "subtitle": "Log transaksi penuh untuk semua pesanan P2P anda",
+    "totalOrders": "{count} pesanan",
+    "placed": "Diletakkan",
+    "executed": "Dilaksanakan",
+    "canceled": "Dibatalkan",
+    "totalTrades": "Perdagangan",
+    "filterAll": "Semua",
+    "loading": "Memuatkan sejarah pesanan...",
+    "noOrders": "Belum ada pesanan P2P",
+    "noOrdersDesc": "Cipta pesanan beli atau jual di halaman Exchange untuk melihat sejarah anda.",
+    "trade": "{count} perdagangan",
+    "originalAmount": "Jumlah Asal",
+    "filledAmount": "Terisi",
+    "remainingAmount": "Baki",
+    "fillProgress": "Kemajuan Pengisian",
+    "executionHistory": "Sejarah Pelaksanaan",
+    "asRole": "sebagai {role}",
+    "roleBuyer": "pembeli",
+    "roleSeller": "penjual",
+    "price": "Harga",
+    "noTradesYet": "Belum ada perdagangan dilaksanakan untuk pesanan ini"
   },
   "faucet": {
     "testnetFaucet": "Paip Testnet · USDT Mock",
