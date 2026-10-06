@@ -12,9 +12,11 @@ const RPC_HTTP =
     ? 'https://opbnb-testnet-rpc.bnbchain.org'
     : 'https://opbnb-mainnet-rpc.bnbchain.org');
 
+// Default explorer is opbnbscan.com (NodeReal), where all mainnet contracts
+// are verified. Overridable via NEXT_PUBLIC_EXPLORER_URL.
 const EXPLORER =
   process.env.NEXT_PUBLIC_EXPLORER_URL ||
-  (IS_TESTNET ? 'https://opbnb-testnet.bscscan.com' : 'https://opbnb.bscscan.com');
+  (IS_TESTNET ? 'https://testnet.opbnbscan.com' : 'https://opbnbscan.com');
 
 export const opBNBMainnet = defineChain({
   id: 204,
@@ -22,7 +24,7 @@ export const opBNBMainnet = defineChain({
   nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
   rpcUrls: { default: { http: ['https://opbnb-mainnet-rpc.bnbchain.org'] } },
   blockExplorers: {
-    default: { name: 'opBNBScan', url: 'https://opbnb.bscscan.com' },
+    default: { name: 'opBNBScan', url: 'https://opbnbscan.com' },
   },
   contracts: {
     multicall3: { address: '0xcA11bde05977b3631167028862bE2a173976CA11' },
@@ -36,7 +38,7 @@ export const opBNBTestnet = defineChain({
   nativeCurrency: { name: 'tBNB', symbol: 'tBNB', decimals: 18 },
   rpcUrls: { default: { http: ['https://opbnb-testnet-rpc.bnbchain.org'] } },
   blockExplorers: {
-    default: { name: 'opBNB Testnet Scan', url: 'https://opbnb-testnet.bscscan.com' },
+    default: { name: 'opBNB Testnet Scan', url: 'https://testnet.opbnbscan.com' },
   },
   contracts: {
     multicall3: { address: '0xcA11bde05977b3631167028862bE2a173976CA11' },

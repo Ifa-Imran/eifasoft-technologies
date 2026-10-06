@@ -1,6 +1,7 @@
 'use client';
 
 import { GlassCard, StatCard, ProgressBar } from '@/components/ui';
+import { PriceCandleChart } from '@/components/analytics/PriceCandleChart';
 import { useGlobalStats } from '@/hooks/useGlobalStats';
 import { useKairoPrice } from '@/hooks/useKairoPrice';
 import { USDT_DECIMALS, KAIRO_DECIMALS } from '@/config/contracts';
@@ -69,6 +70,9 @@ export default function AnalyticsPage() {
           gradient="success"
         />
       </div>
+
+      {/* Price Candle Chart */}
+      <PriceCandleChart livePrice={price} />
 
       {/* Supply & Liquidity Info */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

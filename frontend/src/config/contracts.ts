@@ -13,9 +13,11 @@ export const contracts = {
   usdt: (process.env.NEXT_PUBLIC_USDT || '0x') as Address,
 } as const;
 
+// Default explorer is opbnbscan.com (NodeReal) — all mainnet contracts are
+// verified there with "Exact Match". Overridable via NEXT_PUBLIC_EXPLORER_URL.
 export const EXPLORER_URL =
   process.env.NEXT_PUBLIC_EXPLORER_URL ||
-  (IS_TESTNET ? 'https://opbnb-testnet.bscscan.com' : 'https://opbnb.bscscan.com');
+  (IS_TESTNET ? 'https://testnet.opbnbscan.com' : 'https://opbnbscan.com');
 
 export function getExplorerTxUrl(hash: string) {
   return `${EXPLORER_URL}/tx/${hash}`;

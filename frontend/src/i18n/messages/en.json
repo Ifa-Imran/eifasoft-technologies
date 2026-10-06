@@ -436,7 +436,11 @@
     "dexPoolComposition": "DEX pool composition",
     "kairoInPool": "KAIRO in Pool",
     "usdtInPool": "USDT in Pool",
-    "pricePerSupply": "Price (USDT / Total Supply)"
+    "pricePerSupply": "Price (USDT / Total Supply)",
+    "priceChart": "KAIRO Price Chart",
+    "priceChartSubtitle": "Time-based candles from on-chain price snapshots",
+    "chartLoading": "Loading chart…",
+    "chartNoData": "No price history available yet"
   },
   "portfolio": {
     "totalPortfolioValue": "Total Portfolio Value",
